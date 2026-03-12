@@ -1,5 +1,7 @@
 {
-  "name": "miner",
-  "hacs": "1.6.0",
-  "homeassistant": "0.118.0"
+  "name": "MSKSRV ASIC Miner",
+  "render_readme": true,
+  "content_in_root": false,
+  "domains": ["miner"],
+  "homeassistant": "2024.6.0"
 }
