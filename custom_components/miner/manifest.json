@@ -1,17 +1,17 @@
 {
   "domain": "miner",
   "name": "MSKSRV ASIC Miner",
-  "version": "1.1.0",
-  "config_flow": true
+  "codeowners": [
+    "@msksrv"
   ],
   "config_flow": true,
   "dependencies": [
     "network"
   ],
-  "documentation": "https://github.com/Schnitzel/hass-miner",
+  "documentation": "https://github.com/msksrv/msksrv-ha-miner",
   "homekit": {},
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/Schnitzel/hass-miner/issues",
+  "issue_tracker": "https://github.com/msksrv/msksrv-ha-miner/issues",
   "requirements": [
     "pyasic==0.78.9"
   ],
@@ -37,6 +37,6 @@
     { "registered_devices": true }
   ],
   "ssdp": [],
-  "version": "v1.2.7rc2",
+  "version": "1.1.0",
   "zeroconf": []
 }
