@@ -100,6 +100,75 @@ ENTITY_DESCRIPTION_KEY_MAP: dict[str, SensorEntityDescription] = {
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    "ip": SensorEntityDescription(
+        key="IP Address",
+        icon="mdi:ip-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "mac": SensorEntityDescription(
+        key="MAC Address",
+        icon="mdi:ethernet",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "model": SensorEntityDescription(
+        key="ASIC Model",
+        icon="mdi:chip",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "fw_ver": SensorEntityDescription(
+        key="Firmware",
+        icon="mdi:memory",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "uptime": SensorEntityDescription(
+        key="Uptime",
+        icon="mdi:clock-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "uptime_formatted": SensorEntityDescription(
+        key="Uptime Formatted",
+        icon="mdi:clock-time-eight-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "boards_count": SensorEntityDescription(
+        key="Boards",
+        icon="mdi:view-grid-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "pool": SensorEntityDescription(
+        key="Pool",
+        icon="mdi:server-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "pool_host": SensorEntityDescription(
+        key="Pool Host",
+        icon="mdi:server-network",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "pool_port": SensorEntityDescription(
+        key="Pool Port",
+        icon="mdi:ethernet-switch",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "accepted_shares": SensorEntityDescription(
+        key="Accepted Shares",
+        icon="mdi:check-circle-outline",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "rejected_shares": SensorEntityDescription(
+        key="Rejected Shares",
+        icon="mdi:close-circle-outline",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "reject_rate": SensorEntityDescription(
+        key="Reject Rate",
+        icon="mdi:percent",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
 }
 
 
@@ -149,14 +218,35 @@ async def async_setup_entry(
     await coordinator.async_config_entry_first_refresh()
 
     sensors = []
+
     for s in coordinator.data["miner_sensors"]:
         sensors.append(_create_miner_entity(s))
+
+    for s in [
+        "ip",
+        "mac",
+        "model",
+        "fw_ver",
+        "uptime",
+        "uptime_formatted",
+        "boards_count",
+        "pool",
+        "pool_host",
+        "pool_port",
+        "accepted_shares",
+        "rejected_shares",
+        "reject_rate",
+    ]:
+        sensors.append(_create_miner_entity(s))
+
     for board in range(coordinator.miner.expected_hashboards or 3):
         for s in ["board_temperature", "chip_temperature", "board_hashrate"]:
             sensors.append(_create_board_entity(board, s))
+
     for fan in range(coordinator.miner.expected_fans or 4):
         for s in ["fan_speed"]:
             sensors.append(_create_fan_entity(fan, s))
+
     async_add_entities(sensors)
 
 
@@ -181,7 +271,10 @@ class MinerSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
     def _sensor_data(self):
         """Return sensor data."""
         try:
-            return self.coordinator.data["miner_sensors"][self._sensor]
+            if self._sensor in self.coordinator.data["miner_sensors"]:
+                return self.coordinator.data["miner_sensors"][self._sensor]
+
+            return self.coordinator.data.get(self._sensor)
         except LookupError:
             return None
 
