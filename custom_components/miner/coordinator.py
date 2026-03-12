@@ -33,8 +33,35 @@ from .const import CONF_WEB_USERNAME
 
 _LOGGER = logging.getLogger(__name__)
 
-# Matches iotwatt data log interval
 REQUEST_REFRESH_DEFAULT_COOLDOWN = 5
+
+
+def _format_uptime(value) -> str | None:
+    """Format uptime seconds to human readable string."""
+    try:
+        total_seconds = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    if total_seconds < 60:
+        return f"{total_seconds}s"
+
+    days, remainder = divmod(total_seconds, 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    if seconds and not days:
+        parts.append(f"{seconds}s")
+
+    return " ".join(parts) if parts else "0s"
+
 
 DEFAULT_DATA = {
     "hostname": None,
@@ -44,6 +71,15 @@ DEFAULT_DATA = {
     "ip": None,
     "is_mining": False,
     "fw_ver": None,
+    "uptime": None,
+    "uptime_formatted": None,
+    "boards_count": 0,
+    "pool": None,
+    "pool_host": None,
+    "pool_port": None,
+    "accepted_shares": 0,
+    "rejected_shares": 0,
+    "reject_rate": 0,
     "miner_sensors": {
         "hashrate": 0,
         "ideal_hashrate": 0,
@@ -95,6 +131,7 @@ class MinerCoordinator(DataUpdateCoordinator):
             return None
 
         self.miner = miner
+
         if self.miner.api is not None:
             if self.miner.api.pwd is not None:
                 self.miner.api.pwd = self.config_entry.data.get(CONF_RPC_PASSWORD, "")
@@ -106,11 +143,11 @@ class MinerCoordinator(DataUpdateCoordinator):
         if self.miner.ssh is not None:
             self.miner.ssh.username = self.config_entry.data.get(CONF_SSH_USERNAME, "")
             self.miner.ssh.pwd = self.config_entry.data.get(CONF_SSH_PASSWORD, "")
+
         return self.miner
 
     async def _async_update_data(self):
         """Fetch sensors from miners."""
-
         miner = await self.get_miner()
 
         if miner is None:
@@ -130,9 +167,6 @@ class MinerCoordinator(DataUpdateCoordinator):
 
             raise UpdateFailed("Miner Offline (consecutive failure)")
 
-        # At this point, miner is valid
-        _LOGGER.debug(f"Found miner: {self.miner}")
-
         try:
             miner_data = await self.miner.get_data(
                 include=[
@@ -147,6 +181,8 @@ class MinerCoordinator(DataUpdateCoordinator):
                     pyasic.DataOptions.WATTAGE_LIMIT,
                     pyasic.DataOptions.FANS,
                     pyasic.DataOptions.CONFIG,
+                    pyasic.DataOptions.POOLS,
+                    pyasic.DataOptions.UPTIME,
                 ]
             )
         except Exception as err:
@@ -167,25 +203,63 @@ class MinerCoordinator(DataUpdateCoordinator):
             _LOGGER.exception(err)
             raise UpdateFailed from err
 
-        _LOGGER.debug(f"Got data: {miner_data}")
-
-        # Success: reset the failure count
         self._failure_count = 0
 
         try:
             hashrate = round(float(miner_data.hashrate), 2)
-        except TypeError:
+        except (TypeError, ValueError):
             hashrate = None
 
         try:
             expected_hashrate = round(float(miner_data.expected_hashrate), 2)
-        except TypeError:
+        except (TypeError, ValueError):
             expected_hashrate = None
 
         try:
             active_preset = miner_data.config.mining_mode.active_preset.name
         except AttributeError:
             active_preset = None
+
+        try:
+            uptime = miner_data.uptime
+        except AttributeError:
+            uptime = None
+
+        uptime_formatted = _format_uptime(uptime)
+
+        try:
+            boards_count = len(miner_data.hashboards)
+        except Exception:
+            boards_count = 0
+
+        pool = None
+        pool_host = None
+        pool_port = None
+        accepted = None
+        rejected = None
+
+        try:
+            first_pool = miner_data.pools[0]
+            pool = getattr(first_pool, "url", None)
+            accepted = getattr(first_pool, "accepted", None)
+            rejected = getattr(first_pool, "rejected", None)
+
+            if pool:
+                pool_no_proto = str(pool).replace("stratum+tcp://", "").replace(
+                    "stratum+ssl://", ""
+                )
+                if ":" in pool_no_proto:
+                    pool_host, pool_port = pool_no_proto.rsplit(":", 1)
+                else:
+                    pool_host = pool_no_proto
+                    pool_port = None
+        except Exception:
+            pass
+
+        try:
+            reject_rate = round((float(rejected) / float(accepted)) * 100, 2) if accepted else 0
+        except Exception:
+            reject_rate = 0
 
         data = {
             "hostname": miner_data.hostname,
@@ -195,6 +269,15 @@ class MinerCoordinator(DataUpdateCoordinator):
             "ip": self.miner.ip,
             "is_mining": miner_data.is_mining,
             "fw_ver": miner_data.fw_ver,
+            "uptime": uptime,
+            "uptime_formatted": uptime_formatted,
+            "boards_count": boards_count,
+            "pool": pool,
+            "pool_host": pool_host,
+            "pool_port": pool_port,
+            "accepted_shares": accepted,
+            "rejected_shares": rejected,
+            "reject_rate": reject_rate,
             "miner_sensors": {
                 "hashrate": hashrate,
                 "ideal_hashrate": expected_hashrate,
