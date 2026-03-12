@@ -1,8 +1,8 @@
 {
   "domain": "miner",
-  "name": "Miner",
-  "codeowners": [
-    "@Schnitzel"
+  "name": "MSKSRV ASIC Miner",
+  "version": "1.1.0",
+  "config_flow": true
   ],
   "config_flow": true,
   "dependencies": [
