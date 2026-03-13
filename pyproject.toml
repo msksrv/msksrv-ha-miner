@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "hass-miner"
+version = "1.1.19"
+description = ""
+authors = ["msksrv"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.13.2.0,<3.14"
+homeassistant = "^2025.7.3"
+colorlog = "^6.9.0"
+ruff = "^0.12.5"
+pyasic = "^0.78.9"
+setuptools = "^80.9.0"
+pre-commit = "^4.2.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

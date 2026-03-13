@@ -1,0 +1,39 @@
+{
+  "domain": "miner",
+  "name": "Miner",
+  "codeowners": [
+    "@msksrv"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "network"
+  ],
+  "documentation": "https://github.com/msksrv/msksrv-ha-miner",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/msksrv/msksrv-ha-miner/issues",
+  "requirements": [
+    "pyasic==0.78.9"
+  ],
+  "dhcp": [
+    { "hostname": "WhatsMiner*" },
+    { "hostname": "whatsminer*" },
+    { "hostname": "Antminer*" },
+    { "hostname": "antminer*" },
+    { "hostname": "Avalon*" },
+    { "hostname": "avalon*" },
+    { "hostname": "Innosilicon*" },
+    { "hostname": "innosilicon*" },
+    { "hostname": "Goldshell*" },
+    { "hostname": "goldshell*" },
+    { "hostname": "Auradine*" },
+    { "hostname": "auradine*" },
+    { "hostname": "BitAxe*" },
+    { "hostname": "bitaxe*" },
+    { "hostname": "IceRiver*" },
+    { "hostname": "iceriver*" },
+    { "hostname": "Hammer*" },
+    { "hostname": "hammer*" },
+    { "registered_devices": true }
+  ],
+  "version": "1.1.0"
+}

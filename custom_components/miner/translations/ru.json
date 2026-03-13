@@ -1,0 +1,43 @@
+{
+  "title": "HASS-miner",
+  "config": {
+    "flow_title": "{name}",  
+    "step": {
+      "user": {
+        "data": {
+          "ip": "IP-адрес",
+          "min_power": "Минимальная мощность (Вт)",
+          "max_power": "Максимальная мощность (Вт)"
+        }
+      },
+      "login": {
+        "data": {
+          "ssh_username": "Имя пользователя SSH",
+          "ssh_password": "Пароль SSH",
+          "rpc_password": "Пароль RPC",
+          "web_username": "Имя пользователя веб-интерфейса",
+          "web_password": "Пароль веб-интерфейса"
+        }
+      },
+      "title": {
+        "data": {
+          "title": "Название устройства"
+        }
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
+      "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]"
+    }
+  },
+  "services": {
+    "reboot": {
+      "name": "Перезагрузить майнер",
+      "description": "Перезагружает майнер."
+    },
+    "restart_backend": {
+      "name": "Перезапустить майнинг",
+      "description": "Перезапускает процесс майнинга на майнере."
+    }
+  }
+}
