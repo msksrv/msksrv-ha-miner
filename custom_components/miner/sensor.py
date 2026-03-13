@@ -120,24 +120,14 @@ ENTITY_DESCRIPTION_KEY_MAP: dict[str, SensorEntityDescription] = {
         icon="mdi:memory",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "uptime": SensorEntityDescription(
-        key="Uptime",
-        icon="mdi:clock-outline",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
     "uptime_formatted": SensorEntityDescription(
-        key="Uptime Formatted",
+        key="Uptime",
         icon="mdi:clock-time-eight-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "boards_count": SensorEntityDescription(
         key="Boards",
         icon="mdi:view-grid-outline",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    "pool": SensorEntityDescription(
-        key="Pool",
-        icon="mdi:server-network",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "pool_host": SensorEntityDescription(
@@ -147,7 +137,7 @@ ENTITY_DESCRIPTION_KEY_MAP: dict[str, SensorEntityDescription] = {
     ),
     "pool_port": SensorEntityDescription(
         key="Pool Port",
-        icon="mdi:ethernet-switch",
+        icon="mdi:numeric",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "accepted_shares": SensorEntityDescription(
@@ -227,10 +217,8 @@ async def async_setup_entry(
         "mac",
         "model",
         "fw_ver",
-        "uptime",
         "uptime_formatted",
         "boards_count",
-        "pool",
         "pool_host",
         "pool_port",
         "accepted_shares",
