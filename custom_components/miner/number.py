@@ -2,20 +2,8 @@
 from __future__ import annotations
 
 import logging
-from importlib.metadata import version
 
-from .const import PYASIC_VERSION
-
-try:
-    import pyasic
-
-    if not version("pyasic") == PYASIC_VERSION:
-        raise ImportError
-except ImportError:
-    from .patch import install_package
-
-    install_package(f"pyasic=={PYASIC_VERSION}")
-    import pyasic
+import pyasic
 
 from homeassistant.components.number import NumberEntityDescription, NumberDeviceClass
 from homeassistant.components.number import NumberEntity

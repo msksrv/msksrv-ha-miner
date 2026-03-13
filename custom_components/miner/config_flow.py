@@ -2,43 +2,26 @@
 from __future__ import annotations
 
 import logging
-from importlib.metadata import version
 
+import pyasic
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.components import network
 from homeassistant.const import CONF_HOST
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.config_entry_flow import register_discovery_flow
-from homeassistant.helpers.selector import TextSelector
-from homeassistant.helpers.selector import TextSelectorConfig
-from homeassistant.helpers.selector import TextSelectorType
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
-from .const import CONF_IP
-from .const import CONF_MAX_POWER
-from .const import CONF_MIN_POWER
-from .const import CONF_RPC_PASSWORD
-from .const import CONF_SSH_PASSWORD
-from .const import CONF_SSH_USERNAME
-from .const import CONF_TITLE
-from .const import CONF_WEB_PASSWORD
-from .const import CONF_WEB_USERNAME
-from .const import DOMAIN
-from .const import PYASIC_VERSION
-
-try:
-    import pyasic
-
-    if version("pyasic") != PYASIC_VERSION:
-        raise ImportError
-except ImportError:
-    from .patch import install_package
-
-    install_package(f"pyasic=={PYASIC_VERSION}")
-    import pyasic
-
-from pyasic import MinerNetwork
+from .const import (
+    CONF_IP,
+    CONF_MAX_POWER,
+    CONF_MIN_POWER,
+    CONF_RPC_PASSWORD,
+    CONF_SSH_PASSWORD,
+    CONF_SSH_USERNAME,
+    CONF_TITLE,
+    CONF_WEB_PASSWORD,
+    CONF_WEB_USERNAME,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -87,24 +70,6 @@ def _normalize_model_name(miner) -> str:
         return raw_model or raw_make or raw_type or "Miner"
     except Exception:
         return "Miner"
-
-
-async def _async_has_devices(hass: HomeAssistant) -> bool:
-    """Return if there are devices that can be discovered."""
-    adapters = await network.async_get_adapters(hass)
-
-    for adapter in adapters:
-        for ip_info in adapter["ipv4"]:
-            local_ip = ip_info["address"]
-            network_prefix = ip_info["network_prefix"]
-            miner_net = MinerNetwork.from_subnet(f"{local_ip}/{network_prefix}")
-            miners = await miner_net.scan()
-            if len(miners) > 0:
-                return True
-    return False
-
-
-register_discovery_flow(DOMAIN, "miner", _async_has_devices)
 
 
 async def validate_ip_input(

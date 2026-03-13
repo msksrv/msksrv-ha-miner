@@ -1,29 +1,13 @@
-"""The Miner integration."""
+"""MSKSRV ASIC Miner integration."""
 from __future__ import annotations
 
-
-from importlib.metadata import version
-
-from .const import PYASIC_VERSION
-
-try:
-    import pyasic
-
-    if version("pyasic") != PYASIC_VERSION:
-        raise ImportError
-except ImportError:
-    from .patch import install_package
-
-    install_package(f"pyasic=={PYASIC_VERSION}")
-    import pyasic
-
+import pyasic
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
-from .const import CONF_IP
-from .const import DOMAIN
+from .const import CONF_IP, DOMAIN
 from .coordinator import MinerCoordinator
 from .services import async_setup_services
 
@@ -34,24 +18,33 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
 ]
 
+_SERVICES_SETUP = "services_setup"
+
+
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the Miner integration (global)."""
+    hass.data.setdefault(DOMAIN, {})
+
+    if not hass.data[DOMAIN].get(_SERVICES_SETUP):
+        await async_setup_services(hass)
+        hass.data[DOMAIN][_SERVICES_SETUP] = True
+
+    return True
+
 
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up Miner from a config entry."""
-
     miner_ip = config_entry.data[CONF_IP]
     miner = await pyasic.get_miner(miner_ip)
 
     if miner is None:
         raise ConfigEntryNotReady("Miner could not be found.")
 
-    m_coordinator = MinerCoordinator(hass, config_entry)
-    hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = m_coordinator
+    coordinator = MinerCoordinator(hass, config_entry)
+    hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
 
-    await m_coordinator.async_config_entry_first_refresh()
-
+    await coordinator.async_config_entry_first_refresh()
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
-
-    await async_setup_services(hass)
 
     return True
 
@@ -62,6 +55,6 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
         config_entry, PLATFORMS
     )
     if unload_ok:
-        hass.data[DOMAIN].pop(config_entry.entry_id)
+        hass.data[DOMAIN].pop(config_entry.entry_id, None)
 
     return unload_ok
