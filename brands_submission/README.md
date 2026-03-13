@@ -1,41 +1,42 @@
 # Submit these brand assets to Home Assistant for HACS icon
 
-To show the **MSKSRV ASIC Miner** icon in the HACS store and in the HA integrations panel (when not using local brand folder), add them to the official brands repo.
+To show the **MSKSRV ASIC Miner** icon in the HACS store, add them to the official brands repo (one-time).
 
-## Steps
+## Быстрый способ (GitHub UI)
 
-1. **Fork** [home-assistant/brands](https://github.com/home-assistant/brands).
+1. Открой **https://github.com/home-assistant/brands**.
+2. Нажми **Fork** (создай форк под своим аккаунтом).
+3. В своём форке зайди в папку **`custom_integrations`**.
+4. Нажми **Add file → Create new file**.
+5. Имя файла: **`miner/icon.png`** (папка создастся автоматически).
+6. Вставь содержимое файла **`brands_submission/custom_integrations/miner/icon.png`** (скачай из этого репо или открой локально и перетащи в браузер — GitHub позволит загрузить бинарный файл через drag-and-drop при создании).
+7. Нажми **Commit new file**.
+8. Аналогично создай **`miner/logo.png`** (в той же папке `miner`).
+9. Открой **Pull request** из своего форка в **home-assistant/brands**, ветка **master**. Заголовок: **Add miner custom integration brand (MSKSRV ASIC Miner)**.
 
-2. **Clone your fork** and create a branch:
+## Через Git (если удобнее)
+
+1. **Форкни** [home-assistant/brands](https://github.com/home-assistant/brands).
+2. **Клонируй свой форк** и зайди в папку:
    ```bash
    git clone https://github.com/YOUR_USERNAME/brands.git
    cd brands
+   ```
+3. **Создай ветку и скопируй файлы** (из папки с репо msksrv-ha-miner):
+   ```bash
    git checkout -b add-miner-custom-integration
-   ```
-
-3. **Copy the miner brand folder** into the repo:
-   ```bash
-   cp -r brands_submission/custom_integrations/miner custom_integrations/
-   ```
-   Or on Windows (PowerShell):
-   ```powershell
-   Copy-Item -Recurse brands_submission\custom_integrations\miner custom_integrations\
-   ```
-
-4. **Commit and push** to your fork:
-   ```bash
+   mkdir -p custom_integrations/miner
+   cp /path/to/msksrv-ha-miner/brands_submission/custom_integrations/miner/* custom_integrations/miner/
    git add custom_integrations/miner
    git commit -m "Add miner custom integration brand (MSKSRV ASIC Miner)"
    git push origin add-miner-custom-integration
    ```
+4. **Открой PR**: https://github.com/home-assistant/brands/compare — выбери свой форк и ветку `add-miner-custom-integration`.
 
-5. **Open a Pull Request** on [home-assistant/brands](https://github.com/home-assistant/brands/compare) from your branch to `master`.  
-   Title example: `Add miner custom integration brand (MSKSRV ASIC Miner)`.
+## Требования (home-assistant/brands)
 
-## Requirements (from home-assistant/brands)
+- `icon.png`: 256×256 px (или 512×512 для `icon@2x.png`).
+- `logo.png`: короткая сторона 128–256 px.
+- PNG, прозрачный фон предпочтителен.
 
-- `icon.png`: 256×256 px (or 512×512 for `icon@2x.png`).
-- `logo.png`: shortest side 128–256 px (or 256–512 for `logo@2x.png`).
-- PNG, transparent background preferred.
-
-Once the PR is merged, HACS and the brands CDN will serve this icon for the `miner` integration.
+После мержа PR иконка будет подхватываться HACS и CDN брендов для интеграции `miner`.
