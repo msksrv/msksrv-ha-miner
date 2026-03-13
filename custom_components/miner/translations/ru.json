@@ -1,13 +1,38 @@
 {
-  "title": "HASS-miner",
+  "title": "MSKSRV ASIC Miner",
   "config": {
-    "flow_title": "{name}",  
+    "flow_title": "{name}",
     "step": {
       "user": {
+        "menu_options": {
+          "scan": "Сканировать локальную сеть",
+          "manual": "Ввести IP вручную"
+        },
+        "menu_option_descriptions": {
+          "scan": "Поиск майнеров в локальной подсети",
+          "manual": "Подключение к майнеру по IP-адресу"
+        }
+      },
+      "scan": {
+        "title": "Сканирование локальной сети",
+        "data": {
+          "subnet": "Подсеть (CIDR)",
+          "min_power": "Минимальная мощность (Вт)",
+          "max_power": "Максимальная мощность (Вт)"
+        }
+      },
+      "manual": {
+        "title": "Ручная настройка",
         "data": {
           "ip": "IP-адрес",
           "min_power": "Минимальная мощность (Вт)",
           "max_power": "Максимальная мощность (Вт)"
+        }
+      },
+      "pick_miner": {
+        "title": "Выбор майнера",
+        "data": {
+          "selected_miner": "Найденный майнер"
         }
       },
       "login": {
@@ -25,9 +50,18 @@
         }
       }
     },
+    "progress": {
+      "network_scan": "Сканирование локальной сети на наличие майнеров"
+    },
+    "error": {
+      "cannot_connect": "Не удалось подключиться к майнеру",
+      "invalid_subnet": "Некорректная подсеть. Используй IPv4 CIDR, например 192.168.1.0/24",
+      "scan_failed": "Ошибка сканирования сети"
+    },
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
-      "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]"
+      "no_devices_found": "Майнеры не найдены",
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
   "services": {
@@ -38,6 +72,10 @@
     "restart_backend": {
       "name": "Перезапустить майнинг",
       "description": "Перезапускает процесс майнинга на майнере."
+    },
+    "set_work_mode": {
+      "name": "Установить режим работы майнера",
+      "description": "Устанавливает режим работы (низкий, нормальный, высокий) на майнере."
     }
   }
 }

@@ -6,13 +6,49 @@
 
 Advanced monitoring and control of **ASIC Bitcoin miners** directly from **Home Assistant**.
 
-Perfect for:
+---
 
-- Heat reuse
-- Solar mining
-- Automated power management
+# What it does
+
+## Discovery & setup
+
+- **DHCP discovery** — automatic discovery of miners by hostname (Antminer, WhatsMiner, Avalon, Goldshell, etc.)
+- **Network scan** — scan local subnet for miners with smart default subnet detection (hostname, outbound IP, prioritizes LAN ranges, deprioritizes Docker)
+- **Manual setup** — add a miner by IP address
+- **Credentials** — optional RPC, web, and SSH credentials for full control
+
+## Monitoring
+
+- **Hashrate** — current and ideal hashrate (TH/s)
+- **Power** — consumption (W), power limit, efficiency (J/TH)
+- **Temperature** — miner average, per-board, per-chip
+- **Fans** — speed per fan (RPM)
+- **Pool** — host, port, accepted/rejected shares, reject rate
+- **Device info** — model, firmware, uptime, boards count, IP, MAC
+- **Board diagnostics** — per-board temperature, chip temp, board hashrate
+
+## Control
+
+- **Power limit** — set wattage limit (number entity) where supported
+- **Power mode** — select Low / Normal / High (select entity) where supported
+- **Start/Stop mining** — switch to pause or resume mining where supported
+- **Reboot** — service to reboot miner
+- **Restart backend** — service to restart mining process
+- **Set work mode** — service to set low/normal/high mode (device actions)
+
+## Automation & services
+
+- **Device actions** — reboot, restart_backend, set_work_mode for automations and scripts
+- **Services** — `miner.reboot`, `miner.restart_backend`, `miner.set_work_mode` with device selector
+- **Entities** — sensor, number, switch, select platforms for dashboards and triggers
+
+## Use cases
+
+- Heat reuse integration
+- Solar mining and power management
+- Automated power/load management
 - Smart home mining integration
-- Mining farms monitoring
+- Mining farm monitoring
 
 ---
 
@@ -84,9 +120,10 @@ https://pyasic.readthedocs.io/en/latest/miners/supported_types/
 
 | Platform | Description |
 |--------|-------------|
-| `sensor` | Miner metrics |
-| `number` | Power limit control |
-| `switch` | Start / stop miner |
+| `sensor` | Miner metrics (hashrate, power, temp, fans, pool, boards, etc.) |
+| `number` | Power limit control (wattage) where autotuning is supported |
+| `switch` | Start / stop mining where shutdown is supported |
+| `select` | Power mode (Low / Normal / High) where power modes are supported |
 
 ---
 
@@ -95,7 +132,8 @@ https://pyasic.readthedocs.io/en/latest/miners/supported_types/
 | Service | Description |
 |-------|-------------|
 | `reboot` | Reboot miner |
-| `restart_backend` | Restart miner backend |
+| `restart_backend` | Restart mining process |
+| `set_work_mode` | Set work mode (low, normal, high) |
 
 ---
 

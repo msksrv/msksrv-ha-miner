@@ -1,13 +1,38 @@
 {
-  "title": "HASS-miner",
+  "title": "MSKSRV ASIC Miner",
   "config": {
-    "flow_title": "{name}",  
+    "flow_title": "{name}",
     "step": {
       "user": {
+        "menu_options": {
+          "scan": "Scan local network",
+          "manual": "Enter IP manually"
+        },
+        "menu_option_descriptions": {
+          "scan": "Search miners in the local subnet",
+          "manual": "Connect directly to a miner by IP address"
+        }
+      },
+      "scan": {
+        "title": "Scan local network",
+        "data": {
+          "subnet": "Subnet (CIDR)",
+          "min_power": "Min Power (W)",
+          "max_power": "Max Power (W)"
+        }
+      },
+      "manual": {
+        "title": "Manual setup",
         "data": {
           "ip": "IP Address",
           "min_power": "Min Power (W)",
           "max_power": "Max Power (W)"
+        }
+      },
+      "pick_miner": {
+        "title": "Select miner",
+        "data": {
+          "selected_miner": "Discovered miner"
         }
       },
       "login": {
@@ -25,9 +50,18 @@
         }
       }
     },
+    "progress": {
+      "network_scan": "Scanning local network for miners"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to miner",
+      "invalid_subnet": "Invalid subnet. Use IPv4 CIDR like 192.168.1.0/24",
+      "scan_failed": "Network scan failed"
+    },
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
-      "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]"
+      "no_devices_found": "No miners found",
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
   "services": {
@@ -38,6 +72,10 @@
     "restart_backend": {
       "name": "Restart mining on miner",
       "description": "Restarts the mining process on a miner."
+    },
+    "set_work_mode": {
+      "name": "Set work mode on miner",
+      "description": "Sets the work mode (low, normal, high) on a miner."
     }
   }
 }
