@@ -193,9 +193,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_RPC_PASSWORD,
                         default=user_input.get(
                             CONF_RPC_PASSWORD,
-                            self._miner.rpc.pwd
-                            if self._miner.api.pwd is not None
-                            else "",
+                            self._miner.rpc.pwd or "",
                         ),
                     )
                 ] = TextSelector(
