@@ -537,16 +537,17 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
     def _options_schema(
         self, user_input: dict[str, Any] | None = None
     ) -> vol.Schema:
+        """Build options schema (EntitySelector needs suggested_value, not default=None)."""
         user_input = user_input or {}
-        current = self.config_entry.options.get(CONF_POWER_SWITCH, "")
-        default_entity = user_input.get(CONF_POWER_SWITCH, current) or None
+        stored = self.config_entry.options.get(CONF_POWER_SWITCH)
+        suggested = user_input.get(CONF_POWER_SWITCH, stored)
+        optional_kwargs: dict[str, Any] = {}
+        if suggested:
+            optional_kwargs["description"] = {"suggested_value": suggested}
         return vol.Schema(
             {
-                vol.Optional(
-                    CONF_POWER_SWITCH,
-                    default=default_entity,
-                ): EntitySelector(
-                    EntitySelectorConfig(domain="switch"),
+                vol.Optional(CONF_POWER_SWITCH, **optional_kwargs): EntitySelector(
+                    EntitySelectorConfig(domain=["switch"]),
                 ),
             }
         )
