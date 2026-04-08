@@ -60,6 +60,20 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Miner options",
+        "description": "Link a smart switch that cuts power to this miner. The power-off button calls switch.turn_off on it.",
+        "data": {
+          "power_switch": "Power switch"
+        }
+      }
+    },
+    "error": {
+      "invalid_switch": "The selected entity is missing or is not a switch"
+    }
+  },
   "services": {
     "reboot": {
       "name": "Reboot miner",
@@ -79,6 +93,11 @@
     }
   },
   "entity": {
+    "button": {
+      "power_off": {
+        "name": "Power off"
+      }
+    },
     "select": {
       "pool_priority": {
         "name": "Pool priority"

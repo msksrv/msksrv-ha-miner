@@ -3,12 +3,13 @@ from __future__ import annotations
 
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
+from .const import CONF_POWER_SWITCH, DOMAIN
 from .coordinator import MinerCoordinator
 
 
@@ -20,7 +21,12 @@ async def async_setup_entry(
     """Set up Miner button entities."""
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     await coordinator.async_config_entry_first_refresh()
-    async_add_entities([MinerRebootButton(coordinator=coordinator)])
+    async_add_entities(
+        [
+            MinerRebootButton(coordinator=coordinator),
+            MinerPowerOffButton(coordinator=coordinator),
+        ]
+    )
 
 
 class MinerRebootButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
@@ -53,3 +59,62 @@ class MinerRebootButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
     @property
     def available(self) -> bool:
         return self.coordinator.available
+
+
+class MinerPowerOffButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
+    """Turn off a linked smart switch (cuts power to the miner)."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "power_off"
+    _attr_icon = "mdi:power-plug-off"
+    _attr_entity_category = EntityCategory.CONFIG
+
+    def __init__(self, coordinator: MinerCoordinator) -> None:
+        super().__init__(coordinator=coordinator)
+        self._attr_unique_id = f"{self.coordinator.data['mac']}-power-off"
+
+    @property
+    def device_info(self) -> entity.DeviceInfo:
+        return entity.DeviceInfo(
+            identifiers={(DOMAIN, self.coordinator.data["mac"])},
+            manufacturer=self.coordinator.data["make"],
+            model=self.coordinator.data["model"],
+            sw_version=self.coordinator.data["fw_ver"],
+            name=f"{self.coordinator.config_entry.title}",
+        )
+
+    @property
+    def _power_switch_entity_id(self) -> str | None:
+        eid = self.coordinator.config_entry.options.get(CONF_POWER_SWITCH)
+        return str(eid).strip() if eid else None
+
+    @property
+    def available(self) -> bool:
+        eid = self._power_switch_entity_id
+        if not eid:
+            return False
+        return self.hass.states.get(eid) is not None
+
+    async def async_added_to_hass(self) -> None:
+        """Register for config entry updates (options)."""
+        await super().async_added_to_hass()
+
+        async def _entry_updated(_hass: HomeAssistant, entry: ConfigEntry) -> None:
+            if entry.entry_id == self.coordinator.config_entry.entry_id:
+                self.async_write_ha_state()
+
+        self.async_on_remove(
+            self.coordinator.config_entry.add_update_listener(_entry_updated)
+        )
+
+    async def async_press(self) -> None:
+        """Turn off the configured power switch."""
+        eid = self._power_switch_entity_id
+        if not eid:
+            return
+        await self.hass.services.async_call(
+            "switch",
+            "turn_off",
+            {"entity_id": eid},
+            blocking=False,
+        )

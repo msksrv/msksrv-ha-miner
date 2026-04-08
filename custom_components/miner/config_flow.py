@@ -11,6 +11,9 @@ import pyasic
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
+from homeassistant.core import callback
+from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
@@ -18,6 +21,7 @@ from .const import (
     CONF_IP,
     CONF_MAX_POWER,
     CONF_MIN_POWER,
+    CONF_POWER_SWITCH,
     CONF_RPC_PASSWORD,
     CONF_SELECTED_MINER,
     CONF_SSH_PASSWORD,
@@ -66,6 +70,14 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Miner."""
 
     VERSION = 1
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> MinerOptionsFlow:
+        """Return the options flow for this integration."""
+        return MinerOptionsFlow(config_entry)
 
     def __init__(self) -> None:
         """Initialize flow state."""
@@ -485,4 +497,56 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_create_entry(
             title=self._data[CONF_TITLE],
             data=self._data,
+        )
+
+
+class MinerOptionsFlow(config_entries.OptionsFlow):
+    """Options for a Miner config entry (e.g. linked power switch)."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Manage miner options."""
+        if user_input is not None:
+            new_options = {**self.config_entry.options}
+            entity_id = user_input.get(CONF_POWER_SWITCH)
+            if entity_id:
+                registry = er.async_get(self.hass)
+                entity = registry.async_get(entity_id)
+                if entity is None or entity.domain != "switch":
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._options_schema(user_input),
+                        errors={"base": "invalid_switch"},
+                    )
+                new_options[CONF_POWER_SWITCH] = entity_id
+            else:
+                new_options.pop(CONF_POWER_SWITCH, None)
+
+            return self.async_create_entry(title="", data=new_options)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=self._options_schema(),
+        )
+
+    def _options_schema(
+        self, user_input: dict[str, Any] | None = None
+    ) -> vol.Schema:
+        user_input = user_input or {}
+        current = self.config_entry.options.get(CONF_POWER_SWITCH, "")
+        default_entity = user_input.get(CONF_POWER_SWITCH, current) or None
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_POWER_SWITCH,
+                    default=default_entity,
+                ): EntitySelector(
+                    EntitySelectorConfig(domain="switch"),
+                ),
+            }
         )

@@ -64,6 +64,20 @@
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Настройки майнера",
+        "description": "Укажите умный выключатель, который обесточивает этот майнер. Кнопка «Выключить питание» вызывает для него switch.turn_off.",
+        "data": {
+          "power_switch": "Выключатель питания"
+        }
+      }
+    },
+    "error": {
+      "invalid_switch": "Выбранная сущность не найдена или не является switch"
+    }
+  },
   "services": {
     "reboot": {
       "name": "Перезагрузить майнер",
@@ -83,6 +97,11 @@
     }
   },
   "entity": {
+    "button": {
+      "power_off": {
+        "name": "Выключить питание"
+      }
+    },
     "select": {
       "pool_priority": {
         "name": "Приоритет пула"

@@ -13,6 +13,7 @@ CONF_MIN_POWER = "min_power"
 CONF_MAX_POWER = "max_power"
 CONF_SUBNET = "subnet"
 CONF_SELECTED_MINER = "selected_miner"
+CONF_POWER_SWITCH = "power_switch"
 
 SERVICE_REBOOT = "reboot"
 SERVICE_RESTART_BACKEND = "restart_backend"
