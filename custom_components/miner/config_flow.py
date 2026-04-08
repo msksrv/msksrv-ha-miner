@@ -12,6 +12,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
+from homeassistant.core import split_entity_id
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
@@ -77,7 +78,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> MinerOptionsFlow:
         """Return the options flow for this integration."""
-        return MinerOptionsFlow(config_entry)
+        return MinerOptionsFlow()
 
     def __init__(self) -> None:
         """Initialize flow state."""
@@ -503,10 +504,6 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class MinerOptionsFlow(config_entries.OptionsFlow):
     """Options for a Miner config entry (e.g. linked power switch)."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ):
@@ -515,9 +512,13 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             new_options = {**self.config_entry.options}
             entity_id = user_input.get(CONF_POWER_SWITCH)
             if entity_id:
+                try:
+                    ent_domain, _ = split_entity_id(entity_id)
+                except ValueError:
+                    ent_domain = ""
                 registry = er.async_get(self.hass)
                 entity = registry.async_get(entity_id)
-                if entity is None or entity.domain != "switch":
+                if entity is None or ent_domain != "switch":
                     return self.async_show_form(
                         step_id="init",
                         data_schema=self._options_schema(user_input),
@@ -547,7 +548,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         return vol.Schema(
             {
                 vol.Optional(CONF_POWER_SWITCH, **optional_kwargs): EntitySelector(
-                    EntitySelectorConfig(domain=["switch"]),
+                    EntitySelectorConfig(domain="switch"),
                 ),
             }
         )
