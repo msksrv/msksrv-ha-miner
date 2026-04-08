@@ -280,6 +280,20 @@ class MinerCoordinator(DataUpdateCoordinator):
                     "board_temperature": board.temp,
                     "chip_temperature": board.chip_temp,
                     "board_hashrate": round(float(board.hashrate or 0), 2),
+                    "board_chips": board.chips,
+                    "board_expected_chips": board.expected_chips,
+                    "board_effective_chips": (
+                        min(board.chips, board.expected_chips)
+                        if board.chips is not None and board.expected_chips is not None
+                        else board.chips
+                    ),
+                    "board_effective_chips_percent": (
+                        round((board.chips / board.expected_chips) * 100, 2)
+                        if board.chips is not None
+                        and board.expected_chips is not None
+                        and board.expected_chips > 0
+                        else None
+                    ),
                 }
                 for board in miner_data.hashboards
             },

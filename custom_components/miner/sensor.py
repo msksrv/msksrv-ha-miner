@@ -74,6 +74,31 @@ ENTITY_DESCRIPTION_KEY_MAP: dict[str, SensorEntityDescription] = {
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    "board_chips": SensorEntityDescription(
+        key="Board Chips",
+        icon="mdi:chip",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "board_expected_chips": SensorEntityDescription(
+        key="Board Expected Chips",
+        icon="mdi:chip-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "board_effective_chips": SensorEntityDescription(
+        key="Board Effective Chips",
+        icon="mdi:check-decagram-outline",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "board_effective_chips_percent": SensorEntityDescription(
+        key="Board Effective Chips Percent",
+        icon="mdi:percent",
+        native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     "power_limit": SensorEntityDescription(
         key="Power Limit",
         state_class=SensorStateClass.MEASUREMENT,
@@ -228,7 +253,15 @@ async def async_setup_entry(
         sensors.append(_create_miner_entity(s))
 
     for board in range(coordinator.miner.expected_hashboards or 3):
-        for s in ["board_temperature", "chip_temperature", "board_hashrate"]:
+        for s in [
+            "board_temperature",
+            "chip_temperature",
+            "board_hashrate",
+            "board_chips",
+            "board_expected_chips",
+            "board_effective_chips",
+            "board_effective_chips_percent",
+        ]:
             sensors.append(_create_board_entity(board, s))
 
     for fan in range(coordinator.miner.expected_fans or 4):

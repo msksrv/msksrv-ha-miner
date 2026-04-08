@@ -76,6 +76,10 @@
     "set_work_mode": {
       "name": "Set work mode on miner",
       "description": "Sets the work mode (low, normal, high) on a miner."
+    },
+    "set_pool": {
+      "name": "Set pool on miner",
+      "description": "Select an existing pool or set host/port manually and apply."
     }
   }
 }
