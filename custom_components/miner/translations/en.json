@@ -81,5 +81,12 @@
       "name": "Set pool on miner",
       "description": "Select an existing pool or set host/port manually and apply."
     }
+  },
+  "entity": {
+    "select": {
+      "pool_priority": {
+        "name": "Pool priority"
+      }
+    }
   }
 }
