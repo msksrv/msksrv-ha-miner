@@ -37,7 +37,6 @@ from .const import (
     CONF_POWER_SWITCH,
     CONF_RPC_PASSWORD,
     CONF_SELECTED_MINER,
-    CONF_SIDEBAR_PANEL,
     CONF_SSH_PASSWORD,
     CONF_SSH_USERNAME,
     CONF_SUBNET,
@@ -743,8 +742,6 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 new_options[CONF_POWER_SWITCH] = entity_id
             else:
                 new_options.pop(CONF_POWER_SWITCH, None)
-            new_options[CONF_SIDEBAR_PANEL] = bool(user_input.get(CONF_SIDEBAR_PANEL))
-
             entry_id = self.config_entry.entry_id
             coordinator = self.hass.data.get(DOMAIN, {}).get(entry_id)
             if pool_action != "none" and port_int is not None:
@@ -954,7 +951,6 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 new_options = {**self.config_entry.options}
                 new_options[CONF_FARM_AMBIENT_TEMP_ENTITIES] = list(ents)
                 new_options[CONF_FARM_POOL_PRESETS] = new_slots
-                new_options[CONF_SIDEBAR_PANEL] = bool(user_input.get(CONF_SIDEBAR_PANEL))
                 strip_legacy_farm_pool_keys(new_options)
 
                 new_data = {**self.config_entry.data, CONF_FARM_DEVICE_IDS: devices}
@@ -1078,17 +1074,6 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             ): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
         }
         fields.update(self._farm_pool_slots_vol(user_input))
-        fields[
-            vol.Optional(
-                CONF_SIDEBAR_PANEL,
-                default=bool(
-                    user_input.get(
-                        CONF_SIDEBAR_PANEL,
-                        self.config_entry.options.get(CONF_SIDEBAR_PANEL, False),
-                    )
-                ),
-            )
-        ] = BooleanSelector()
         return vol.Schema(fields)
 
     def _options_schema(
@@ -1152,14 +1137,5 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                         autocomplete="new-password",
                     ),
                 ),
-                vol.Optional(
-                    CONF_SIDEBAR_PANEL,
-                    default=bool(
-                        user_input.get(
-                            CONF_SIDEBAR_PANEL,
-                            self.config_entry.options.get(CONF_SIDEBAR_PANEL, False),
-                        )
-                    ),
-                ): BooleanSelector(),
             }
         )
