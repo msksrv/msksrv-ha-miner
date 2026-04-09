@@ -80,7 +80,7 @@
     "step": {
       "farm_options": {
         "title": "Farm settings",
-        "description": "Up to 5 stratum presets per farm (each farm has its own list in its integration entry). Leave a slot's host empty to remove it. After save, presets are stored with the farm. Worker templates {{ip}} / {{ip_last}} work in each slot. On the farm device card, pick a preset and use Apply buttons.",
+        "description": "Up to 5 stratum presets per farm (each farm has its own list in its integration entry). Leave a slot's host empty to remove it. After save, presets are stored with the farm. In the worker field you can use per-miner IP tokens as documented in the integration README. On the farm device card, pick a preset and use Apply buttons.",
         "data": {
           "farm_device_ids": "Miner devices",
           "farm_ambient_temp_entities": "Temperature sensors",

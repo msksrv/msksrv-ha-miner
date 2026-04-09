@@ -84,7 +84,7 @@
     "step": {
       "farm_options": {
         "title": "Farm settings",
-        "description": "Up to 5 stratum presets per farm (each farm entry has its own list). Clear a slot's host to remove it. Use {{ip}} / {{ip_last}} in workers. Pick slot 1–5 when applying from this form; on the device card use Preset + Apply buttons.",
+        "description": "Up to 5 stratum presets per farm (each farm entry has its own list). Clear a slot's host to remove it. For worker IP placeholders, see the integration README. Pick slot 1–5 when applying from this form; on the device card use Preset + Apply buttons.",
         "data": {
           "farm_device_ids": "Miner devices",
           "farm_ambient_temp_entities": "Temperature sensors",
