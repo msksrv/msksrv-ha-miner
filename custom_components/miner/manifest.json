@@ -22,8 +22,35 @@
       "macaddress": "C80831"
     },
     {
+      "hostname": "whatsminer*"
+    },
+    {
+      "hostname": "antminer*"
+    },
+    {
+      "hostname": "avalon*"
+    },
+    {
+      "hostname": "innosilicon*"
+    },
+    {
+      "hostname": "goldshell*"
+    },
+    {
+      "hostname": "auradine*"
+    },
+    {
+      "hostname": "bitaxe*"
+    },
+    {
+      "hostname": "iceriver*"
+    },
+    {
+      "hostname": "hammer*"
+    },
+    {
       "registered_devices": true
     }
   ],
-  "version": "1.4.0b5"
+  "version": "1.4.0b6"
 }
