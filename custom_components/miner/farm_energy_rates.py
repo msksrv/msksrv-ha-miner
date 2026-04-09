@@ -122,7 +122,7 @@ def farm_electricity_schema_fields(
             NumberSelectorConfig(
                 min=0,
                 max=9999,
-                step=0.0001,
+                step="any",
                 mode="box",
             )
         )
