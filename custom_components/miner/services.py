@@ -14,9 +14,11 @@ from .const import (
     DOMAIN,
     SERVICE_REBOOT,
     SERVICE_RESTART_BACKEND,
+    SERVICE_SET_FARM_POOL,
     SERVICE_SET_POOL,
     SERVICE_SET_WORK_MODE,
 )
+from .device_resolution import async_get_farm_config_entry_for_device
 from .device_resolution import async_get_miner_config_entry_for_device
 
 LOGGER = logging.getLogger(__name__)
@@ -171,3 +173,66 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         await asyncio.gather(*(apply_pool(c, m) for c, m in targets))
 
     hass.services.async_register(DOMAIN, SERVICE_SET_POOL, set_pool)
+
+    async def set_farm_pool(call: ServiceCall) -> None:
+        """Apply the same stratum primary or backup to every miner on a farm device."""
+        registry = async_get_device_registry(hass)
+        raw_ids = call.data.get(CONF_DEVICE_ID)
+        if not raw_ids:
+            return
+        device_ids = [raw_ids] if isinstance(raw_ids, str) else list(raw_ids)
+
+        mode = str(call.data.get("mode", "manual")).lower()
+        replace_primary = mode == "manual"
+        if mode not in ("manual", "append"):
+            LOGGER.error("set_farm_pool: mode must be manual or append, got %s", mode)
+            return
+
+        host = call.data.get("host")
+        port = call.data.get("port")
+        if not host or port is None:
+            LOGGER.error("set_farm_pool: host and port are required")
+            return
+        try:
+            port_int = int(port)
+            if port_int < 1 or port_int > 65535:
+                raise ValueError
+        except (TypeError, ValueError):
+            LOGGER.error("set_farm_pool: invalid port")
+            return
+
+        use_ssl = call.data.get("use_ssl") if "use_ssl" in call.data else None
+        username = call.data.get("username")
+        password = call.data.get("password")
+
+        for did in device_ids:
+            device = registry.async_get(did)
+            if device is None:
+                continue
+            entry = async_get_farm_config_entry_for_device(hass, device)
+            if entry is None:
+                LOGGER.warning(
+                    "set_farm_pool: device %s is not a miner farm device", did
+                )
+                continue
+            coord = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+            if coord is None or not hasattr(coord, "async_apply_stratum_to_members"):
+                LOGGER.warning("set_farm_pool: farm entry %s is not loaded", entry.title)
+                continue
+            ok, err_key = await coord.async_apply_stratum_to_members(
+                device_ids=None,
+                replace_primary=replace_primary,
+                host=str(host).strip(),
+                port=port_int,
+                use_ssl=use_ssl,
+                username=username,
+                password=password,
+            )
+            if not ok:
+                LOGGER.error(
+                    "set_farm_pool for %s failed: %s",
+                    entry.title,
+                    err_key or "unknown",
+                )
+
+    hass.services.async_register(DOMAIN, SERVICE_SET_FARM_POOL, set_farm_pool)

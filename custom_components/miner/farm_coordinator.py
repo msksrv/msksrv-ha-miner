@@ -19,6 +19,21 @@ from .device_resolution import async_get_miner_config_entry_for_device
 _LOGGER = logging.getLogger(__name__)
 
 
+def expand_farm_pool_username(template: str, miner_ip: object | None) -> str:
+    """Replace {ip} and {ip_last} in the worker string (farm bulk apply only)."""
+    ip_s = str(miner_ip or "").strip()
+    parts = ip_s.split(".")
+    last_octet = ip_s
+    if len(parts) == 4:
+        try:
+            nums = [int(x) for x in parts]
+            if all(0 <= n <= 255 for n in nums):
+                last_octet = parts[3]
+        except ValueError:
+            pass
+    return template.replace("{ip}", ip_s).replace("{ip_last}", last_octet)
+
+
 class MinerFarmCoordinator(DataUpdateCoordinator):
     """Sum metrics from linked miner coordinators; emergency stop via linked switches."""
 
@@ -36,10 +51,10 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             config_entry=entry,
         )
 
-    def _iter_miner_coordinators(self):
-        """Yield miner coordinators for each configured miner device on the farm."""
+    def _iter_miner_coordinators_for_ids(self, device_ids: list[str]):
+        """Yield miner coordinators for each device id in the given list."""
         dev_reg = dr.async_get(self.hass)
-        for did in self.device_ids:
+        for did in device_ids:
             device = dev_reg.async_get(did)
             if device is None:
                 continue
@@ -49,6 +64,10 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             coord = self.hass.data.get(DOMAIN, {}).get(entry.entry_id)
             if coord is not None and callable(getattr(coord, "get_miner", None)):
                 yield coord
+
+    def _iter_miner_coordinators(self):
+        """Yield miner coordinators for each configured miner device on the farm."""
+        yield from self._iter_miner_coordinators_for_ids(self.device_ids)
 
     def _ambient_temperature_map(self) -> dict[str, dict]:
         """Linked room sensors: value, unit, friendly name (from source state)."""
@@ -192,3 +211,93 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                 {"entity_id": eid},
                 blocking=False,
             )
+
+    def _reported_algorithms_for_device_ids(self, device_ids: list[str]) -> set[str]:
+        """Non-empty algorithm strings from members (last successful poll) for these devices."""
+        distinct: set[str] = set()
+        for coord in self._iter_miner_coordinators_for_ids(device_ids):
+            if not coord.last_update_success:
+                continue
+            algo = coord.data.get("algorithm")
+            if algo and str(algo).strip():
+                distinct.add(str(algo).strip())
+        return distinct
+
+    def farm_stratum_allowed_for_device_ids(self, device_ids: list[str]) -> bool:
+        """False when members report two or more different algorithms."""
+        return len(self._reported_algorithms_for_device_ids(device_ids)) <= 1
+
+    def farm_stratum_allowed_by_algorithm(self) -> bool:
+        """False when configured members report two or more different algorithms."""
+        return self.farm_stratum_allowed_for_device_ids(self.device_ids)
+
+    async def async_apply_stratum_to_members(
+        self,
+        *,
+        device_ids: list[str] | None = None,
+        replace_primary: bool,
+        host: str,
+        port: int,
+        use_ssl: bool | None = None,
+        username: str | None = None,
+        password: str | None = None,
+    ) -> tuple[bool, str | None]:
+        """Apply primary or backup stratum to every member (same as per-miner pool tools)."""
+        ids = list(device_ids) if device_ids is not None else list(self.device_ids)
+        if not self.farm_stratum_allowed_for_device_ids(ids):
+            return False, "farm_pool_mixed_algorithms"
+        members = list(self._iter_miner_coordinators_for_ids(ids))
+        if not members:
+            return False, "farm_pool_no_members"
+
+        from . import pool_stratum
+
+        append_ssl = bool(use_ssl) if use_ssl is not None else False
+        user_template = "" if username is None else str(username)
+        failures = 0
+        for coord in members:
+            miner = await coord.get_miner()
+            if miner is None:
+                failures += 1
+                _LOGGER.warning(
+                    "Farm stratum: miner unreachable (entry %s)",
+                    coord.config_entry.entry_id,
+                )
+                continue
+            per_user = expand_farm_pool_username(
+                user_template, coord.data.get("ip")
+            )
+            try:
+                if replace_primary:
+                    ok = await pool_stratum.async_apply_primary_stratum(
+                        miner,
+                        host,
+                        port,
+                        use_ssl,
+                        per_user,
+                        password,
+                        force_user_password=True,
+                    )
+                else:
+                    ok = await pool_stratum.async_append_stratum_pool(
+                        miner,
+                        host,
+                        port,
+                        append_ssl,
+                        per_user,
+                        password,
+                    )
+                if not ok:
+                    failures += 1
+                else:
+                    await coord.async_request_refresh()
+            except Exception:
+                _LOGGER.exception(
+                    "Farm stratum apply failed (entry %s)",
+                    coord.config_entry.entry_id,
+                )
+                failures += 1
+
+        if failures:
+            return False, "farm_pool_apply_failed"
+        return True, None

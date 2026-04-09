@@ -84,10 +84,24 @@
     "step": {
       "farm_options": {
         "title": "Farm settings",
-        "description": "Choose which miner devices belong to this farm (add new miners here after they are set up). Optionally link room temperature sensors; each appears on the farm device using the same friendly name as the source sensor.",
+        "description": "Pool and worker fields start empty until you set them. One worker string for all miners, or use {{ip}} for each miner's full IP and {{ip_last}} for the last IPv4 octet (example: msksrv.{{ip_last}}). Same password on every miner.",
         "data": {
           "farm_device_ids": "Miner devices",
-          "farm_ambient_temp_entities": "Temperature sensors"
+          "farm_ambient_temp_entities": "Temperature sensors",
+          "pool_action": {
+            "name": "Stratum pool (all members)",
+            "description": "Leave unchanged, replace primary on each miner, or append a backup (max 3 pools each).",
+            "options": {
+              "none": "Do not change pools",
+              "replace_primary": "Set primary pool (host and port below)",
+              "append_backup": "Add backup pool (host and port below)"
+            }
+          },
+          "pool_host": "Stratum host",
+          "pool_port": "Stratum port",
+          "pool_use_ssl": "Use stratum+ssl",
+          "pool_username": "Worker username",
+          "pool_password": "Worker password"
         }
       },
       "init": {
@@ -123,7 +137,11 @@
       "invalid_pool_port": "Port must be between 1 and 65535.",
       "pool_apply_failed": "The miner rejected the pool change or the backup pool limit was reached.",
       "miner_offline": "Cannot reach the miner; pool was not changed.",
-      "miner_not_loaded": "Miner integration is not loaded; try again later."
+      "miner_not_loaded": "Miner integration is not loaded; try again later.",
+      "farm_pool_mixed_algorithms": "Members report different mining algorithms; set pools per miner or split the farm.",
+      "farm_pool_no_members": "No linked miner coordinators for this farm.",
+      "farm_pool_apply_failed": "Pool change failed on one or more miners (offline, rejected, or backup limit).",
+      "farm_not_loaded": "Farm is not loaded; try again later."
     }
   },
   "services": {
@@ -142,6 +160,10 @@
     "set_pool": {
       "name": "Set pool on miner",
       "description": "Reorder configured pools, replace the primary stratum URL, or append a backup (mode append, max 3 pools)."
+    },
+    "set_farm_pool": {
+      "name": "Set pool on farm",
+      "description": "Apply the same stratum primary (manual) or backup (append) to every miner on a farm device. Skipped when members report different algorithms."
     }
   },
   "entity": {

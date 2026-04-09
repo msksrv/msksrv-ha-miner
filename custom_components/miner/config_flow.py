@@ -803,7 +803,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
     async def async_step_farm_options(
         self, user_input: dict[str, Any] | None = None
     ):
-        """Edit farm members and optional room / ambient temperature sensors."""
+        """Farm members, room sensors, and optional stratum apply to all members."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -843,6 +843,38 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     errors["base"] = "invalid_temp_entity"
                     break
 
+            pool_action = str(user_input.get("pool_action", "none"))
+            if pool_action not in ("none", "replace_primary", "append_backup"):
+                pool_action = "none"
+
+            pool_host = (user_input.get("pool_host") or "").strip()
+            pool_port_raw = user_input.get("pool_port")
+            pool_port_int: int | None = None
+
+            if pool_action != "none":
+                if not pool_host or pool_port_raw is None or pool_port_raw == "":
+                    errors["pool_host"] = "pool_fields_required"
+                else:
+                    try:
+                        pool_port_int = int(pool_port_raw)
+                        if pool_port_int < 1 or pool_port_int > 65535:
+                            raise ValueError
+                    except (TypeError, ValueError):
+                        errors["pool_port"] = "invalid_pool_port"
+
+            farm_coord = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+
+            if (
+                pool_action != "none"
+                and not errors
+                and devices
+                and farm_coord is not None
+                and hasattr(farm_coord, "farm_stratum_allowed_for_device_ids")
+                and not farm_coord.farm_stratum_allowed_for_device_ids(devices)
+            ):
+                errors["base"] = "farm_pool_mixed_algorithms"
+
+            new_unique_id = self.config_entry.unique_id
             if not errors and devices:
                 key = ",".join(sorted(devices))
                 uid_digest = hashlib.sha256(key.encode()).hexdigest()[:20]
@@ -854,6 +886,36 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                         if ent.unique_id == new_unique_id:
                             errors["base"] = "farm_device_set_conflict"
                             break
+
+            if not errors:
+                if (
+                    pool_action != "none"
+                    and pool_port_int is not None
+                    and devices
+                ):
+                    if farm_coord is None or not hasattr(
+                        farm_coord, "async_apply_stratum_to_members"
+                    ):
+                        errors["base"] = "farm_not_loaded"
+                    else:
+                        use_ssl = bool(user_input.get("pool_use_ssl"))
+                        uname = str(user_input.get("pool_username") or "")
+                        pwd = str(user_input.get("pool_password") or "")
+                        try:
+                            ok, err_key = await farm_coord.async_apply_stratum_to_members(
+                                device_ids=devices,
+                                replace_primary=pool_action == "replace_primary",
+                                host=pool_host,
+                                port=pool_port_int,
+                                use_ssl=use_ssl,
+                                username=uname,
+                                password=pwd,
+                            )
+                            if not ok:
+                                errors["base"] = err_key or "farm_pool_apply_failed"
+                        except Exception:
+                            _LOGGER.exception("Farm stratum from options")
+                            errors["base"] = "farm_pool_apply_failed"
 
             if not errors:
                 new_options = {**self.config_entry.options}
@@ -876,6 +938,57 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             errors=errors,
         )
 
+    def _farm_pool_options_vol(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[Any, Any]:
+        user_input = user_input or {}
+        pool_action_suggested = user_input.get("pool_action", "none")
+        pool_host_suggested = user_input.get("pool_host", "")
+        pool_port_suggested = user_input.get("pool_port")
+        pool_user_suggested = user_input.get("pool_username", "")
+        pool_pass_suggested = user_input.get("pool_password", "")
+        return {
+            vol.Optional(
+                "pool_action",
+                description={"suggested_value": pool_action_suggested},
+            ): SelectSelector(
+                SelectSelectorConfig(
+                    options=["none", "replace_primary", "append_backup"],
+                ),
+            ),
+            vol.Optional(
+                "pool_host",
+                description={"suggested_value": pool_host_suggested},
+            ): str,
+            vol.Optional(
+                "pool_port",
+                description={"suggested_value": pool_port_suggested},
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=1,
+                    max=65535,
+                    mode="box",
+                ),
+            ),
+            vol.Optional(
+                "pool_use_ssl",
+                default=bool(user_input.get("pool_use_ssl", False)),
+            ): BooleanSelector(),
+            vol.Optional(
+                "pool_username",
+                description={"suggested_value": pool_user_suggested},
+            ): str,
+            vol.Optional(
+                "pool_password",
+                description={"suggested_value": pool_pass_suggested},
+            ): TextSelector(
+                TextSelectorConfig(
+                    type=TextSelectorType.PASSWORD,
+                    autocomplete="new-password",
+                ),
+            ),
+        }
+
     def _farm_options_schema(
         self, user_input: dict[str, Any] | None = None
     ) -> vol.Schema:
@@ -888,20 +1001,20 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         if isinstance(stored, str):
             stored = [stored]
         suggested = user_input.get(CONF_FARM_AMBIENT_TEMP_ENTITIES, stored)
-        return vol.Schema(
-            {
-                vol.Required(
-                    CONF_FARM_DEVICE_IDS,
-                    description={"suggested_value": suggested_devices},
-                ): DeviceSelector(
-                    DeviceSelectorConfig(integration=DOMAIN, multiple=True),
-                ),
-                vol.Optional(
-                    CONF_FARM_AMBIENT_TEMP_ENTITIES,
-                    description={"suggested_value": suggested},
-                ): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
-            }
-        )
+        fields: dict[Any, Any] = {
+            vol.Required(
+                CONF_FARM_DEVICE_IDS,
+                description={"suggested_value": suggested_devices},
+            ): DeviceSelector(
+                DeviceSelectorConfig(integration=DOMAIN, multiple=True),
+            ),
+            vol.Optional(
+                CONF_FARM_AMBIENT_TEMP_ENTITIES,
+                description={"suggested_value": suggested},
+            ): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
+        }
+        fields.update(self._farm_pool_options_vol(user_input))
+        return vol.Schema(fields)
 
     def _options_schema(
         self, user_input: dict[str, Any] | None = None
