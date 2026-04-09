@@ -16,6 +16,7 @@ CONF_SELECTED_MINER = "selected_miner"
 CONF_POWER_SWITCH = "power_switch"
 CONF_IS_FARM = "is_farm"
 CONF_FARM_DEVICE_IDS = "farm_device_ids"
+CONF_FARM_AMBIENT_TEMP_ENTITIES = "farm_ambient_temp_entities"
 
 SERVICE_REBOOT = "reboot"
 SERVICE_RESTART_BACKEND = "restart_backend"

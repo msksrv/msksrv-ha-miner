@@ -24,6 +24,7 @@ from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, Tex
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .const import (
+    CONF_FARM_AMBIENT_TEMP_ENTITIES,
     CONF_FARM_DEVICE_IDS,
     CONF_IP,
     CONF_IS_FARM,
@@ -87,13 +88,11 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_supports_options_flow(
         cls, config_entry: config_entries.ConfigEntry
     ) -> bool:
-        """Farm entries have no options UI yet.
+        """Farm: room temperature entity links. Miner: power switch + pool.
 
         Do not call super(): older HA cores have no ConfigFlow.async_supports_options_flow
         and would raise AttributeError (500 on config flow).
         """
-        if config_entry.data.get(CONF_IS_FARM):
-            return False
         return (
             cls.async_get_options_flow
             is not config_entries.ConfigFlow.async_get_options_flow
@@ -611,7 +610,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
     ):
         """Manage miner options."""
         if self.config_entry.data.get(CONF_IS_FARM):
-            return self.async_abort(reason="farm_no_options")
+            return await self.async_step_farm_options(user_input)
 
         if user_input is not None:
             errors: dict[str, str] = {}
@@ -719,6 +718,60 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="init",
             data_schema=self._options_schema(),
+        )
+
+    async def async_step_farm_options(
+        self, user_input: dict[str, Any] | None = None
+    ):
+        """Link room / ambient temperature sensors to the farm device."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            ents = user_input.get(CONF_FARM_AMBIENT_TEMP_ENTITIES)
+            if ents is None:
+                ents = []
+            if isinstance(ents, str):
+                ents = [ents]
+            registry = er.async_get(self.hass)
+            for eid in ents:
+                try:
+                    ent_domain, _ = split_entity_id(eid)
+                except ValueError:
+                    errors["base"] = "invalid_temp_entity"
+                    break
+                if ent_domain != "sensor":
+                    errors["base"] = "invalid_temp_entity"
+                    break
+                if registry.async_get(eid) is None:
+                    errors["base"] = "invalid_temp_entity"
+                    break
+
+            if not errors:
+                new_options = {**self.config_entry.options}
+                new_options[CONF_FARM_AMBIENT_TEMP_ENTITIES] = list(ents)
+                return self.async_create_entry(title="", data=new_options)
+
+        return self.async_show_form(
+            step_id="farm_options",
+            data_schema=self._farm_options_schema(user_input),
+            errors=errors,
+        )
+
+    def _farm_options_schema(
+        self, user_input: dict[str, Any] | None = None
+    ) -> vol.Schema:
+        user_input = user_input or {}
+        stored = self.config_entry.options.get(CONF_FARM_AMBIENT_TEMP_ENTITIES) or []
+        if isinstance(stored, str):
+            stored = [stored]
+        suggested = user_input.get(CONF_FARM_AMBIENT_TEMP_ENTITIES, stored)
+        return vol.Schema(
+            {
+                vol.Optional(
+                    CONF_FARM_AMBIENT_TEMP_ENTITIES,
+                    description={"suggested_value": suggested},
+                ): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
+            }
         )
 
     def _options_schema(

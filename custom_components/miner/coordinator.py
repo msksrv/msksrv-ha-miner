@@ -68,6 +68,7 @@ DEFAULT_DATA = {
     "accepted_shares": 0,
     "rejected_shares": 0,
     "reject_rate": 0,
+    "algorithm": None,
     "miner_sensors": {
         "hashrate": 0,
         "ideal_hashrate": 0,
@@ -249,6 +250,13 @@ class MinerCoordinator(DataUpdateCoordinator):
         except Exception:
             reject_rate = 0
 
+        try:
+            algorithm = miner_data.algo
+        except Exception:
+            algorithm = None
+        if algorithm is not None:
+            algorithm = str(algorithm).strip() or None
+
         data = {
             "hostname": miner_data.hostname,
             "mac": miner_data.mac,
@@ -260,6 +268,7 @@ class MinerCoordinator(DataUpdateCoordinator):
             "uptime": uptime,
             "uptime_formatted": uptime_formatted,
             "boards_count": boards_count,
+            "algorithm": algorithm,
             "pool": pool,
             "pool_host": pool_host,
             "pool_port": pool_port,

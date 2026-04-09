@@ -70,17 +70,24 @@
       "farm_no_title": "Укажи название фермы",
       "farm_no_devices": "Выбери хотя бы одно устройство-майнер",
       "farm_invalid_device": "Одно из выбранных устройств больше не существует",
-      "farm_only_miner_devices": "Можно добавлять только отдельные майнеры, не другую ферму"
+      "farm_only_miner_devices": "Можно добавлять только отдельные майнеры, не другую ферму",
+      "invalid_temp_entity": "Каждая запись должна быть существующей сущностью sensor"
     },
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
       "no_devices_found": "Майнеры не найдены",
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "farm_no_options": "У фермы нет экрана настроек; удали и добавь ферму заново, чтобы изменить список майнеров."
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
   "options": {
     "step": {
+      "farm_options": {
+        "title": "Температура в помещениях (ферма)",
+        "description": "По желанию: выбери датчики температуры (например зональные). Каждый появится на устройстве фермы с тем же отображаемым именем, что и у исходного датчика.",
+        "data": {
+          "farm_ambient_temp_entities": "Датчики температуры"
+        }
+      },
       "init": {
         "title": "Настройки майнера",
         "description": "Выключатель питания и при необходимости смена stratum-пула (майнер должен быть доступен для применения пула).",
@@ -105,6 +112,7 @@
     },
     "error": {
       "invalid_switch": "Выбранная сущность не найдена или не является switch",
+      "invalid_temp_entity": "Каждая запись должна быть существующей сущностью sensor",
       "pool_fields_required": "Укажите хост и порт stratum для этого действия.",
       "invalid_pool_port": "Порт должен быть от 1 до 65535.",
       "pool_apply_failed": "Майнер отклонил смену пула или достигнут лимит резервных слотов.",
@@ -157,6 +165,9 @@
       },
       "farm_algorithm": {
         "name": "Алгоритм"
+      },
+      "farm_effective_chips_percent": {
+        "name": "Рабочие чипы"
       }
     },
     "select": {

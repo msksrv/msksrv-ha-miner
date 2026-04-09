@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
@@ -9,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
+from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES
 from .const import CONF_FARM_DEVICE_IDS
 from .const import CONF_POWER_SWITCH
 from .const import DOMAIN
@@ -48,11 +50,42 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             if coord is not None and callable(getattr(coord, "get_miner", None)):
                 yield coord
 
+    def _ambient_temperature_map(self) -> dict[str, dict]:
+        """Linked room sensors: value, unit, friendly name (from source state)."""
+        raw = self.config_entry.options.get(CONF_FARM_AMBIENT_TEMP_ENTITIES) or []
+        if isinstance(raw, str):
+            raw = [raw]
+        out: dict[str, dict] = {}
+        for eid in raw:
+            eid = str(eid).strip()
+            if not eid:
+                continue
+            state = self.hass.states.get(eid)
+            friendly = eid
+            unit = "°C"
+            value = None
+            if state is not None:
+                friendly = state.attributes.get("friendly_name") or eid
+                unit = state.attributes.get("unit_of_measurement") or "°C"
+                try:
+                    value = float(state.state)
+                except (TypeError, ValueError):
+                    value = None
+            out[eid] = {
+                "value": value,
+                "unit_of_measurement": unit,
+                "friendly_name": friendly,
+            }
+        return out
+
     async def _async_update_data(self) -> dict:
         total_hash = 0.0
         total_w = 0.0
         miner_count = 0
         miners_online = 0
+        chips_expected = 0
+        chips_effective = 0
+        algo_counts: Counter[str] = Counter()
 
         for coord in self._iter_miner_coordinators():
             miner_count += 1
@@ -73,13 +106,54 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                 except (TypeError, ValueError):
                     pass
 
+            al = coord.data.get("algorithm")
+            if al:
+                algo_counts[str(al)] += 1
+
+            boards = coord.data.get("board_sensors") or {}
+            for board in boards.values():
+                exp = board.get("board_expected_chips")
+                act = board.get("board_chips")
+                if exp is None or act is None:
+                    continue
+                try:
+                    exp_i = int(exp)
+                    act_i = int(act)
+                except (TypeError, ValueError):
+                    continue
+                if exp_i <= 0:
+                    continue
+                chips_expected += exp_i
+                chips_effective += min(act_i, exp_i)
+
+        if algo_counts:
+            if len(algo_counts) == 1:
+                algorithm_summary = next(iter(algo_counts.keys()))
+            else:
+                algorithm_summary = ", ".join(
+                    f"{name} ({count})"
+                    for name, count in sorted(algo_counts.items())
+                )
+        else:
+            algorithm_summary = "SHA256d"
+
+        chips_percent = (
+            round(100.0 * chips_effective / chips_expected, 2)
+            if chips_expected > 0
+            else None
+        )
+
         return {
             "total_hashrate_th": round(total_hash, 2),
             "total_power_w": round(total_w, 0),
             "total_power_kw": round(total_w / 1000.0, 3) if total_w else 0.0,
             "miner_count": miner_count,
             "miners_online": miners_online,
-            "algorithm": "SHA256d",
+            "algorithm": algorithm_summary,
+            "chips_effective_percent": chips_percent,
+            "chips_effective": chips_effective if chips_expected else None,
+            "chips_expected": chips_expected if chips_expected else None,
+            "ambient_temperatures": self._ambient_temperature_map(),
             "emergency_stop_available": self.emergency_stop_available,
         }
 

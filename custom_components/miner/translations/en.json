@@ -70,17 +70,24 @@
       "farm_no_title": "Enter a name for the farm",
       "farm_no_devices": "Select at least one miner device",
       "farm_invalid_device": "A selected device no longer exists",
-      "farm_only_miner_devices": "Only individual miner devices can be added (not another farm)"
+      "farm_only_miner_devices": "Only individual miner devices can be added (not another farm)",
+      "invalid_temp_entity": "Each entry must be an existing sensor entity"
     },
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
       "no_devices_found": "No miners found",
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "farm_no_options": "Farm has no options screen; delete and add the farm again to change miners."
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
   "options": {
     "step": {
+      "farm_options": {
+        "title": "Farm room temperatures",
+        "description": "Optional: pick temperature sensors (e.g. room probes). Each appears on the farm device using the same friendly name as the source sensor.",
+        "data": {
+          "farm_ambient_temp_entities": "Temperature sensors"
+        }
+      },
       "init": {
         "title": "Miner options",
         "description": "Smart plug switch and optional stratum pool changes (miner must be reachable to apply pools).",
@@ -105,6 +112,7 @@
     },
     "error": {
       "invalid_switch": "The selected entity is missing or is not a switch",
+      "invalid_temp_entity": "Each entry must be an existing sensor entity",
       "pool_fields_required": "Enter both stratum host and port for this action.",
       "invalid_pool_port": "Port must be between 1 and 65535.",
       "pool_apply_failed": "The miner rejected the pool change or the backup pool limit was reached.",
@@ -157,6 +165,9 @@
       },
       "farm_algorithm": {
         "name": "Algorithm"
+      },
+      "farm_effective_chips_percent": {
+        "name": "Effective chips"
       }
     },
     "select": {

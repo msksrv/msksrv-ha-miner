@@ -46,6 +46,16 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         coordinator = MinerFarmCoordinator(hass, config_entry)
         hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
         await coordinator.async_config_entry_first_refresh()
+
+        async def _farm_options_changed(
+            hass_inner: HomeAssistant, entry: ConfigEntry
+        ) -> None:
+            await hass_inner.config_entries.async_reload(entry.entry_id)
+
+        config_entry.async_on_unload(
+            config_entry.add_update_listener(_farm_options_changed)
+        )
+
         await hass.config_entries.async_forward_entry_setups(
             config_entry, FARM_PLATFORMS
         )
