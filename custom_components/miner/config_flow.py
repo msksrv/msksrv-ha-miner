@@ -28,6 +28,7 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from .const import (
     CONF_FARM_AMBIENT_TEMP_ENTITIES,
     CONF_FARM_DEVICE_IDS,
+    CONF_FARM_POOL_PRESETS,
     CONF_IP,
     CONF_IS_FARM,
     CONF_MAX_POWER,
@@ -48,6 +49,10 @@ from .const import (
     SCAN_MAX_HOSTS,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
+from .farm_pool_presets import FARM_POOL_SLOT_COUNT
+from .farm_pool_presets import farm_pool_preset_slots
+from .farm_pool_presets import farm_pool_slots_from_user_input
+from .farm_pool_presets import strip_legacy_farm_pool_keys
 from .discovery import (
     DiscoveredMiner,
     async_scan_subnet,
@@ -843,24 +848,48 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     errors["base"] = "invalid_temp_entity"
                     break
 
+            opts = self.config_entry.options
+            prev_slots = farm_pool_preset_slots(opts)
+            new_slots = farm_pool_slots_from_user_input(user_input, prev_slots)
+
+            for i in range(FARM_POOL_SLOT_COUNT):
+                h = (user_input.get(f"pool_slot_{i}_host") or "").strip()
+                pr = user_input.get(f"pool_slot_{i}_port")
+                has_port = pr is not None and str(pr).strip() != ""
+                if h and not has_port:
+                    errors[f"pool_slot_{i}_port"] = "pool_fields_required"
+                elif has_port and not h:
+                    errors[f"pool_slot_{i}_host"] = "pool_fields_required"
+                elif h and has_port:
+                    try:
+                        pi = int(pr)
+                        if pi < 1 or pi > 65535:
+                            raise ValueError
+                    except (TypeError, ValueError):
+                        errors[f"pool_slot_{i}_port"] = "invalid_pool_port"
+
             pool_action = str(user_input.get("pool_action", "none"))
             if pool_action not in ("none", "replace_primary", "append_backup"):
                 pool_action = "none"
 
-            pool_host = (user_input.get("pool_host") or "").strip()
-            pool_port_raw = user_input.get("pool_port")
-            pool_port_int: int | None = None
+            apply_slot_raw = str(user_input.get("pool_apply_slot", "1"))
+            try:
+                apply_slot_i = int(apply_slot_raw) - 1
+            except (TypeError, ValueError):
+                apply_slot_i = 0
 
+            preset_for_apply: dict[str, Any] | None = None
+            pool_port_int: int | None = None
             if pool_action != "none":
-                if not pool_host or pool_port_raw is None or pool_port_raw == "":
-                    errors["pool_host"] = "pool_fields_required"
+                if apply_slot_i < 0 or apply_slot_i >= FARM_POOL_SLOT_COUNT:
+                    errors["pool_apply_slot"] = "farm_pool_apply_slot_invalid"
                 else:
-                    try:
-                        pool_port_int = int(pool_port_raw)
-                        if pool_port_int < 1 or pool_port_int > 65535:
-                            raise ValueError
-                    except (TypeError, ValueError):
-                        errors["pool_port"] = "invalid_pool_port"
+                    cand = new_slots[apply_slot_i]
+                    if not cand.get("host"):
+                        errors["pool_apply_slot"] = "farm_pool_apply_slot_invalid"
+                    else:
+                        preset_for_apply = cand
+                        pool_port_int = int(cand["port"])
 
             farm_coord = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
 
@@ -890,6 +919,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             if not errors:
                 if (
                     pool_action != "none"
+                    and preset_for_apply is not None
                     and pool_port_int is not None
                     and devices
                 ):
@@ -898,18 +928,18 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     ):
                         errors["base"] = "farm_not_loaded"
                     else:
-                        use_ssl = bool(user_input.get("pool_use_ssl"))
-                        uname = str(user_input.get("pool_username") or "")
-                        pwd = str(user_input.get("pool_password") or "")
+                        use_ssl = bool(preset_for_apply.get("use_ssl", False))
+                        uname_eff = str(preset_for_apply.get("username") or "")
+                        pwd_eff = str(preset_for_apply.get("password") or "")
                         try:
                             ok, err_key = await farm_coord.async_apply_stratum_to_members(
                                 device_ids=devices,
                                 replace_primary=pool_action == "replace_primary",
-                                host=pool_host,
+                                host=str(preset_for_apply["host"]),
                                 port=pool_port_int,
                                 use_ssl=use_ssl,
-                                username=uname,
-                                password=pwd,
+                                username=uname_eff,
+                                password=pwd_eff,
                             )
                             if not ok:
                                 errors["base"] = err_key or "farm_pool_apply_failed"
@@ -920,6 +950,9 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             if not errors:
                 new_options = {**self.config_entry.options}
                 new_options[CONF_FARM_AMBIENT_TEMP_ENTITIES] = list(ents)
+                new_options[CONF_FARM_POOL_PRESETS] = new_slots
+                strip_legacy_farm_pool_keys(new_options)
+
                 new_data = {**self.config_entry.data, CONF_FARM_DEVICE_IDS: devices}
                 update_kw: dict[str, Any] = {
                     "data": new_data,
@@ -938,56 +971,83 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             errors=errors,
         )
 
-    def _farm_pool_options_vol(
+    def _farm_pool_slots_vol(
         self, user_input: dict[str, Any] | None = None
     ) -> dict[Any, Any]:
         user_input = user_input or {}
-        pool_action_suggested = user_input.get("pool_action", "none")
-        pool_host_suggested = user_input.get("pool_host", "")
-        pool_port_suggested = user_input.get("pool_port")
-        pool_user_suggested = user_input.get("pool_username", "")
-        pool_pass_suggested = user_input.get("pool_password", "")
-        return {
-            vol.Optional(
-                "pool_action",
-                description={"suggested_value": pool_action_suggested},
-            ): SelectSelector(
-                SelectSelectorConfig(
-                    options=["none", "replace_primary", "append_backup"],
-                ),
-            ),
-            vol.Optional(
-                "pool_host",
-                description={"suggested_value": pool_host_suggested},
-            ): str,
-            vol.Optional(
-                "pool_port",
-                description={"suggested_value": pool_port_suggested},
-            ): NumberSelector(
+        slots = farm_pool_preset_slots(self.config_entry.options)
+        out: dict[Any, Any] = {}
+        for i in range(FARM_POOL_SLOT_COUNT):
+            s = slots[i] if i < len(slots) else {}
+            host_s = user_input.get(f"pool_slot_{i}_host", s.get("host", ""))
+            port_s = user_input.get(f"pool_slot_{i}_port", s.get("port"))
+            if f"pool_slot_{i}_use_ssl" in user_input:
+                ssl_def = bool(user_input.get(f"pool_slot_{i}_use_ssl"))
+            else:
+                ssl_def = bool(s.get("use_ssl", False))
+            user_s = user_input.get(f"pool_slot_{i}_username", s.get("username", ""))
+            pass_s = user_input.get(f"pool_slot_{i}_password", s.get("password", ""))
+            out[
+                vol.Optional(
+                    f"pool_slot_{i}_host",
+                    description={"suggested_value": host_s},
+                )
+            ] = str
+            out[
+                vol.Optional(
+                    f"pool_slot_{i}_port",
+                    description={"suggested_value": port_s},
+                )
+            ] = NumberSelector(
                 NumberSelectorConfig(
                     min=1,
                     max=65535,
                     mode="box",
                 ),
-            ),
-            vol.Optional(
-                "pool_use_ssl",
-                default=bool(user_input.get("pool_use_ssl", False)),
-            ): BooleanSelector(),
-            vol.Optional(
-                "pool_username",
-                description={"suggested_value": pool_user_suggested},
-            ): str,
-            vol.Optional(
-                "pool_password",
-                description={"suggested_value": pool_pass_suggested},
-            ): TextSelector(
+            )
+            out[
+                vol.Optional(
+                    f"pool_slot_{i}_use_ssl",
+                    default=ssl_def,
+                )
+            ] = BooleanSelector()
+            out[
+                vol.Optional(
+                    f"pool_slot_{i}_username",
+                    description={"suggested_value": user_s},
+                )
+            ] = str
+            out[
+                vol.Optional(
+                    f"pool_slot_{i}_password",
+                    description={"suggested_value": pass_s},
+                )
+            ] = TextSelector(
                 TextSelectorConfig(
                     type=TextSelectorType.PASSWORD,
                     autocomplete="new-password",
                 ),
+            )
+        apply_opts = [str(n) for n in range(1, FARM_POOL_SLOT_COUNT + 1)]
+        out[
+            vol.Optional(
+                "pool_action",
+                description={"suggested_value": user_input.get("pool_action", "none")},
+            )
+        ] = SelectSelector(
+            SelectSelectorConfig(
+                options=["none", "replace_primary", "append_backup"],
             ),
-        }
+        )
+        out[
+            vol.Optional(
+                "pool_apply_slot",
+                description={
+                    "suggested_value": user_input.get("pool_apply_slot", "1"),
+                },
+            )
+        ] = SelectSelector(SelectSelectorConfig(options=apply_opts))
+        return out
 
     def _farm_options_schema(
         self, user_input: dict[str, Any] | None = None
@@ -1013,7 +1073,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 description={"suggested_value": suggested},
             ): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
         }
-        fields.update(self._farm_pool_options_vol(user_input))
+        fields.update(self._farm_pool_slots_vol(user_input))
         return vol.Schema(fields)
 
     def _options_schema(

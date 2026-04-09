@@ -22,6 +22,7 @@ PLATFORMS: list[Platform] = [
 FARM_PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.BUTTON,
+    Platform.SELECT,
 ]
 
 _SERVICES_SETUP = "services_setup"

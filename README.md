@@ -69,6 +69,8 @@ When the miner is temporarily unreachable, the integration keeps entities alive 
 | **`select`** | **Pool priority** — reorder configured pool slots so the chosen entry becomes primary. | At least **two** pools in the primary pool group in miner config. |
 | **`button`** | **Reboot** — device reboot via pyasic. | Always (per miner). |
 | **`button`** | **Power off** — `switch.turn_off` on the switch chosen in **integration options**. | Always listed; **available** only if a valid `switch` entity is configured and present in the state machine. |
+| **`select`** | **Farm: preset to apply** — picks which saved stratum slot is used by the farm’s apply buttons. | **Farm** device only; at least one configured preset. |
+| **`button`** | **Farm: apply preset as primary / backup** — same logic as bulk stratum from **Configure**; uses the select above. | **Farm** device; requires presets. |
 
 ### Automation
 
@@ -119,10 +121,11 @@ To **add or remove miners** on an existing farm, open **Configure** on the **far
 
 **Configure** also links **room temperature** sensors: pick one or more **`sensor`** entities (e.g. ZigBee probes). Each appears on the farm device as a temperature sensor whose **name matches the source entity’s friendly name** (and unit follows the source). Saving reloads the entry.
 
-**Stratum (all members)** — pool host, port, worker, and password **start empty**; nothing is pushed until you choose an action other than **do nothing** and save. Behaviour matches **`miner.set_pool`** (replace primary or append backup); **every** linked miner must accept the change or the form errors. Bulk apply is **blocked** if members report **more than one algorithm** (last successful poll).
+**Stratum (all members)** — up to **five** preset slots per **farm integration entry** (each farm has its **own** list in that entry’s options — independent of other farms). Each slot has host, port, SSL, worker, password. **Clear a slot’s host** (and port) and save to **remove** that preset. Applying from **Configure** uses the **“which slot (1–5)”** selector plus **replace primary** / **append backup**; behaviour matches **`miner.set_pool`**. **Every** linked miner must accept the change or the form errors. Bulk apply is **blocked** if members report **more than one algorithm** (last successful poll).
 
-- **Worker** — can be **one string for everyone** (e.g. `msksrv.worker1`). Many **Bitcoin-style** stratum pools accept `subaccount.workername`; other ecosystems (e.g. some altcoins, payout schemes) expect a **wallet address** or a different format — follow your pool’s docs.
-- **Per-miner worker from one template** — in the farm worker field only, the integration expands **`{ip}`** to that miner’s **full IPv4** and **`{ip_last}`** to the **last octet** (e.g. `msksrv.{ip_last}` → `msksrv.50` for `192.168.1.50`). **Password** is still **one value** copied to all members. **Single-miner** Configure is unchanged (fully manual, no templates).
+- **Worker** — per slot, same rules as before: shared string or **`{ip}`** / **`{ip_last}`** templates (farm-only). Many **Bitcoin-style** pools use `subaccount.workername`; follow your pool’s docs for other coins.
+- **Dashboard** — on the **farm device**, use **Preset to apply** (select) and **Apply preset as primary pool** / **… as backup pool** (buttons) without opening **Configure**. Buttons log an error if apply fails (e.g. mixed algorithms, offline miner).
+- **Secrets** — presets live in HA **config storage** with the farm entry; include them in your **backup** threat model.
 
 Farm sensors include **total hashrate / power**, **miner count / online**, **algorithm summary** (from pyasic per miner; if miners differ, shown as e.g. `SHA256d (3), Scrypt (1)`; if none report an algorithm, **SHA256d** is assumed as label only), **effective chips %** (sum of working chips vs expected chips across **online** members’ hashboards), and any linked **ambient temperature** sensors.
 
@@ -202,11 +205,11 @@ The integration loads **pyasic only when needed** (single-miner setup, scan, ser
 
 ## Releases (beta & stable)
 
-Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b8`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
+Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b9`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
 
 ### Automatic (recommended)
 
-Push a tag **`v1.4.0b8`** or **`v1.4.0`**:
+Push a tag **`v1.4.0b9`** or **`v1.4.0`**:
 
 1. **Create release from tag** runs → opens a GitHub **Release** for that tag. Betas (`bN`, `aN`, `rc`, `beta` in the version) are marked **Pre-release** automatically; pure **`X.Y.Z`** tags are **full** releases.
 2. **Release** runs on publish → writes `manifest.json` **`version`** without the leading **`v`**, zips `custom_components/miner`, uploads **`miner.zip`** to the same release.

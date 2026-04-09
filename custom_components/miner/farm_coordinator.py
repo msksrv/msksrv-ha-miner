@@ -301,3 +301,29 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         if failures:
             return False, "farm_pool_apply_failed"
         return True, None
+
+    async def async_apply_saved_preset_slot(
+        self,
+        slot_index: int,
+        *,
+        replace_primary: bool,
+        device_ids: list[str] | None = None,
+    ) -> tuple[bool, str | None]:
+        """Apply a stratum preset from options by slot index (0 .. slots-1)."""
+        from .farm_pool_presets import farm_pool_preset_slots
+
+        slots = farm_pool_preset_slots(self.config_entry.options)
+        if slot_index < 0 or slot_index >= len(slots):
+            return False, "farm_pool_apply_slot_invalid"
+        preset = slots[slot_index]
+        if not preset.get("host"):
+            return False, "farm_pool_apply_slot_invalid"
+        return await self.async_apply_stratum_to_members(
+            device_ids=device_ids,
+            replace_primary=replace_primary,
+            host=str(preset["host"]),
+            port=int(preset["port"]),
+            use_ssl=bool(preset.get("use_ssl", False)),
+            username=str(preset.get("username") or ""),
+            password=str(preset.get("password") or ""),
+        )

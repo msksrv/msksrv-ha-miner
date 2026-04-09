@@ -84,7 +84,7 @@
     "step": {
       "farm_options": {
         "title": "Farm settings",
-        "description": "Pool and worker fields start empty until you set them. One worker string for all miners, or use {{ip}} for each miner's full IP and {{ip_last}} for the last IPv4 octet (example: msksrv.{{ip_last}}). Same password on every miner.",
+        "description": "Up to 5 stratum presets per farm (each farm entry has its own list). Clear a slot's host to remove it. Use {{ip}} / {{ip_last}} in workers. Pick slot 1–5 when applying from this form; on the device card use Preset + Apply buttons.",
         "data": {
           "farm_device_ids": "Miner devices",
           "farm_ambient_temp_entities": "Temperature sensors",
@@ -97,11 +97,7 @@
               "append_backup": "Add backup pool (host and port below)"
             }
           },
-          "pool_host": "Stratum host",
-          "pool_port": "Stratum port",
-          "pool_use_ssl": "Use stratum+ssl",
-          "pool_username": "Worker username",
-          "pool_password": "Worker password"
+          "pool_apply_slot": "Which slot (1–5) to apply"
         }
       },
       "init": {
@@ -141,6 +137,7 @@
       "farm_pool_mixed_algorithms": "Members report different mining algorithms; set pools per miner or split the farm.",
       "farm_pool_no_members": "No linked miner coordinators for this farm.",
       "farm_pool_apply_failed": "Pool change failed on one or more miners (offline, rejected, or backup limit).",
+      "farm_pool_apply_slot_invalid": "Choose a slot number that has a saved host and port.",
       "farm_not_loaded": "Farm is not loaded; try again later."
     }
   },
@@ -176,6 +173,12 @@
       },
       "farm_emergency_stop": {
         "name": "Emergency stop"
+      },
+      "farm_apply_pool_primary": {
+        "name": "Apply preset as primary pool"
+      },
+      "farm_apply_pool_append": {
+        "name": "Apply preset as backup pool"
       }
     },
     "sensor": {
@@ -199,6 +202,9 @@
       }
     },
     "select": {
+      "farm_pool_preset": {
+        "name": "Preset to apply"
+      },
       "pool_priority": {
         "name": "Pool priority"
       }

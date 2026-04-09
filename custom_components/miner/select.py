@@ -14,6 +14,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pyasic.config.mining import MiningModeHPM, MiningModeLPM, MiningModeNormal
 from pyasic.config.pools import PoolGroup
 
+from .const import CONF_IS_FARM
 from .const import DOMAIN
 from .coordinator import MinerCoordinator
 
@@ -51,6 +52,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Miner select entities."""
+    if config_entry.data.get(CONF_IS_FARM):
+        from .farm_select import async_setup_farm_selects
+
+        await async_setup_farm_selects(hass, config_entry, async_add_entities)
+        return
+
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     await coordinator.async_config_entry_first_refresh()
