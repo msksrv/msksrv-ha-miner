@@ -1,6 +1,7 @@
 """Aggregate data and actions for a farm (multiple miner devices)."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections import Counter
 from datetime import timedelta
@@ -12,11 +13,25 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES
 from .const import CONF_FARM_DEVICE_IDS
+from .const import CONF_IP
 from .const import CONF_POWER_SWITCH
 from .const import DOMAIN
 from .device_resolution import async_get_miner_config_entry_for_device
 
 _LOGGER = logging.getLogger(__name__)
+
+# Second+ miners sometimes miss the first send_config (API busy); brief retries help.
+_FARM_STRATUM_ATTEMPTS = 3
+_FARM_STRATUM_RETRY_DELAY_SEC = 1.2
+_FARM_STRATUM_MEMBER_GAP_SEC = 0.25
+
+
+def _miner_ip_for_worker_template(coord) -> str:
+    """Prefer polled IP; fall back to config entry (avoids empty {ip} on stale data)."""
+    ip = coord.data.get("ip")
+    if ip is not None and str(ip).strip():
+        return str(ip).strip()
+    return str(coord.config_entry.data.get(CONF_IP) or "").strip()
 
 
 def expand_farm_pool_username(template: str, miner_ip: object | None) -> str:
@@ -255,48 +270,79 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         append_ssl = bool(use_ssl) if use_ssl is not None else False
         user_template = "" if username is None else str(username)
         failures = 0
+        member_index = 0
         for coord in members:
-            miner = await coord.get_miner()
-            if miner is None:
-                failures += 1
-                _LOGGER.warning(
-                    "Farm stratum: miner unreachable (entry %s)",
-                    coord.config_entry.entry_id,
-                )
-                continue
             per_user = expand_farm_pool_username(
-                user_template, coord.data.get("ip")
+                user_template, _miner_ip_for_worker_template(coord)
             )
-            try:
-                if replace_primary:
-                    ok = await pool_stratum.async_apply_primary_stratum(
-                        miner,
-                        host,
-                        port,
-                        use_ssl,
-                        per_user,
-                        password,
-                        force_user_password=True,
+            entry_title = coord.config_entry.title
+            miner_ip = coord.config_entry.data.get(CONF_IP, "?")
+            success = False
+            for attempt in range(_FARM_STRATUM_ATTEMPTS):
+                miner = await coord.get_miner()
+                if miner is None:
+                    _LOGGER.warning(
+                        "Farm stratum: no connection (attempt %s/%s) %s ip=%s",
+                        attempt + 1,
+                        _FARM_STRATUM_ATTEMPTS,
+                        entry_title,
+                        miner_ip,
                     )
-                else:
-                    ok = await pool_stratum.async_append_stratum_pool(
-                        miner,
-                        host,
-                        port,
-                        append_ssl,
-                        per_user,
-                        password,
+                    if attempt + 1 < _FARM_STRATUM_ATTEMPTS:
+                        await asyncio.sleep(_FARM_STRATUM_RETRY_DELAY_SEC)
+                    continue
+                try:
+                    if replace_primary:
+                        ok = await pool_stratum.async_apply_primary_stratum(
+                            miner,
+                            host,
+                            port,
+                            use_ssl,
+                            per_user,
+                            password,
+                            force_user_password=True,
+                        )
+                    else:
+                        ok = await pool_stratum.async_append_stratum_pool(
+                            miner,
+                            host,
+                            port,
+                            append_ssl,
+                            per_user,
+                            password,
+                        )
+                    if ok:
+                        await coord.async_request_refresh()
+                        success = True
+                        break
+                    _LOGGER.warning(
+                        "Farm stratum: miner rejected or invalid config (attempt %s/%s) %s ip=%s",
+                        attempt + 1,
+                        _FARM_STRATUM_ATTEMPTS,
+                        entry_title,
+                        miner_ip,
                     )
-                if not ok:
-                    failures += 1
-                else:
-                    await coord.async_request_refresh()
-            except Exception:
-                _LOGGER.exception(
-                    "Farm stratum apply failed (entry %s)",
-                    coord.config_entry.entry_id,
-                )
+                except Exception:
+                    _LOGGER.exception(
+                        "Farm stratum: exception (attempt %s/%s) %s ip=%s",
+                        attempt + 1,
+                        _FARM_STRATUM_ATTEMPTS,
+                        entry_title,
+                        miner_ip,
+                    )
+                if attempt + 1 < _FARM_STRATUM_ATTEMPTS:
+                    await asyncio.sleep(_FARM_STRATUM_RETRY_DELAY_SEC)
+            if not success:
                 failures += 1
+                _LOGGER.error(
+                    "Farm stratum: gave up on %s (ip=%s) after %s attempts",
+                    entry_title,
+                    miner_ip,
+                    _FARM_STRATUM_ATTEMPTS,
+                )
+            member_index += 1
+            if member_index < len(members) and success:
+                await asyncio.sleep(_FARM_STRATUM_MEMBER_GAP_SEC)
 
         if failures:
             return False, "farm_pool_apply_failed"
