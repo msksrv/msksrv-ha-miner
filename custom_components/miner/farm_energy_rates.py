@@ -10,30 +10,32 @@ from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 
 from .const import CONF_FARM_ENERGY_RATES
 
-# ISO 4217 codes; first "" = slot off
-FARM_ELECTRICITY_CURRENCIES: tuple[str, ...] = (
-    "",
-    "EUR",
-    "USD",
-    "RUB",
-    "GBP",
-    "UAH",
-    "PLN",
-    "KZT",
-    "BYN",
-    "CHF",
-    "CZK",
-    "SEK",
-    "NOK",
-    "TRY",
-    "CNY",
-    "JPY",
-    "AUD",
-    "CAD",
-    "BRL",
-    "INR",
-    "MXN",
-)
+# SelectSelector must not use "" as option value — frontend returns 400 Bad Request.
+_FARM_CUR_OFF = "none"
+
+FARM_ELECTRICITY_CURRENCY_OPTIONS: list[dict[str, str]] = [
+    {"value": _FARM_CUR_OFF, "label": "—"},
+    {"value": "EUR", "label": "EUR"},
+    {"value": "USD", "label": "USD"},
+    {"value": "RUB", "label": "RUB"},
+    {"value": "GBP", "label": "GBP"},
+    {"value": "UAH", "label": "UAH"},
+    {"value": "PLN", "label": "PLN"},
+    {"value": "KZT", "label": "KZT"},
+    {"value": "BYN", "label": "BYN"},
+    {"value": "CHF", "label": "CHF"},
+    {"value": "CZK", "label": "CZK"},
+    {"value": "SEK", "label": "SEK"},
+    {"value": "NOK", "label": "NOK"},
+    {"value": "TRY", "label": "TRY"},
+    {"value": "CNY", "label": "CNY"},
+    {"value": "JPY", "label": "JPY"},
+    {"value": "AUD", "label": "AUD"},
+    {"value": "CAD", "label": "CAD"},
+    {"value": "BRL", "label": "BRL"},
+    {"value": "INR", "label": "INR"},
+    {"value": "MXN", "label": "MXN"},
+]
 
 
 def farm_energy_rates_list(options: dict[str, Any]) -> list[tuple[str, float]]:
@@ -59,7 +61,10 @@ def farm_energy_rates_from_user_input(user_input: dict[str, Any]) -> list[dict[s
     """Build stored list from options flow fields."""
     stored: list[dict[str, Any]] = []
     for i in range(1, 4):
-        c = str(user_input.get(f"farm_elec_currency_{i}") or "").strip().upper()
+        raw_cur = str(user_input.get(f"farm_elec_currency_{i}") or _FARM_CUR_OFF).strip()
+        if raw_cur.lower() == _FARM_CUR_OFF or not raw_cur:
+            continue
+        c = raw_cur.upper()
         pr = user_input.get(f"farm_elec_price_kwh_{i}")
         try:
             pf = float(pr) if pr is not None else 0.0
@@ -79,7 +84,7 @@ def farm_electricity_schema_fields(
     stored: list[dict[str, Any]] = (
         [x for x in stored_raw if isinstance(x, dict)] if isinstance(stored_raw, list) else []
     )
-    fields: dict[vol.Marker, Any] = {}
+    fields: dict[Any, Any] = {}
     for i in range(1, 4):
         cur_key = f"farm_elec_currency_{i}"
         price_key = f"farm_elec_price_kwh_{i}"
@@ -93,23 +98,31 @@ def farm_electricity_schema_fields(
             def_cur = ""
             def_price = 0.0
         sug_cur = ui.get(cur_key, def_cur)
+        if isinstance(sug_cur, str) and sug_cur.strip():
+            select_suggested = sug_cur.strip().upper()
+        else:
+            select_suggested = _FARM_CUR_OFF
         sug_price = ui.get(price_key, def_price)
+        try:
+            price_suggested = float(sug_price) if sug_price is not None else 0.0
+        except (TypeError, ValueError):
+            price_suggested = 0.0
         fields[
             vol.Optional(
                 cur_key,
-                description={"suggested_value": sug_cur if sug_cur else ""},
+                description={"suggested_value": select_suggested},
             )
-        ] = SelectSelector(SelectSelectorConfig(options=list(FARM_ELECTRICITY_CURRENCIES)))
+        ] = SelectSelector(SelectSelectorConfig(options=FARM_ELECTRICITY_CURRENCY_OPTIONS))
         fields[
             vol.Optional(
                 price_key,
-                description={"suggested_value": sug_price},
+                description={"suggested_value": price_suggested},
             )
         ] = NumberSelector(
             NumberSelectorConfig(
                 min=0,
                 max=9999,
-                step=0.000001,
+                step=0.0001,
                 mode="box",
             )
         )
