@@ -11,6 +11,7 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.core import callback
 from homeassistant.core import split_entity_id
 from homeassistant.helpers import device_registry as dr
@@ -258,7 +259,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return
 
         if self._has_entry_with_host(host):
-            raise config_entries.AbortFlow("already_configured")
+            raise AbortFlow("already_configured")
 
     async def _async_prepare_miner(
         self, miner, host: str, base_data: dict[str, Any]
@@ -297,7 +298,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_MAX_POWER: DEFAULT_MAX_POWER,
                     },
                 )
-            except config_entries.AbortFlow as err:
+            except AbortFlow as err:
                 return self.async_abort(reason=err.reason)
 
             return await self.async_step_login()
@@ -421,7 +422,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         try:
             await self._async_prepare_miner(miner, host, user_input)
-        except config_entries.AbortFlow as err:
+        except AbortFlow as err:
             return self.async_abort(reason=err.reason)
 
         return await self.async_step_login()
@@ -551,7 +552,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         try:
             await self._async_prepare_miner(miner, selected_ip, base_data)
-        except config_entries.AbortFlow as err:
+        except AbortFlow as err:
             return self.async_abort(reason=err.reason)
 
         model = normalize_model_name(miner)
