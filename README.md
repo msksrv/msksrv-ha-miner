@@ -115,9 +115,9 @@ Pool fields are applied **only when you submit** this form; they are not stored 
 Add **Farm** from the same integration menu, enter a **name**, and multi-select **miner devices** (only entries created as single miners, not other farms).  
 **Emergency stop** is **available** only if at least one member has a **power switch** configured under **Configure** and that `switch` exists in HA. It sends **`switch.turn_off`** to **all** such switches (parallel, non-blocking).
 
-To **change which miners** are on the farm, remove the farm entry and add it again with the new device list.
+To **add or remove miners** on an existing farm, open **Configure** on the **farm** integration entry, update **Miner devices** (multi-select), and save. Finish setting up any **new** miner as its own integration entry first so it appears in the picker.
 
-**Configure** on the **farm** integration entry opens **room temperature links**: pick one or more **`sensor`** entities (e.g. ZigBee probes). Each appears on the farm device as a temperature sensor whose **name matches the source entity’s friendly name** (and unit follows the source). Updating the list reloads the entry.
+**Configure** also links **room temperature** sensors: pick one or more **`sensor`** entities (e.g. ZigBee probes). Each appears on the farm device as a temperature sensor whose **name matches the source entity’s friendly name** (and unit follows the source). Saving reloads the entry.
 
 Farm sensors include **total hashrate / power**, **miner count / online**, **algorithm summary** (from pyasic per miner; if miners differ, shown as e.g. `SHA256d (3), Scrypt (1)`; if none report an algorithm, **SHA256d** is assumed as label only), **effective chips %** (sum of working chips vs expected chips across **online** members’ hashboards), and any linked **ambient temperature** sensors.
 
@@ -196,11 +196,11 @@ The integration loads **pyasic only when needed** (single-miner setup, scan, ser
 
 ## Releases (beta & stable)
 
-Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b6`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
+Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b7`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
 
 ### Automatic (recommended)
 
-Push a tag **`v1.4.0b6`** or **`v1.4.0`**:
+Push a tag **`v1.4.0b7`** or **`v1.4.0`**:
 
 1. **Create release from tag** runs → opens a GitHub **Release** for that tag. Betas (`bN`, `aN`, `rc`, `beta` in the version) are marked **Pre-release** automatically; pure **`X.Y.Z`** tags are **full** releases.
 2. **Release** runs on publish → writes `manifest.json` **`version`** without the leading **`v`**, zips `custom_components/miner`, uploads **`miner.zip`** to the same release.

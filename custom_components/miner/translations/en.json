@@ -71,6 +71,7 @@
       "farm_no_devices": "Select at least one miner device",
       "farm_invalid_device": "A selected device no longer exists",
       "farm_only_miner_devices": "Only individual miner devices can be added (not another farm)",
+      "farm_device_set_conflict": "Another farm already uses this exact set of miners",
       "invalid_temp_entity": "Each entry must be an existing sensor entity"
     },
     "abort": {
@@ -82,9 +83,10 @@
   "options": {
     "step": {
       "farm_options": {
-        "title": "Farm room temperatures",
-        "description": "Optional: pick temperature sensors (e.g. room probes). Each appears on the farm device using the same friendly name as the source sensor.",
+        "title": "Farm settings",
+        "description": "Choose which miner devices belong to this farm (add new miners here after they are set up). Optionally link room temperature sensors; each appears on the farm device using the same friendly name as the source sensor.",
         "data": {
+          "farm_device_ids": "Miner devices",
           "farm_ambient_temp_entities": "Temperature sensors"
         }
       },
@@ -111,6 +113,10 @@
       }
     },
     "error": {
+      "farm_no_devices": "Select at least one miner device",
+      "farm_invalid_device": "A selected device no longer exists",
+      "farm_only_miner_devices": "Only individual miner devices can be added (not another farm)",
+      "farm_device_set_conflict": "Another farm already uses this exact set of miners",
       "invalid_switch": "The selected entity is missing or is not a switch",
       "invalid_temp_entity": "Each entry must be an existing sensor entity",
       "pool_fields_required": "Enter both stratum host and port for this action.",

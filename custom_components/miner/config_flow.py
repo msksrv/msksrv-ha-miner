@@ -803,10 +803,27 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
     async def async_step_farm_options(
         self, user_input: dict[str, Any] | None = None
     ):
-        """Link room / ambient temperature sensors to the farm device."""
+        """Edit farm members and optional room / ambient temperature sensors."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            devices = user_input.get(CONF_FARM_DEVICE_IDS)
+            if isinstance(devices, str):
+                devices = [devices]
+            if not devices:
+                errors["base"] = "farm_no_devices"
+            else:
+                dev_reg = dr.async_get(self.hass)
+                for did in devices:
+                    dev = dev_reg.async_get(did)
+                    if dev is None:
+                        errors["base"] = "farm_invalid_device"
+                        break
+                    ce = async_get_miner_config_entry_for_device(self.hass, dev)
+                    if ce is None:
+                        errors["base"] = "farm_only_miner_devices"
+                        break
+
             ents = user_input.get(CONF_FARM_AMBIENT_TEMP_ENTITIES)
             if ents is None:
                 ents = []
@@ -826,9 +843,31 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     errors["base"] = "invalid_temp_entity"
                     break
 
+            if not errors and devices:
+                key = ",".join(sorted(devices))
+                uid_digest = hashlib.sha256(key.encode()).hexdigest()[:20]
+                new_unique_id = f"farm_{uid_digest}"
+                if new_unique_id != self.config_entry.unique_id:
+                    for ent in self.hass.config_entries.async_entries(DOMAIN):
+                        if ent.entry_id == self.config_entry.entry_id:
+                            continue
+                        if ent.unique_id == new_unique_id:
+                            errors["base"] = "farm_device_set_conflict"
+                            break
+
             if not errors:
                 new_options = {**self.config_entry.options}
                 new_options[CONF_FARM_AMBIENT_TEMP_ENTITIES] = list(ents)
+                new_data = {**self.config_entry.data, CONF_FARM_DEVICE_IDS: devices}
+                update_kw: dict[str, Any] = {
+                    "data": new_data,
+                    "options": new_options,
+                }
+                if new_unique_id != self.config_entry.unique_id:
+                    update_kw["unique_id"] = new_unique_id
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, **update_kw
+                )
                 return self.async_create_entry(title="", data=new_options)
 
         return self.async_show_form(
@@ -841,12 +880,22 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> vol.Schema:
         user_input = user_input or {}
+        stored_devices = self.config_entry.data.get(CONF_FARM_DEVICE_IDS) or []
+        if isinstance(stored_devices, str):
+            stored_devices = [stored_devices]
+        suggested_devices = user_input.get(CONF_FARM_DEVICE_IDS, stored_devices)
         stored = self.config_entry.options.get(CONF_FARM_AMBIENT_TEMP_ENTITIES) or []
         if isinstance(stored, str):
             stored = [stored]
         suggested = user_input.get(CONF_FARM_AMBIENT_TEMP_ENTITIES, stored)
         return vol.Schema(
             {
+                vol.Required(
+                    CONF_FARM_DEVICE_IDS,
+                    description={"suggested_value": suggested_devices},
+                ): DeviceSelector(
+                    DeviceSelectorConfig(integration=DOMAIN, multiple=True),
+                ),
                 vol.Optional(
                     CONF_FARM_AMBIENT_TEMP_ENTITIES,
                     description={"suggested_value": suggested},
