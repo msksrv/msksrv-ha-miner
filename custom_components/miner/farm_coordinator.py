@@ -34,6 +34,13 @@ def _miner_ip_for_worker_template(coord) -> str:
     return str(coord.config_entry.data.get(CONF_IP) or "").strip()
 
 
+def _miner_ip_for_worker_expansion(entry: ConfigEntry, coord) -> str:
+    """IP for {ip} / {ip_last} when coordinator may be missing."""
+    if coord is not None:
+        return _miner_ip_for_worker_template(coord)
+    return str(entry.data.get(CONF_IP) or "").strip()
+
+
 def expand_farm_pool_username(template: str, miner_ip: object | None) -> str:
     """Replace {ip} and {ip_last} in the worker string (farm bulk apply only)."""
     ip_s = str(miner_ip or "").strip()
@@ -66,18 +73,55 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             config_entry=entry,
         )
 
-    def _iter_miner_coordinators_for_ids(self, device_ids: list[str]):
-        """Yield miner coordinators for each device id in the given list."""
+    def _iter_miner_member_pairs(
+        self,
+        device_ids: list[str],
+        *,
+        warn_missing: bool = False,
+    ):
+        """Yield (miner ConfigEntry, coordinator | None), deduped by config entry id."""
         dev_reg = dr.async_get(self.hass)
+        seen: set[str] = set()
         for did in device_ids:
             device = dev_reg.async_get(did)
             if device is None:
+                if warn_missing:
+                    _LOGGER.warning(
+                        "Farm stratum: device id not in registry (skipped): %s",
+                        did,
+                    )
                 continue
             entry = async_get_miner_config_entry_for_device(self.hass, device)
             if entry is None:
+                if warn_missing:
+                    _LOGGER.warning(
+                        "Farm stratum: device has no miner integration (skipped): %s",
+                        did,
+                    )
                 continue
+            if entry.entry_id in seen:
+                if warn_missing:
+                    _LOGGER.warning(
+                        "Farm stratum: duplicate miner for two devices — only first is used (%s)",
+                        entry.title,
+                    )
+                continue
+            seen.add(entry.entry_id)
             coord = self.hass.data.get(DOMAIN, {}).get(entry.entry_id)
-            if coord is not None and callable(getattr(coord, "get_miner", None)):
+            if coord is not None and not callable(getattr(coord, "get_miner", None)):
+                coord = None
+            if coord is None and warn_missing:
+                _LOGGER.warning(
+                    "Farm stratum: no coordinator for %s (ip=%s); using config entry for API",
+                    entry.title,
+                    entry.data.get(CONF_IP, "?"),
+                )
+            yield entry, coord
+
+    def _iter_miner_coordinators_for_ids(self, device_ids: list[str]):
+        """Yield miner coordinators for each device id in the given list."""
+        for _entry, coord in self._iter_miner_member_pairs(device_ids):
+            if coord is not None:
                 yield coord
 
     def _iter_miner_coordinators(self):
@@ -261,25 +305,30 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         ids = list(device_ids) if device_ids is not None else list(self.device_ids)
         if not self.farm_stratum_allowed_for_device_ids(ids):
             return False, "farm_pool_mixed_algorithms"
-        members = list(self._iter_miner_coordinators_for_ids(ids))
-        if not members:
+        pairs = list(self._iter_miner_member_pairs(ids, warn_missing=True))
+        if not pairs:
             return False, "farm_pool_no_members"
 
         from . import pool_stratum
+        from .coordinator import async_get_miner_from_config_entry
 
         append_ssl = bool(use_ssl) if use_ssl is not None else False
         user_template = "" if username is None else str(username)
         failures = 0
         member_index = 0
-        for coord in members:
+        for entry, coord in pairs:
             per_user = expand_farm_pool_username(
-                user_template, _miner_ip_for_worker_template(coord)
+                user_template, _miner_ip_for_worker_expansion(entry, coord)
             )
-            entry_title = coord.config_entry.title
-            miner_ip = coord.config_entry.data.get(CONF_IP, "?")
+            entry_title = entry.title
+            miner_ip = entry.data.get(CONF_IP, "?")
             success = False
             for attempt in range(_FARM_STRATUM_ATTEMPTS):
-                miner = await coord.get_miner()
+                miner = None
+                if coord is not None:
+                    miner = await coord.get_miner()
+                if miner is None:
+                    miner = await async_get_miner_from_config_entry(entry)
                 if miner is None:
                     _LOGGER.warning(
                         "Farm stratum: no connection (attempt %s/%s) %s ip=%s",
@@ -312,7 +361,8 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                             password,
                         )
                     if ok:
-                        await coord.async_request_refresh()
+                        if coord is not None:
+                            await coord.async_request_refresh()
                         success = True
                         break
                     _LOGGER.warning(
@@ -341,7 +391,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                     _FARM_STRATUM_ATTEMPTS,
                 )
             member_index += 1
-            if member_index < len(members) and success:
+            if member_index < len(pairs) and success:
                 await asyncio.sleep(_FARM_STRATUM_MEMBER_GAP_SEC)
 
         if failures:

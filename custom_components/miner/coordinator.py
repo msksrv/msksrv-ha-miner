@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from .const import CONF_IP
+from .const import CONF_IS_FARM
 from .const import CONF_MIN_POWER
 from .const import CONF_MAX_POWER
 from .const import CONF_RPC_PASSWORD
@@ -18,8 +19,38 @@ from .const import CONF_SSH_PASSWORD
 from .const import CONF_SSH_USERNAME
 from .const import CONF_WEB_PASSWORD
 from .const import CONF_WEB_USERNAME
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def async_get_miner_from_config_entry(
+    entry: ConfigEntry,
+) -> pyasic.AnyMiner | None:
+    """Open a pyasic connection using stored credentials (coordinator not required)."""
+    if (
+        entry.domain != DOMAIN
+        or entry.data.get(CONF_IS_FARM)
+        or not entry.data.get(CONF_IP)
+    ):
+        return None
+    miner_ip = entry.data[CONF_IP]
+    miner = await pyasic.get_miner(miner_ip)
+    if miner is None:
+        return None
+
+    if miner.api is not None and miner.api.pwd is not None:
+        miner.api.pwd = entry.data.get(CONF_RPC_PASSWORD, "")
+
+    if miner.web is not None:
+        miner.web.username = entry.data.get(CONF_WEB_USERNAME, "")
+        miner.web.pwd = entry.data.get(CONF_WEB_PASSWORD, "")
+
+    if miner.ssh is not None:
+        miner.ssh.username = entry.data.get(CONF_SSH_USERNAME, "")
+        miner.ssh.pwd = entry.data.get(CONF_SSH_PASSWORD, "")
+
+    return miner
 
 REQUEST_REFRESH_DEFAULT_COOLDOWN = 5
 
