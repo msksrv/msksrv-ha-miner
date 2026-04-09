@@ -17,6 +17,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES
 from .const import DOMAIN
 from .const import TERA_HASH_PER_SECOND
+from .farm_cost_sensors import setup_farm_cost_sensors
 from .farm_coordinator import MinerFarmCoordinator
 
 
@@ -47,6 +48,7 @@ async def async_setup_farm_sensors(
         if eid:
             entities.append(FarmAmbientTemperatureSensor(coordinator, eid))
     async_add_entities(entities)
+    setup_farm_cost_sensors(hass, config_entry, async_add_entities)
 
 
 class _FarmSensor(CoordinatorEntity[MinerFarmCoordinator], SensorEntity):

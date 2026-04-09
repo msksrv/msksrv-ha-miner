@@ -80,10 +80,16 @@
     "step": {
       "farm_options": {
         "title": "Farm settings",
-        "description": "Up to 5 stratum presets per farm (each farm has its own list in its integration entry). Leave a slot's host empty to remove it. After save, presets are stored with the farm. In the worker field you can use per-miner IP tokens as documented in the integration README. On the farm device card, pick a preset and use Apply buttons.",
+        "description": "Up to 5 stratum presets per farm (each farm has its own list in its integration entry). Leave a slot's host empty to remove it. After save, presets are stored with the farm. In the worker field you can use per-miner IP tokens as documented in the integration README. On the farm device card, pick a preset and use Apply buttons. Optional electricity tariffs: up to three currency + price per kWh pairs; cost sensors integrate total farm power over time. After changing tariffs, reload this integration entry so entities match. Lifetime total is restored from the database after restart; hour/day/month reset on the calendar boundary.",
         "data": {
           "farm_device_ids": "Miner devices",
           "farm_ambient_temp_entities": "Temperature sensors",
+          "farm_elec_currency_1": "Tariff 1 — currency (empty = off)",
+          "farm_elec_price_kwh_1": "Tariff 1 — price per kWh",
+          "farm_elec_currency_2": "Tariff 2 — currency (empty = off)",
+          "farm_elec_price_kwh_2": "Tariff 2 — price per kWh",
+          "farm_elec_currency_3": "Tariff 3 — currency (empty = off)",
+          "farm_elec_price_kwh_3": "Tariff 3 — price per kWh",
           "pool_action": {
             "name": "Stratum pool (all members)",
             "description": "Leave unchanged, replace primary on each miner, or append a backup (max 3 pools each).",
@@ -195,6 +201,21 @@
       },
       "farm_effective_chips_percent": {
         "name": "Effective chips"
+      },
+      "farm_cost_now": {
+        "name": "Power cost at current draw ({currency})"
+      },
+      "farm_cost_hour": {
+        "name": "Electricity cost this hour ({currency})"
+      },
+      "farm_cost_day": {
+        "name": "Electricity cost today ({currency})"
+      },
+      "farm_cost_month": {
+        "name": "Electricity cost this month ({currency})"
+      },
+      "farm_cost_total": {
+        "name": "Electricity cost total ({currency})"
       }
     },
     "select": {

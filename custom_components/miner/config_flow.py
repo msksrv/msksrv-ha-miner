@@ -29,6 +29,7 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from .const import (
     CONF_FARM_AMBIENT_TEMP_ENTITIES,
     CONF_FARM_DEVICE_IDS,
+    CONF_FARM_ENERGY_RATES,
     CONF_FARM_POOL_PRESETS,
     CONF_IP,
     CONF_IS_FARM,
@@ -53,6 +54,8 @@ from .device_resolution import async_get_miner_config_entry_for_device
 from .farm_pool_presets import FARM_POOL_SLOT_COUNT
 from .farm_pool_presets import farm_pool_preset_slots
 from .farm_pool_presets import farm_pool_slots_from_user_input
+from .farm_energy_rates import farm_electricity_schema_fields
+from .farm_energy_rates import farm_energy_rates_from_user_input
 from .farm_pool_presets import strip_legacy_farm_pool_keys
 from .discovery import (
     DiscoveredMiner,
@@ -951,6 +954,9 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 new_options = {**self.config_entry.options}
                 new_options[CONF_FARM_AMBIENT_TEMP_ENTITIES] = list(ents)
                 new_options[CONF_FARM_POOL_PRESETS] = new_slots
+                new_options[CONF_FARM_ENERGY_RATES] = farm_energy_rates_from_user_input(
+                    user_input
+                )
                 strip_legacy_farm_pool_keys(new_options)
 
                 new_data = {**self.config_entry.data, CONF_FARM_DEVICE_IDS: devices}
@@ -1074,6 +1080,9 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             ): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
         }
         fields.update(self._farm_pool_slots_vol(user_input))
+        fields.update(
+            farm_electricity_schema_fields(self.config_entry.options, user_input)
+        )
         return vol.Schema(fields)
 
     def _options_schema(

@@ -84,10 +84,16 @@
     "step": {
       "farm_options": {
         "title": "Farm settings",
-        "description": "Up to 5 stratum presets per farm (each farm entry has its own list). Clear a slot's host to remove it. For worker IP placeholders, see the integration README. Pick slot 1–5 when applying from this form; on the device card use Preset + Apply buttons.",
+        "description": "Up to 5 stratum presets per farm (each farm entry has its own list). Clear a slot's host to remove it. For worker IP placeholders, see the integration README. Pick slot 1–5 when applying from this form; on the device card use Preset + Apply buttons. Optional electricity: up to three currency + price/kWh pairs; sensors integrate total farm power. Reload this entry after changing tariffs so entities match. Lifetime total is restored after restart; hour/day/month reset on the calendar.",
         "data": {
           "farm_device_ids": "Miner devices",
           "farm_ambient_temp_entities": "Temperature sensors",
+          "farm_elec_currency_1": "Tariff 1 — currency (empty = off)",
+          "farm_elec_price_kwh_1": "Tariff 1 — price per kWh",
+          "farm_elec_currency_2": "Tariff 2 — currency (empty = off)",
+          "farm_elec_price_kwh_2": "Tariff 2 — price per kWh",
+          "farm_elec_currency_3": "Tariff 3 — currency (empty = off)",
+          "farm_elec_price_kwh_3": "Tariff 3 — price per kWh",
           "pool_action": {
             "name": "Stratum pool (all members)",
             "description": "Leave unchanged, replace primary on each miner, or append a backup (max 3 pools each).",
@@ -199,6 +205,21 @@
       },
       "farm_effective_chips_percent": {
         "name": "Effective chips"
+      },
+      "farm_cost_now": {
+        "name": "Power cost at current draw ({currency})"
+      },
+      "farm_cost_hour": {
+        "name": "Electricity cost this hour ({currency})"
+      },
+      "farm_cost_day": {
+        "name": "Electricity cost today ({currency})"
+      },
+      "farm_cost_month": {
+        "name": "Electricity cost this month ({currency})"
+      },
+      "farm_cost_total": {
+        "name": "Electricity cost total ({currency})"
       }
     },
     "select": {
