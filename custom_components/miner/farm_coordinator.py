@@ -10,11 +10,9 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import CONF_FARM_DEVICE_IDS
-from .const import CONF_IP
-from .const import CONF_IS_FARM
 from .const import CONF_POWER_SWITCH
 from .const import DOMAIN
-from .coordinator import MinerCoordinator
+from .device_resolution import async_get_miner_config_entry_for_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,21 +35,17 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         )
 
     def _iter_miner_coordinators(self):
-        """Yield MinerCoordinator for each configured miner device on the farm."""
+        """Yield miner coordinators for each configured miner device on the farm."""
         dev_reg = dr.async_get(self.hass)
         for did in self.device_ids:
             device = dev_reg.async_get(did)
             if device is None:
                 continue
-            entry = self.hass.config_entries.async_get_entry(device.primary_config_entry)
-            if entry is None or entry.domain != DOMAIN:
-                continue
-            if entry.data.get(CONF_IS_FARM):
-                continue
-            if not entry.data.get(CONF_IP):
+            entry = async_get_miner_config_entry_for_device(self.hass, device)
+            if entry is None:
                 continue
             coord = self.hass.data.get(DOMAIN, {}).get(entry.entry_id)
-            if isinstance(coord, MinerCoordinator):
+            if coord is not None and callable(getattr(coord, "get_miner", None)):
                 yield coord
 
     async def _async_update_data(self) -> dict:
@@ -97,8 +91,8 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             device = dev_reg.async_get(did)
             if device is None:
                 continue
-            entry = self.hass.config_entries.async_get_entry(device.primary_config_entry)
-            if entry is None or entry.domain != DOMAIN or entry.data.get(CONF_IS_FARM):
+            entry = async_get_miner_config_entry_for_device(self.hass, device)
+            if entry is None:
                 continue
             eid = entry.options.get(CONF_POWER_SWITCH)
             if eid:

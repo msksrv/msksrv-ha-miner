@@ -8,7 +8,6 @@ import logging
 import socket
 from typing import Any
 
-import pyasic
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
@@ -45,21 +44,23 @@ from .const import (
     DOMAIN,
     SCAN_MAX_HOSTS,
 )
+from .device_resolution import async_get_miner_config_entry_for_device
 from .discovery import (
     DiscoveredMiner,
     async_scan_subnet,
     get_stable_identifier,
     normalize_model_name,
 )
-from . import pool_stratum
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def validate_ip_input(
     data: dict[str, Any],
-) -> tuple[dict[str, str], pyasic.AnyMiner | None]:
+) -> tuple[dict[str, str], Any]:
     """Validate that the miner is reachable."""
+    import pyasic
+
     miner_ip = str(data.get(CONF_IP, "")).strip()
 
     if not miner_ip:
@@ -204,6 +205,8 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo):
         """Handle DHCP discovery."""
+        import pyasic
+
         host = str(discovery_info.ip)
         ip_tail = host.split(".")[-1]
 
@@ -287,15 +290,8 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if dev is None:
                     errors["base"] = "farm_invalid_device"
                     break
-                ce = self.hass.config_entries.async_get_entry(
-                    dev.primary_config_entry
-                )
-                if (
-                    ce is None
-                    or ce.domain != DOMAIN
-                    or ce.data.get(CONF_IS_FARM)
-                    or not ce.data.get(CONF_IP)
-                ):
+                ce = async_get_miner_config_entry_for_device(self.hass, dev)
+                if ce is None:
                     errors["base"] = "farm_only_miner_devices"
                     break
 
@@ -448,6 +444,8 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_show_form(step_id="pick_miner", data_schema=schema)
 
         selected_ip = str(user_input[CONF_SELECTED_MINER]).strip()
+
+        import pyasic
 
         try:
             miner = await asyncio.wait_for(pyasic.get_miner(selected_ip), timeout=5)
@@ -680,6 +678,8 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 uname = str(user_input.get("pool_username") or "")
                 pwd = str(user_input.get("pool_password") or "")
                 try:
+                    from . import pool_stratum
+
                     if pool_action == "replace_primary":
                         ok = await pool_stratum.async_apply_primary_stratum(
                             miner,

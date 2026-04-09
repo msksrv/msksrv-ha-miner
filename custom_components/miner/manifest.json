@@ -9,7 +9,7 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/msksrv/msksrv-ha-miner/issues",
   "requirements": [
-    "pyasic==0.78.10"
+    "pyasic>=0.78.9,<0.79"
   ],
   "dhcp": [
     {
@@ -70,5 +70,5 @@
       "registered_devices": true
     }
   ],
-  "version": "1.4.0b2"
+  "version": "1.4.0b3"
 }

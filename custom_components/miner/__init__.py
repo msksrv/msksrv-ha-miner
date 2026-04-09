@@ -1,7 +1,6 @@
 """MSKSRV ASIC Miner integration."""
 from __future__ import annotations
 
-import pyasic
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -10,9 +9,7 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from .const import CONF_IP
 from .const import CONF_IS_FARM
 from .const import DOMAIN
-from .coordinator import MinerCoordinator
 from .farm_coordinator import MinerFarmCoordinator
-from .services import async_setup_services
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -35,6 +32,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     if not hass.data[DOMAIN].get(_SERVICES_SETUP):
+        from .services import async_setup_services
+
         await async_setup_services(hass)
         hass.data[DOMAIN][_SERVICES_SETUP] = True
 
@@ -51,6 +50,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             config_entry, FARM_PLATFORMS
         )
         return True
+
+    import pyasic
+
+    from .coordinator import MinerCoordinator
 
     miner_ip = config_entry.data[CONF_IP]
     miner = await pyasic.get_miner(miner_ip)

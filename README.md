@@ -179,17 +179,21 @@ DHCP-based discovery matches hostnames such as **Antminer**, **WhatsMiner**, **A
 ## Requirements
 
 - **Home Assistant** ≥ **2025.1.0** (see `hacs.json`).
-- **Python dependency**: **pyasic** version pinned in [`manifest.json`](custom_components/miner/manifest.json) (installed automatically).
+- **Python dependency**: **pyasic** `0.78.x` (range in [`manifest.json`](custom_components/miner/manifest.json); installed automatically by Home Assistant).
+
+If setup logs **`Requirements for miner not found`** for pyasic: the host must reach **PyPI** (or your proxy). On very new HA builds (**Python 3.14**), some wheels may lag; updating Home Assistant or retrying after a day often fixes it. The manifest allows **`pyasic>=0.78.9,<0.79`** so pip can pick a build that installs cleanly.
+
+The integration loads **pyasic only when needed** (single-miner setup, scan, services, etc.). **Farm** setup and the config-flow menu should work even if pyasic failed to install until then — fix pyasic first so **per-IP miners** load again.
 
 ---
 
 ## Releases (beta & stable)
 
-Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b2`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
+Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b3`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
 
 ### Automatic (recommended)
 
-Push a tag **`v1.4.0b2`** or **`v1.4.0`**:
+Push a tag **`v1.4.0b3`** or **`v1.4.0`**:
 
 1. **Create release from tag** runs → opens a GitHub **Release** for that tag. Betas (`bN`, `aN`, `rc`, `beta` in the version) are marked **Pre-release** automatically; pure **`X.Y.Z`** tags are **full** releases.
 2. **Release** runs on publish → writes `manifest.json` **`version`** without the leading **`v`**, zips `custom_components/miner`, uploads **`miner.zip`** to the same release.

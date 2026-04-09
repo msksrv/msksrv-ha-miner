@@ -1,4 +1,4 @@
-# Opens a GitHub Release when you push a version tag (e.g. v1.4.0b2).
+# Opens a GitHub Release when you push a version tag (e.g. v1.4.0b3).
 # Betas are marked Pre-release; stable tags (v1.4.0) are full releases.
 # The "Release" workflow then attaches miner.zip and patches manifest version.
 

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
+from typing import cast
 
 from homeassistant.components.sensor import EntityCategory
 from homeassistant.components.sensor import SensorDeviceClass
@@ -22,8 +24,10 @@ from .const import CONF_IS_FARM
 from .const import DOMAIN
 from .const import JOULES_PER_TERA_HASH
 from .const import TERA_HASH_PER_SECOND
-from .coordinator import MinerCoordinator
 from .farm_sensor import async_setup_farm_sensors
+
+if TYPE_CHECKING:
+    from .coordinator import MinerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -199,7 +203,11 @@ async def async_setup_entry(
         await async_setup_farm_sensors(hass, config_entry, async_add_entities)
         return
 
-    coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    from .coordinator import MinerCoordinator
+
+    coordinator = cast(
+        MinerCoordinator, hass.data[DOMAIN][config_entry.entry_id]
+    )
 
     def _create_miner_entity(sensor: str) -> MinerSensor:
         """Create a miner sensor entity."""
@@ -277,7 +285,7 @@ async def async_setup_entry(
     async_add_entities(sensors)
 
 
-class MinerSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
+class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     """Defines a Miner Sensor."""
 
     entity_description: SensorEntityDescription
@@ -332,7 +340,7 @@ class MinerSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
         return self.coordinator.available
 
 
-class MinerBoardSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
+class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     """Defines a Miner Board Sensor."""
 
     entity_description: SensorEntityDescription
@@ -386,7 +394,7 @@ class MinerBoardSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
         return self.coordinator.available
 
 
-class MinerFanSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
+class MinerFanSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     """Defines a Miner Fan Sensor."""
 
     entity_description: SensorEntityDescription

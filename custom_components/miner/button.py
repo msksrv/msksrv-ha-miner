@@ -1,6 +1,9 @@
 """Support for Miner action buttons."""
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+from typing import cast
+
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
@@ -12,8 +15,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_IS_FARM
 from .const import CONF_POWER_SWITCH
 from .const import DOMAIN
-from .coordinator import MinerCoordinator
 from .farm_button import async_setup_farm_buttons
+
+if TYPE_CHECKING:
+    from .coordinator import MinerCoordinator
 
 
 async def async_setup_entry(
@@ -26,7 +31,11 @@ async def async_setup_entry(
         await async_setup_farm_buttons(hass, config_entry, async_add_entities)
         return
 
-    coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    from .coordinator import MinerCoordinator
+
+    coordinator = cast(
+        MinerCoordinator, hass.data[DOMAIN][config_entry.entry_id]
+    )
     await coordinator.async_config_entry_first_refresh()
     async_add_entities(
         [
@@ -37,7 +46,7 @@ async def async_setup_entry(
     )
 
 
-class MinerRebootButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
+class MinerRebootButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
     """Button to reboot a miner."""
 
     _attr_device_class = ButtonDeviceClass.RESTART
@@ -69,7 +78,7 @@ class MinerRebootButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
         return self.coordinator.available
 
 
-class _MinerLinkedSwitchButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
+class _MinerLinkedSwitchButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
     """Shared: linked HA switch from integration options (on/off power strip)."""
 
     _attr_has_entity_name = True

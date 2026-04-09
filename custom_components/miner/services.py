@@ -9,7 +9,6 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers.device_registry import (
     async_get as async_get_device_registry,
 )
-from pyasic.config.mining import MiningModeConfig
 
 from .const import (
     DOMAIN,
@@ -18,9 +17,7 @@ from .const import (
     SERVICE_SET_POOL,
     SERVICE_SET_WORK_MODE,
 )
-from .pool_stratum import async_append_stratum_pool
-from .pool_stratum import async_apply_primary_stratum
-from .pool_stratum import ensure_first_pool_group
+from .device_resolution import async_get_miner_config_entry_for_device
 
 LOGGER = logging.getLogger(__name__)
 
@@ -41,10 +38,18 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         coordinators = []
         for device_id in miner_ids:
             device = registry.async_get(device_id)
-            if device and device.primary_config_entry in hass_devices:
-                coordinator = hass_devices[device.primary_config_entry]
-                tasks.append(coordinator.get_miner())
-                coordinators.append(coordinator)
+            if not device:
+                continue
+            entry = async_get_miner_config_entry_for_device(hass, device)
+            if entry is None:
+                continue
+            coordinator = hass_devices.get(entry.entry_id)
+            if coordinator is None or not callable(
+                getattr(coordinator, "get_miner", None)
+            ):
+                continue
+            tasks.append(coordinator.get_miner())
+            coordinators.append(coordinator)
 
         if not tasks:
             return []
@@ -69,6 +74,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_RESTART_BACKEND, restart_backend)
 
     async def set_work_mode(call: ServiceCall) -> None:
+        from pyasic.config.mining import MiningModeConfig
+
         targets = await get_targets(call)
         mode = call.data.get("mode", "high")
 
@@ -90,6 +97,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_SET_WORK_MODE, set_work_mode)
 
     async def set_pool(call: ServiceCall) -> None:
+        from .pool_stratum import async_append_stratum_pool
+        from .pool_stratum import async_apply_primary_stratum
+        from .pool_stratum import ensure_first_pool_group
+
         targets = await get_targets(call)
         mode = str(call.data.get("mode", "existing")).lower()
         pool_index = int(call.data.get("pool_index", 0))

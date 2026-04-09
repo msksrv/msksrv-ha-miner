@@ -6,8 +6,6 @@ import ipaddress
 import logging
 from dataclasses import dataclass
 
-import pyasic
-
 from .const import (
     SCAN_CONCURRENCY,
     SCAN_MAX_HOSTS,
@@ -118,6 +116,8 @@ async def async_detect_miner(ip: str) -> DiscoveredMiner | None:
 
     if not open_ports:
         return None
+
+    import pyasic
 
     try:
         miner = await asyncio.wait_for(pyasic.get_miner(ip), timeout=SCAN_MINER_TIMEOUT)
