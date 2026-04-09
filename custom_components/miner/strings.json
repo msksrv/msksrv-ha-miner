@@ -93,7 +93,8 @@
               "append_backup": "Add backup pool (host and port below)"
             }
           },
-          "pool_apply_slot": "Slot to apply (1–5)"
+          "pool_apply_slot": "Slot to apply (1–5)",
+          "sidebar_panel": "Show MSKSRV Miner in the sidebar"
         }
       },
       "init": {
@@ -114,7 +115,8 @@
           "pool_port": "Stratum port",
           "pool_use_ssl": "Use stratum+ssl",
           "pool_username": "Worker username",
-          "pool_password": "Worker password"
+          "pool_password": "Worker password",
+          "sidebar_panel": "Show MSKSRV Miner in the sidebar"
         }
       }
     },

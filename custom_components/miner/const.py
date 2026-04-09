@@ -23,6 +23,7 @@ CONF_FARM_POOL_PORT = "farm_pool_port"
 CONF_FARM_POOL_USE_SSL = "farm_pool_use_ssl"
 CONF_FARM_POOL_USERNAME = "farm_pool_username"
 CONF_FARM_POOL_PASSWORD = "farm_pool_password"
+CONF_SIDEBAR_PANEL = "sidebar_panel"
 
 SERVICE_REBOOT = "reboot"
 SERVICE_RESTART_BACKEND = "restart_backend"

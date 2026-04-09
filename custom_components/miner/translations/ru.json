@@ -97,7 +97,8 @@
               "append_backup": "Добавить резервный пул (хост и порт ниже)"
             }
           },
-          "pool_apply_slot": "Какой слот (1–5) применить"
+          "pool_apply_slot": "Какой слот (1–5) применить",
+          "sidebar_panel": "Показывать MSKSRV Miner в боковой панели"
         }
       },
       "init": {
@@ -118,7 +119,8 @@
           "pool_port": "Порт stratum",
           "pool_use_ssl": "Использовать stratum+ssl",
           "pool_username": "Имя воркера",
-          "pool_password": "Пароль воркера"
+          "pool_password": "Пароль воркера",
+          "sidebar_panel": "Показывать MSKSRV Miner в боковой панели"
         }
       }
     },
