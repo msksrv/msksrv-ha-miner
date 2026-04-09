@@ -82,6 +82,19 @@ def _format_uptime(value) -> str | None:
     return " ".join(parts) if parts else "0s"
 
 
+def _primary_pool_metrics(pools):
+    """Prefer the pool marked active; otherwise the first slot (miner order)."""
+    if not pools:
+        return None
+    for p in pools:
+        try:
+            if getattr(p, "active", None) is True:
+                return p
+        except Exception:
+            pass
+    return pools[0]
+
+
 DEFAULT_DATA = {
     "hostname": None,
     "mac": None,
@@ -96,6 +109,7 @@ DEFAULT_DATA = {
     "pool": None,
     "pool_host": None,
     "pool_port": None,
+    "pool_worker": None,
     "accepted_shares": 0,
     "rejected_shares": 0,
     "reject_rate": 0,
@@ -255,24 +269,29 @@ class MinerCoordinator(DataUpdateCoordinator):
         pool = None
         pool_host = None
         pool_port = None
+        pool_worker = None
         accepted = None
         rejected = None
 
         try:
-            first_pool = miner_data.pools[0]
-            pool = getattr(first_pool, "url", None)
-            accepted = getattr(first_pool, "accepted", None)
-            rejected = getattr(first_pool, "rejected", None)
+            first_pool = _primary_pool_metrics(miner_data.pools)
+            if first_pool is not None:
+                pool = getattr(first_pool, "url", None)
+                accepted = getattr(first_pool, "accepted", None)
+                rejected = getattr(first_pool, "rejected", None)
+                raw_user = getattr(first_pool, "user", None)
+                if raw_user is not None:
+                    pool_worker = str(raw_user).strip() or None
 
-            if pool:
-                pool_no_proto = str(pool).replace("stratum+tcp://", "").replace(
-                    "stratum+ssl://", ""
-                )
-                if ":" in pool_no_proto:
-                    pool_host, pool_port = pool_no_proto.rsplit(":", 1)
-                else:
-                    pool_host = pool_no_proto
-                    pool_port = None
+                if pool:
+                    pool_no_proto = str(pool).replace("stratum+tcp://", "").replace(
+                        "stratum+ssl://", ""
+                    )
+                    if ":" in pool_no_proto:
+                        pool_host, pool_port = pool_no_proto.rsplit(":", 1)
+                    else:
+                        pool_host = pool_no_proto
+                        pool_port = None
         except Exception:
             pass
 
@@ -303,6 +322,7 @@ class MinerCoordinator(DataUpdateCoordinator):
             "pool": pool,
             "pool_host": pool_host,
             "pool_port": pool_port,
+            "pool_worker": pool_worker,
             "accepted_shares": accepted,
             "rejected_shares": rejected,
             "reject_rate": reject_rate,

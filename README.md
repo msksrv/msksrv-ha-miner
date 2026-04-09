@@ -1,10 +1,10 @@
-# MSKSRV ASIC Miner
+# MSKSRV ASIC Miner — Home Assistant integration for ASIC miners
+
+**MSKSRV ASIC Miner** is a **[Home Assistant](https://www.home-assistant.io/)** custom integration for **local monitoring and control of ASIC Bitcoin miners** (Antminer, WhatsMiner, Avalon, Innosilicon, Goldshell, IceRiver, BitAxe, and others supported by [**pyasic**](https://github.com/UpstreamData/pyasic)). Install via **[HACS](https://www.hacs.xyz/)** or manually; one **config entry per miner IP**, optional **RPC / web / SSH** credentials, **stratum pool** tools, and an optional **farm** device that aggregates hashrate, power, and **bulk pool apply** across many miners.
 
 [![GitHub Release](https://img.shields.io/github/v/release/msksrv/msksrv-ha-miner?style=for-the-badge)](https://github.com/msksrv/msksrv-ha-miner/releases)
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)](LICENSE)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
-
-**Home Assistant** integration for monitoring and controlling **ASIC Bitcoin miners** on your LAN. Built on [**pyasic**](https://github.com/UpstreamData/pyasic); one **config entry** per miner (IP), with optional credentials and a linked **smart switch** for hard power-off.
 
 ---
 
@@ -21,14 +21,18 @@
 - [Configuration](#configuration)
 - [Farm device](#farm-device)
 - [Entities](#entities)
+- [Automation examples (YAML)](#automation-examples-yaml)
 - [Services](#services)
 - [Device actions](#device-actions)
 - [Discovery](#discovery)
 - [Requirements](#requirements)
+- [Troubleshooting](#troubleshooting)
 - [Limitations](#limitations)
-- [Releases (beta & stable)](#releases-beta--stable)
+- [Releases](#releases)
 - [License](#license)
 - [Credits](#credits)
+
+**Search keywords:** Home Assistant miner, HACS ASIC integration, Bitcoin miner dashboard, Antminer Home Assistant, WhatsMiner sensor, hashrate sensor, stratum pool automation, mining farm Home Assistant, pyasic.
 
 ---
 
@@ -54,7 +58,7 @@ Poll interval is **10 seconds** (`local_polling`). Typical data includes:
 - **Thermal** — average temperature; **per-board** board temp, chip temp, hashrate
 - **Chips** — per-board chip counts, expected chips, effective chips, effective %
 - **Fans** — RPM per fan
-- **Pool** — primary pool host/port, accepted/rejected shares, reject rate
+- **Pool** — primary pool host/port, **pool worker** (stratum user from the active or first pool slot), accepted/rejected shares, reject rate
 - **Device** — model, firmware, uptime (formatted), board count, IP, MAC
 
 When the miner is temporarily unreachable, the integration keeps entities alive with **degraded / zeroed** data on the first failure, then marks the device unavailable on repeated failures.
@@ -76,6 +80,7 @@ When the miner is temporarily unreachable, the integration keeps entities alive 
 
 - **Services** — reboot, restart mining backend, set work mode, set pool, set farm pool (see [Services](#services)).
 - **Device actions** — reboot, restart backend, set work mode from the device automation UI (see [Device actions](#device-actions)).
+- **YAML examples** — [Automation examples (YAML)](#automation-examples-yaml).
 
 ---
 
@@ -112,6 +117,10 @@ Open **Settings → Devices & services → Integrations** (not the “Devices”
 
 Pool fields are applied **only when you submit** this form; they are not stored as long-lived options (only the power switch entity id is saved).
 
+### Sidebar & dashboards
+
+Use Home Assistant’s **built-in** tools: **Profile** (user menu) → customize **sidebar** visibility/order, and/or create a **Lovelace** view with miner cards and enable **Show in sidebar** on that dashboard. This integration does **not** register its own sidebar panel (avoids duplicate menu entries).
+
 ### Farm device {#farm-device}
 
 Add **Farm** from the same integration menu, enter a **name**, and multi-select **miner devices** (only entries created as single miners, not other farms).  
@@ -141,7 +150,7 @@ Naming follows `{device title} …`; board/fan indices depend on hardware.
 |------|-----------|
 | Miner | Hashrate, ideal hashrate, active preset, temperature, power limit, consumption, efficiency |
 | Diagnostics | IP, MAC, ASIC model, firmware, uptime, boards count |
-| Pool | Pool host, pool port, accepted/rejected shares, reject rate |
+| Pool | Pool host, pool port, **pool worker** (stratum user), accepted/rejected shares, reject rate |
 | Per board | Board temperature, chip temperature, board hashrate, chips / expected / effective / % |
 | Per fan | Fan speed (RPM) |
 
@@ -153,6 +162,92 @@ Naming follows `{device title} …`; board/fan indices depend on hardware.
 - **`select.*_pool_priority`** — pick primary pool among configured slots (≥2 pools).
 - **`button.*_reboot`** — software reboot.
 - **`button.*_power_off`** / **`button.*_power_on`** — `switch.turn_off` / `switch.turn_on` on the linked switch.
+
+---
+
+## Automation examples (YAML)
+
+Replace `device_id` values with IDs from **Developer tools → Devices** (or use the UI automation editor’s device selector — it fills the correct id).
+
+### Reboot one miner when a helper turns on
+
+```yaml
+automation:
+  - alias: "Reboot miner from helper"
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.reboot_miner_now
+        to: "on"
+    actions:
+      - action: miner.reboot
+        data:
+          device_id:
+            - abc123yourDeviceIdHere
+      - action: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.reboot_miner_now
+```
+
+### Set primary stratum pool (manual mode)
+
+```yaml
+automation:
+  - alias: "Point miner at new primary pool"
+    triggers:
+      - trigger: time
+        at: "04:00:00"
+    actions:
+      - action: miner.set_pool
+        data:
+          device_id:
+            - abc123yourDeviceIdHere
+          mode: manual
+          host: "pool.example.com"
+          port: 3333
+          use_ssl: false
+          username: "account.worker1"
+          password: "optional_pool_password"
+```
+
+### Farm: same pool on all linked miners
+
+Worker string can use **`{ip}`** or **`{ip_last}`** per miner (e.g. `mypool.{ip_last}`).
+
+```yaml
+automation:
+  - alias: "Farm pool switch"
+    triggers:
+      - trigger: state
+        entity_id: input_select.farm_pool_choice
+    actions:
+      - action: miner.set_farm_pool
+        data:
+          device_id:
+            - farmDeviceIdHere
+          mode: manual
+          host: "stratum.pool.com"
+          port: 443
+          use_ssl: true
+          username: "user.{ip_last}"
+          password: ""
+```
+
+### Alert when hashrate drops (example pattern)
+
+```yaml
+automation:
+  - alias: "Low hashrate warning"
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.my_miner_hashrate
+        below: 50
+        for: "00:10:00"
+    actions:
+      - action: notify.persistent_notification
+        data:
+          title: "Miner hashrate low"
+          message: "Check {{ state_attr('sensor.my_miner_hashrate', 'friendly_name') }}"
+```
 
 ---
 
@@ -203,20 +298,18 @@ The integration loads **pyasic only when needed** (single-miner setup, scan, ser
 
 ---
 
-## Releases (beta & stable)
+## Troubleshooting
 
-Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b11`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
+| Symptom | What to check |
+|--------|----------------|
+| **Miner unavailable** | Ping IP; RPC/web passwords; firewall; miner web UI reachable from HA host. |
+| **No pool worker sensor value** | Firmware/API may omit stratum user in pool stats; primary/active pool is used when reported. |
+| **Farm pool apply fails for one member** | Logs show `Farm stratum:` — offline miner, mixed algorithms, or duplicate device entries on the farm (use **Configure** to fix device list). |
+| **DHCP discovery never starts** | Hostname patterns are **lowercase** in `manifest.json`; HA lowercases DHCP hostnames before match. |
+| **Ghost sidebar item “MSKSRV…” after upgrade** | Older betas registered a custom panel; disable it under **Profile → sidebar**, or restart HA after updating to **1.4.x**. |
+| **PyPI / pyasic install errors** | Network, corporate proxy, Python version; see [Requirements](#requirements). |
 
-### Automatic (recommended)
-
-Push a tag **`v1.4.0b11`** or **`v1.4.0`**:
-
-1. **Create release from tag** runs → opens a GitHub **Release** for that tag. Betas (`bN`, `aN`, `rc`, `beta` in the version) are marked **Pre-release** automatically; pure **`X.Y.Z`** tags are **full** releases.
-2. **Release** runs on publish → writes `manifest.json` **`version`** without the leading **`v`**, zips `custom_components/miner`, uploads **`miner.zip`** to the same release.
-
-### Manual
-
-You can still create a release in the GitHub UI: pick the tag, turn on **Set as a pre-release** for betas, then **Publish** — the ZIP workflow runs the same way.
+**Issues & feature requests:** [GitHub Issues](https://github.com/msksrv/msksrv-ha-miner/issues).
 
 ---
 
@@ -229,6 +322,25 @@ You can still create a release in the GitHub UI: pick the tag, turn on **Set as 
 Supported device families in pyasic:
 
 https://pyasic.readthedocs.io/en/latest/miners/supported_types/
+
+---
+
+## Releases
+
+**Current stable line: 1.4.x** — farm stratum improvements (deduplicated members, fallback when a coordinator is missing), **pool worker** sensor, config-flow fixes for DHCP “already configured”, and removal of the experimental custom sidebar panel (use HA’s own sidebar settings).
+
+### Automatic release (GitHub Actions)
+
+Push a version tag:
+
+- **Stable:** `v1.4.0` → full **Release**, `miner.zip` attached, `manifest.json` version updated in the workflow to match the tag (without leading `v`).
+- **Beta / RC:** `v1.5.0b1`, `v1.5.0rc1`, etc. → **Pre-release** (same ZIP workflow).
+
+Workflows: **Create release from tag** (drafts the GitHub release) and **Release** (on publish: patch manifest version in the artifact, zip `custom_components/miner`, upload **`miner.zip`**).
+
+### Manual
+
+You can create a release in the GitHub UI: choose the tag, optionally **Set as a pre-release** for betas, then **Publish** — the ZIP workflow runs the same way.
 
 ---
 

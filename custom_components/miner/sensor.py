@@ -171,6 +171,11 @@ ENTITY_DESCRIPTION_KEY_MAP: dict[str, SensorEntityDescription] = {
         icon="mdi:numeric",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    "pool_worker": SensorEntityDescription(
+        key="Pool Worker",
+        icon="mdi:account",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
     "accepted_shares": SensorEntityDescription(
         key="Accepted Shares",
         icon="mdi:check-circle-outline",
@@ -260,6 +265,7 @@ async def async_setup_entry(
         "boards_count",
         "pool_host",
         "pool_port",
+        "pool_worker",
         "accepted_shares",
         "rejected_shares",
         "reject_rate",
