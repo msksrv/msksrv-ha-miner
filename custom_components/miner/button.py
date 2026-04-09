@@ -16,6 +16,7 @@ from .const import CONF_IS_FARM
 from .const import CONF_POWER_SWITCH
 from .const import DOMAIN
 from .farm_button import async_setup_farm_buttons
+from .miner_device_info import get_miner_device_info
 
 if TYPE_CHECKING:
     from .coordinator import MinerCoordinator
@@ -61,13 +62,7 @@ class MinerRebootButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
 
     @property
     def device_info(self) -> entity.DeviceInfo:
-        return entity.DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.data["mac"])},
-            manufacturer=self.coordinator.data["make"],
-            model=self.coordinator.data["model"],
-            sw_version=self.coordinator.data["fw_ver"],
-            name=f"{self.coordinator.config_entry.title}",
-        )
+        return get_miner_device_info(self.coordinator)
 
     async def async_press(self) -> None:
         """Handle button press."""
@@ -89,13 +84,7 @@ class _MinerLinkedSwitchButton(CoordinatorEntity["MinerCoordinator"], ButtonEnti
 
     @property
     def device_info(self) -> entity.DeviceInfo:
-        return entity.DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.data["mac"])},
-            manufacturer=self.coordinator.data["make"],
-            model=self.coordinator.data["model"],
-            sw_version=self.coordinator.data["fw_ver"],
-            name=f"{self.coordinator.config_entry.title}",
-        )
+        return get_miner_device_info(self.coordinator)
 
     @property
     def _power_switch_entity_id(self) -> str | None:

@@ -13,6 +13,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import MinerCoordinator
+from .miner_device_info import get_miner_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,13 +65,7 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
     @property
     def device_info(self) -> entity.DeviceInfo:
         """Return device info."""
-        return entity.DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.data["mac"])},
-            manufacturer=self.coordinator.data["make"],
-            model=self.coordinator.data["model"],
-            sw_version=self.coordinator.data["fw_ver"],
-            name=f"{self.coordinator.config_entry.title}",
-        )
+        return get_miner_device_info(self.coordinator)
 
     async def async_turn_on(self) -> None:
         """Turn on miner."""

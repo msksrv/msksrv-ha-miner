@@ -25,6 +25,7 @@ from .const import DOMAIN
 from .const import JOULES_PER_TERA_HASH
 from .const import TERA_HASH_PER_SECOND
 from .farm_sensor import async_setup_farm_sensors
+from .miner_device_info import get_miner_device_info
 
 if TYPE_CHECKING:
     from .coordinator import MinerCoordinator
@@ -327,13 +328,7 @@ class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     @property
     def device_info(self) -> entity.DeviceInfo:
         """Return device info."""
-        return entity.DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.data["mac"])},
-            manufacturer=self.coordinator.data["make"],
-            model=self.coordinator.data["model"],
-            sw_version=self.coordinator.data["fw_ver"],
-            name=f"{self.coordinator.config_entry.title}",
-        )
+        return get_miner_device_info(self.coordinator)
 
     @property
     def native_value(self) -> StateType:
@@ -381,13 +376,7 @@ class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     @property
     def device_info(self) -> entity.DeviceInfo:
         """Return device info."""
-        return entity.DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.data["mac"])},
-            manufacturer=self.coordinator.data["make"],
-            model=self.coordinator.data["model"],
-            sw_version=self.coordinator.data["fw_ver"],
-            name=f"{self.coordinator.config_entry.title}",
-        )
+        return get_miner_device_info(self.coordinator)
 
     @property
     def native_value(self) -> StateType:
@@ -436,13 +425,7 @@ class MinerFanSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     @property
     def device_info(self) -> entity.DeviceInfo:
         """Return device info."""
-        return entity.DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.data["mac"])},
-            manufacturer=self.coordinator.data["make"],
-            model=self.coordinator.data["model"],
-            sw_version=self.coordinator.data["fw_ver"],
-            name=f"{self.coordinator.config_entry.title}",
-        )
+        return get_miner_device_info(self.coordinator)
 
     @property
     def native_value(self) -> StateType:

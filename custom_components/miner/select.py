@@ -16,6 +16,7 @@ from pyasic.config.pools import PoolGroup
 
 from .const import CONF_IS_FARM
 from .const import DOMAIN
+from .miner_device_info import get_miner_device_info
 from .coordinator import MinerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -116,13 +117,7 @@ class MinerPowerModeSelect(CoordinatorEntity[MinerCoordinator], SelectEntity):
 
     @property
     def device_info(self) -> entity.DeviceInfo:
-        return entity.DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.data["mac"])},
-            manufacturer=self.coordinator.data["make"],
-            model=self.coordinator.data["model"],
-            sw_version=self.coordinator.data["fw_ver"],
-            name=f"{self.coordinator.config_entry.title}",
-        )
+        return get_miner_device_info(self.coordinator)
 
     @property
     def options(self) -> list[str]:
@@ -170,13 +165,7 @@ class MinerPoolPrioritySelect(CoordinatorEntity[MinerCoordinator], SelectEntity)
 
     @property
     def device_info(self) -> entity.DeviceInfo:
-        return entity.DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.data["mac"])},
-            manufacturer=self.coordinator.data["make"],
-            model=self.coordinator.data["model"],
-            sw_version=self.coordinator.data["fw_ver"],
-            name=f"{self.coordinator.config_entry.title}",
-        )
+        return get_miner_device_info(self.coordinator)
 
     @property
     def options(self) -> list[str]:
