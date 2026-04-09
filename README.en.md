@@ -20,7 +20,7 @@
 
 - [Features](#features)
 - [Installation](#installation)
-- [Configuration](#configuration)
+- [Configuration](#configuration) ([HA UI icons](#ui-legend))
 - [Farm device](#farm-device)
 - [Entities](#entities)
 - [Automation examples (YAML)](#automation-examples-yaml)
@@ -47,9 +47,9 @@
 | **DHCP discovery** | Home Assistant matches **lowercase DHCP hostname** globs (`whatsminer*`, `antminer*`, …) and/or known **MAC OUIs**; then the integration probes the miner API with limited retries (see [Discovery](#discovery)). |
 | **Subnet scan** | Scan an IPv4 subnet (CIDR) with progress UI; pick a discovered host. Subnet size is capped for safety. |
 | **Manual IP** | Add a miner by address. |
-| **Farm** | Second-level device: select existing **miner** devices → **total hashrate (TH/s)**, **total power (kW)**, **miner count / online**, **algorithm** summary, **Emergency stop** (calls `switch.turn_off` on each member’s **power switch** from integration options). **Configure** can apply the **same stratum primary or backup** to every member when they share one reported algorithm. |
+| **Farm** | Second-level device: select existing **miner** devices → **total hashrate (TH/s)**, **total power (kW)**, **miner count / online**, **algorithm** summary, **Emergency stop** (calls `switch.turn_off` on each member’s **power switch** set in [**⋯ → Configure**](#ui-legend) on **that member’s** integration tile). [**⋯ → Configure**](#ui-legend) on the **farm** tile can apply the **same stratum primary or backup** to every member when they share one reported algorithm. |
 | **Credentials** | Optional RPC, web UI, and SSH credentials when the miner exposes those APIs. |
-| **Power switch & pool (options)** | Link a **`switch`** for plug control (**Power off** / **Power on**). Optionally **replace primary stratum** or **append a backup pool** (host, port, SSL, worker) when the miner is online. |
+| **Power switch & pool (options)** | In [**⋯ → Configure**](#ui-legend) on the miner tile: link a **`switch`** for plug control (**Power off** / **Power on**), and optionally **replace primary stratum** or **append a backup pool** (host, port, SSL, worker) when the miner is online. |
 
 ### Monitoring (sensors)
 
@@ -74,9 +74,9 @@ When the miner is temporarily unreachable, the integration keeps entities alive 
 | **`select`** | **Power mode** — Low / Normal / High. | Power modes supported **and** autotuning **not** used (same rule as upstream pyasic usage). |
 | **`select`** | **Pool priority** — reorder configured pool slots so the chosen entry becomes primary. | At least **two** pools in the primary pool group in miner config. |
 | **`button`** | **Reboot** — device reboot via pyasic. | Always (per miner). |
-| **`button`** | **Power off** — `switch.turn_off` on the switch chosen in **integration options**. | Always listed; **available** only if a valid `switch` entity is configured and present in the state machine. |
+| **`button`** | **Power off** — `switch.turn_off` on the switch chosen in [**⋯ → Configure**](#ui-legend) on the miner tile. | Always listed; **available** only if a valid `switch` entity is configured and present in the state machine. |
 | **`select`** | **Farm: preset to apply** — picks which saved stratum slot is used by the farm’s apply buttons. | **Farm** device only; at least one configured preset. |
-| **`button`** | **Farm: apply preset as primary / backup** — same logic as bulk stratum from **Configure**; uses the select above. | **Farm** device; requires presets. |
+| **`button`** | **Farm: apply preset as primary / backup** — same logic as bulk stratum via [**⋯ → Configure**](#ui-legend) on the **farm** tile; uses the select above. | **Farm** device; requires presets. |
 
 ### Automation
 
@@ -105,14 +105,28 @@ Copy the `custom_components/miner` folder into your Home Assistant
 
 ## Configuration {#configuration}
 
-1. **Settings → Devices & services → Add integration → MSKSRV ASIC Miner.**
+### Home Assistant UI icons {#ui-legend}
+
+These match what you see in the HA sidebar and on integration cards:
+
+| Icon | Where to click |
+|:----:|----------------|
+| ⚙️ | **Settings** — **cog** in the sidebar (often bottom-left). |
+| 🔌 | **Devices & services** — inside Settings. |
+| 🧩 | **Integrations** tab under Devices & services — **not** the “Devices” tab. |
+| ➕ | **Add integration** on the Integrations screen. |
+| ⋯ → **Configure** | On the **MSKSRV ASIC Miner** **integration row** (one line per miner IP or **farm**): **⋯** menu on the card, then **Configure** (sometimes a small **cog** on the row instead). Opens **integration options** — **not** the device page from the “Devices” tab. |
+| 👤 | **Profile** (avatar / initials) — **sidebar** customization lives here. |
+| 🛠️ | **Developer tools** — **Devices** tab (for `device_id`), **Actions** tab (call services). |
+
+1. **⚙️ Settings → 🔌 Devices & services → 🧩 Integrations → ➕ Add integration → MSKSRV ASIC Miner.**
 2. Choose **Scan**, **Manual**, **Farm** (aggregate), or complete flow from **DHCP discovery**.
 3. Enter optional **RPC / Web / SSH** credentials if prompted.
 4. Set the **device name** (area / dashboard friendly).
 
 ### Integration options (power + stratum)
 
-Open **Settings → Devices & services → Integrations** (not the “Devices” tab). Find **MSKSRV ASIC Miner**, open the **entry for this miner** (one tile per IP), then **Configure**.
+**⚙️ Settings → 🔌 Devices & services → 🧩 Integrations** (this is **not** the “Devices” tab). Find **MSKSRV ASIC Miner**, select the **entry for this miner** (one row per IP), then [**⋯ → Configure**](#ui-legend).
 
 - **Power switch** — picker limited to **`switch`**. **Power off** / **Power on** stay unavailable until you save a valid switch (or if that entity is removed). Clear the field and submit to unlink.
 - **Stratum pool** — choose **do nothing**, **set primary pool**, or **add backup pool**, then fill **host**, **port**, optional **SSL** and **worker** credentials. The miner must be **reachable** when you submit; up to **3** pools in the primary group (append fails if full).
@@ -121,21 +135,21 @@ Pool fields are applied **only when you submit** this form; they are not stored 
 
 ### Sidebar & dashboards
 
-Use Home Assistant’s **built-in** tools: **Profile** (user menu) → customize **sidebar** visibility/order, and/or create a **Lovelace** view with miner cards and enable **Show in sidebar** on that dashboard. This integration does **not** register its own sidebar panel (avoids duplicate menu entries).
+Use Home Assistant’s **built-in** tools: **👤 Profile** → **sidebar** visibility/order, and/or create a **Lovelace** view with miner cards and enable **Show in sidebar** on that dashboard. This integration does **not** register its own sidebar panel (avoids duplicate menu entries).
 
 ### Farm device {#farm-device}
 
 Add **Farm** from the same integration menu, enter a **name**, and multi-select **miner devices** (only entries created as single miners, not other farms).  
-**Emergency stop** is **available** only if at least one member has a **power switch** configured under **Configure** and that `switch` exists in HA. It sends **`switch.turn_off`** to **all** such switches (parallel, non-blocking).
+**Emergency stop** is **available** only if at least one member has a **power switch** set in [**⋯ → Configure**](#ui-legend) on **that member’s** miner tile and that `switch` exists in HA. It sends **`switch.turn_off`** to **all** such switches (parallel, non-blocking).
 
-To **add or remove miners** on an existing farm, open **Configure** on the **farm** integration entry, update **Miner devices** (multi-select), and save. Finish setting up any **new** miner as its own integration entry first so it appears in the picker.
+To **add or remove miners** on an existing farm, open [**⋯ → Configure**](#ui-legend) on the **farm** integration tile (under **🧩 Integrations**), update **Miner devices** (multi-select), and save. Finish setting up any **new** miner as its own integration entry first so it appears in the picker.
 
-**Configure** also links **room temperature** sensors: pick one or more **`sensor`** entities (e.g. ZigBee probes). Each appears on the farm device as a temperature sensor whose **name matches the source entity’s friendly name** (and unit follows the source). Saving reloads the entry.
+[**⋯ → Configure**](#ui-legend) on the **farm** tile also links **room temperature** sensors: pick one or more **`sensor`** entities (e.g. ZigBee probes). Each appears on the farm device as a temperature sensor whose **name matches the source entity’s friendly name** (and unit follows the source). Saving reloads the entry.
 
-**Stratum (all members)** — up to **five** preset slots per **farm integration entry** (each farm has its **own** list in that entry’s options — independent of other farms). Each slot has host, port, SSL, worker, password. **Clear a slot’s host** (and port) and save to **remove** that preset. Applying from **Configure** uses the **“which slot (1–5)”** selector plus **replace primary** / **append backup**; behaviour matches **`miner.set_pool`**. **Every** linked miner must accept the change or the form errors. Bulk apply is **blocked** if members report **more than one algorithm** (last successful poll).
+**Stratum (all members)** — up to **five** preset slots per **farm integration entry** (each farm has its **own** list in that entry’s options — independent of other farms). Each slot has host, port, SSL, worker, password. **Clear a slot’s host** (and port) and save to **remove** that preset. Bulk apply from [**⋯ → Configure**](#ui-legend) on the **farm** tile uses the **“which slot (1–5)”** selector plus **replace primary** / **append backup**; behaviour matches **`miner.set_pool`**. **Every** linked miner must accept the change or the form errors. Bulk apply is **blocked** if members report **more than one algorithm** (last successful poll).
 
 - **Worker** — per slot, same rules as before: shared string or **`{ip}`** / **`{ip_last}`** templates (farm-only). Many **Bitcoin-style** pools use `subaccount.workername`; follow your pool’s docs for other coins.
-- **Dashboard** — on the **farm device**, use **Preset to apply** (select) and **Apply preset as primary pool** / **… as backup pool** (buttons) without opening **Configure**. Buttons log an error if apply fails (e.g. mixed algorithms, offline miner).
+- **Dashboard** — on the **farm** **device page** (“Devices” tab): **Preset to apply** (select) and **Apply preset as primary pool** / **… as backup pool** (buttons) — **without** [**⋯ → Configure**](#ui-legend) under Integrations. Buttons log an error if apply fails (e.g. mixed algorithms, offline miner).
 - **Secrets** — presets live in HA **config storage** with the farm entry; include them in your **backup** threat model.
 
 Farm sensors include **total hashrate / power**, **miner count / online**, **algorithm summary** (from pyasic per miner; if miners differ, shown as e.g. `SHA256d (3), Scrypt (1)`; if none report an algorithm, **SHA256d** is assumed as label only), **effective chips %** (sum of working chips vs expected chips across **online** members’ hashboards), and any linked **ambient temperature** sensors.
@@ -169,7 +183,7 @@ Naming follows `{device title} …`; board/fan indices depend on hardware.
 
 ## Automation examples (YAML) {#automation-examples-yaml}
 
-Replace `device_id` values with IDs from **Developer tools → Devices** (or use the UI automation editor’s device selector — it fills the correct id).
+Replace `device_id` values with IDs from **🛠️ Developer tools → Devices** (or use the UI automation editor’s device selector — it fills the correct id).
 
 ### Reboot one miner when a helper turns on
 
@@ -265,7 +279,7 @@ All services accept **`device_id`** (Home Assistant device ID). Miner services s
 | **`miner.set_pool`** | **Existing** — `pool_index` (0-based) becomes primary (reorder). **Manual** — set primary slot `host` / `port` / optional `use_ssl`, `username`, `password`. **Append** — add a backup slot (same fields; max 3 pools). |
 | **`miner.set_farm_pool`** | **`device_id`**: farm aggregate device(s). **`mode`**: `manual` (replace primary on every member) or `append` (backup slot). Same **`host` / `port` / `use_ssl` / `username` / `password`** as `set_pool`. **No-op with error log** if members report **different algorithms** or a miner is unreachable / rejects the change. |
 
-Use **Developer tools → Actions** or YAML automations. Pool behaviour depends on **firmware / model** and pyasic support for `get_config` / `send_config`.
+Use **🛠️ Developer tools → Actions** or YAML automations. Pool behaviour depends on **firmware / model** and pyasic support for `get_config` / `send_config`.
 
 ---
 
@@ -306,9 +320,9 @@ The integration loads **pyasic only when needed** (single-miner setup, scan, ser
 |--------|----------------|
 | **Miner unavailable** | Ping IP; RPC/web passwords; firewall; miner web UI reachable from HA host. |
 | **No pool worker sensor value** | Firmware/API may omit stratum user in pool stats; primary/active pool is used when reported. |
-| **Farm pool apply fails for one member** | Logs show `Farm stratum:` — offline miner, mixed algorithms, or duplicate device entries on the farm (use **Configure** to fix device list). |
+| **Farm pool apply fails for one member** | Logs show `Farm stratum:` — offline miner, mixed algorithms, or duplicate device entries on the farm (fix the device list in [**⋯ → Configure**](#ui-legend) on the **farm** tile). |
 | **DHCP discovery never starts** | Hostname patterns are **lowercase** in `manifest.json`; HA lowercases DHCP hostnames before match. |
-| **Ghost sidebar item “MSKSRV…” after upgrade** | Older betas registered a custom panel; disable it under **Profile → sidebar**, or restart HA after updating to **1.4.x**. |
+| **Ghost sidebar item “MSKSRV…” after upgrade** | Older betas registered a custom panel; disable it under **👤 Profile → sidebar**, or restart HA after updating to **1.4.x**. |
 | **PyPI / pyasic install errors** | Network, corporate proxy, Python version; see [Requirements](#requirements). |
 
 **Issues & feature requests:** [GitHub Issues](https://github.com/msksrv/msksrv-ha-miner/issues).
