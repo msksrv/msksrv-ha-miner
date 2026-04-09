@@ -999,10 +999,13 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     description={"suggested_value": host_s},
                 )
             ] = str
+            port_opt: dict[str, Any] = {}
+            if port_s is not None:
+                port_opt["description"] = {"suggested_value": port_s}
             out[
                 vol.Optional(
                     f"pool_slot_{i}_port",
-                    description={"suggested_value": port_s},
+                    **port_opt,
                 )
             ] = NumberSelector(
                 NumberSelectorConfig(
