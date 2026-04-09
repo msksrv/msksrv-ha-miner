@@ -1,7 +1,7 @@
 # MSKSRV ASIC Miner
 
 [![GitHub Release](https://img.shields.io/github/v/release/msksrv/msksrv-ha-miner?style=for-the-badge)](https://github.com/msksrv/msksrv-ha-miner/releases)
-[![License](https://img.shields.io/github/license/msksrv/msksrv-ha-miner?style=for-the-badge)](LICENSE)
+[![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)](LICENSE)
 [![HACS](https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge)](https://github.com/hacs/integration)
 
 **Home Assistant** integration for monitoring and controlling **ASIC Bitcoin miners** on your LAN. Built on [**pyasic**](https://github.com/UpstreamData/pyasic); one **config entry** per miner (IP), with optional credentials and a linked **smart switch** for hard power-off.
@@ -27,6 +27,7 @@
 - [Requirements](#requirements)
 - [Limitations](#limitations)
 - [Releases (beta & stable)](#releases-beta--stable)
+- [License](#license)
 - [Credits](#credits)
 
 ---
@@ -37,7 +38,7 @@
 
 | Capability | Description |
 |------------|-------------|
-| **DHCP discovery** | Miners are suggested when their hostname matches known patterns (see [Discovery](#discovery)). |
+| **DHCP discovery** | New devices are suggested when the **MAC OUI** matches known ASIC vendors (or **registered_devices**); the integration then probes the miner API with limited retries (see [Discovery](#discovery)). |
 | **Subnet scan** | Scan an IPv4 subnet (CIDR) with progress UI; pick a discovered host. Subnet size is capped for safety. |
 | **Manual IP** | Add a miner by address. |
 | **Farm** | Second-level device: select existing **miner** devices → **total hashrate (TH/s)**, **total power (kW)**, **miner count / online**, **algorithm** (SHA256d), **Emergency stop** (calls `switch.turn_off` on each member’s **power switch** from integration options). |
@@ -176,7 +177,9 @@ For automations tied to a **device** (not raw entity IDs), the integration expos
 
 ## Discovery
 
-DHCP-based discovery matches hostnames such as **Antminer**, **WhatsMiner**, **Avalon**, **Innosilicon**, **Goldshell**, **Auradine**, **BitAxe**, **IceRiver**, **Hammer** (case variants), plus **registered_devices** flows where applicable.
+DHCP discovery is **MAC (OUI) based**, not hostname: matchers are **Bitmain** `E0A509`, **WhatsMiner-class** `C41025` / `C80831`, plus **`registered_devices`** when that MAC is already known in the device registry. Extend `manifest.json` → `dhcp` if you need more vendor prefixes.
+
+When a **new** MAC matches, the integration calls the miner API **up to 3 times** (6 s timeout each, **2 s / 5 s** pause between tries). If the API still does not answer, a discoverable flow opens with the IP **pre-filled** for manual finish. **Already configured** miners are skipped by **IP**, **device-registry MAC**, and **`unique_id`** (non-farm entries only).
 
 ---
 
@@ -193,11 +196,11 @@ The integration loads **pyasic only when needed** (single-miner setup, scan, ser
 
 ## Releases (beta & stable)
 
-Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b4`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
+Farm and other work-in-progress builds ship as **semantic pre-releases** (e.g. **`1.4.0b5`** in `manifest.json`). On GitHub they should be published as **Pre-release** — they still appear on the [Releases](https://github.com/msksrv/msksrv-ha-miner/releases) page and get **`miner.zip`**; only the “latest” badge skips them until you ship a stable tag.
 
 ### Automatic (recommended)
 
-Push a tag **`v1.4.0b4`** or **`v1.4.0`**:
+Push a tag **`v1.4.0b5`** or **`v1.4.0`**:
 
 1. **Create release from tag** runs → opens a GitHub **Release** for that tag. Betas (`bN`, `aN`, `rc`, `beta` in the version) are marked **Pre-release** automatically; pure **`X.Y.Z`** tags are **full** releases.
 2. **Release** runs on publish → writes `manifest.json` **`version`** without the leading **`v`**, zips `custom_components/miner`, uploads **`miner.zip`** to the same release.
@@ -217,6 +220,12 @@ You can still create a release in the GitHub UI: pick the tag, turn on **Set as 
 Supported device families in pyasic:
 
 https://pyasic.readthedocs.io/en/latest/miners/supported_types/
+
+---
+
+## License
+
+This project is licensed for **non-commercial use only** — see [`LICENSE`](LICENSE). Commercial use requires **prior written permission** from the copyright holders.
 
 ---
 

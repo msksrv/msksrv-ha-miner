@@ -13,62 +13,17 @@
   ],
   "dhcp": [
     {
-      "hostname": "WhatsMiner*"
+      "macaddress": "E0A509"
     },
     {
-      "hostname": "whatsminer*"
+      "macaddress": "C41025"
     },
     {
-      "hostname": "Antminer*"
-    },
-    {
-      "hostname": "antminer*"
-    },
-    {
-      "hostname": "Avalon*"
-    },
-    {
-      "hostname": "avalon*"
-    },
-    {
-      "hostname": "Innosilicon*"
-    },
-    {
-      "hostname": "innosilicon*"
-    },
-    {
-      "hostname": "Goldshell*"
-    },
-    {
-      "hostname": "goldshell*"
-    },
-    {
-      "hostname": "Auradine*"
-    },
-    {
-      "hostname": "auradine*"
-    },
-    {
-      "hostname": "BitAxe*"
-    },
-    {
-      "hostname": "bitaxe*"
-    },
-    {
-      "hostname": "IceRiver*"
-    },
-    {
-      "hostname": "iceriver*"
-    },
-    {
-      "hostname": "Hammer*"
-    },
-    {
-      "hostname": "hammer*"
+      "macaddress": "C80831"
     },
     {
       "registered_devices": true
     }
   ],
-  "version": "1.4.0b4"
+  "version": "1.4.0b5"
 }

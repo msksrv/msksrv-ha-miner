@@ -14,6 +14,8 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
 from homeassistant.core import split_entity_id
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
+from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import BooleanSelector
 from homeassistant.helpers.selector import DeviceSelector, DeviceSelectorConfig
@@ -54,6 +56,11 @@ from .discovery import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+# DHCP discovery: probe miner API a few times (miner may boot slower than DHCP).
+_DHCP_PROBE_ATTEMPTS = 3
+_DHCP_PROBE_TIMEOUT_SEC = 6
+_DHCP_PROBE_BACKOFF_SEC = (2, 5)
 
 
 async def validate_ip_input(
@@ -154,10 +161,13 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def _manual_schema(self, user_input: dict[str, Any] | None = None) -> vol.Schema:
         """Return manual input schema."""
         user_input = user_input or {}
+        ip_default = str(user_input.get(CONF_IP, "") or "").strip()
+        if not ip_default:
+            ip_default = str(self._data.get(CONF_IP, "") or "").strip()
 
         return vol.Schema(
             {
-                vol.Required(CONF_IP, default=user_input.get(CONF_IP, "")): str,
+                vol.Required(CONF_IP, default=ip_default): str,
                 vol.Optional(
                     CONF_MIN_POWER,
                     default=user_input.get(CONF_MIN_POWER, DEFAULT_MIN_POWER),
@@ -176,6 +186,57 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             if str(entry.data.get(CONF_IP, "")).strip() == host:
                 return True
         return False
+
+    @staticmethod
+    def _dhcp_mac_hex12(dhcp_mac: str) -> str:
+        return dhcp_mac.replace(":", "").replace("-", "").lower()
+
+    def _mac_already_in_miner_integration(self, dhcp_mac: str) -> bool:
+        """True if this MAC already belongs to a configured (non-farm) miner entry."""
+        raw = self._dhcp_mac_hex12(dhcp_mac)
+        if len(raw) != 12:
+            return False
+
+        dev_reg = dr.async_get(self.hass)
+        formatted = format_mac(raw)
+        if device := dev_reg.async_get_device(
+            connections={(CONNECTION_NETWORK_MAC, formatted)}
+        ):
+            for eid in device.config_entries:
+                entry = self.hass.config_entries.async_get_entry(eid)
+                if (
+                    entry
+                    and entry.domain == DOMAIN
+                    and not entry.data.get(CONF_IS_FARM)
+                ):
+                    return True
+
+        for entry in self._async_current_entries():
+            if entry.domain != DOMAIN or entry.data.get(CONF_IS_FARM):
+                continue
+            uid = (entry.unique_id or "").lower().replace(":", "").replace("-", "")
+            if uid == raw:
+                return True
+        return False
+
+    async def _async_dhcp_probe_miner(self, host: str):
+        """Try pyasic.get_miner a few times with backoff."""
+        import pyasic
+
+        miner = None
+        for attempt in range(_DHCP_PROBE_ATTEMPTS):
+            if attempt > 0:
+                await asyncio.sleep(_DHCP_PROBE_BACKOFF_SEC[attempt - 1])
+            try:
+                miner = await asyncio.wait_for(
+                    pyasic.get_miner(host),
+                    timeout=_DHCP_PROBE_TIMEOUT_SEC,
+                )
+            except Exception:
+                miner = None
+            if miner is not None:
+                return miner
+        return None
 
     async def _async_set_unique_or_match_existing(self, miner, host: str) -> None:
         """Set unique ID if available, otherwise only check by host."""
@@ -203,38 +264,57 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data.update(base_data)
 
     async def async_step_dhcp(self, discovery_info: DhcpServiceInfo):
-        """Handle DHCP discovery."""
-        import pyasic
-
+        """Handle DHCP discovery (MAC/OUI match; API probe with limited retries)."""
         host = str(discovery_info.ip)
         ip_tail = host.split(".")[-1]
+        mac = discovery_info.macaddress
 
-        try:
-            miner = await asyncio.wait_for(pyasic.get_miner(host), timeout=5)
-        except Exception:
-            miner = None
+        if self._has_entry_with_host(host):
+            return self.async_abort(reason="already_configured")
 
-        if miner is None:
-            return self.async_abort(reason="no_devices_found")
+        if self._mac_already_in_miner_integration(mac):
+            return self.async_abort(reason="already_configured")
 
-        model = normalize_model_name(miner)
-        display_name = f"{model} (ip {ip_tail})"
-        self.context["title_placeholders"] = {"name": display_name}
+        miner = await self._async_dhcp_probe_miner(host)
 
-        try:
-            await self._async_prepare_miner(
-                miner,
-                host,
-                {
-                    CONF_IP: host,
-                    CONF_MIN_POWER: DEFAULT_MIN_POWER,
-                    CONF_MAX_POWER: DEFAULT_MAX_POWER,
-                },
-            )
-        except config_entries.AbortFlow as err:
-            return self.async_abort(reason=err.reason)
+        if miner is not None:
+            model = normalize_model_name(miner)
+            display_name = f"{model} (ip {ip_tail})"
+            self.context["title_placeholders"] = {"name": display_name}
 
-        return await self.async_step_login()
+            try:
+                await self._async_prepare_miner(
+                    miner,
+                    host,
+                    {
+                        CONF_IP: host,
+                        CONF_MIN_POWER: DEFAULT_MIN_POWER,
+                        CONF_MAX_POWER: DEFAULT_MAX_POWER,
+                    },
+                )
+            except config_entries.AbortFlow as err:
+                return self.async_abort(reason=err.reason)
+
+            return await self.async_step_login()
+
+        # Hostname/MAC matched DHCP but pyasic could not identify the miner yet.
+        # Still create a discoverable flow so the user can finish setup from Integrations.
+        await self.async_set_unique_id(f"miner_dhcp_{discovery_info.macaddress}")
+        self._abort_if_unique_id_configured(
+            updates={CONF_IP: host, CONF_HOST: host}
+        )
+        hn = (discovery_info.hostname or "").strip() or f"Miner .{ip_tail}"
+        self.context["title_placeholders"] = {"name": hn}
+        self._data = {
+            CONF_IP: host,
+            CONF_MIN_POWER: DEFAULT_MIN_POWER,
+            CONF_MAX_POWER: DEFAULT_MAX_POWER,
+        }
+        _LOGGER.debug(
+            "DHCP discovery for %s: API probe failed or timed out, opening manual step",
+            host,
+        )
+        return await self.async_step_manual(user_input=None)
 
     async def async_step_user(self, user_input=None):
         """Show entry mode menu."""
