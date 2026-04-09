@@ -29,6 +29,9 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from .const import (
     CONF_FARM_AMBIENT_TEMP_ENTITIES,
     CONF_FARM_DEVICE_IDS,
+    CONF_FARM_ELEC_TARIFF_MODE,
+    CONF_FARM_ELEC_TOU_CURRENCY,
+    CONF_FARM_ELEC_ZONES,
     CONF_FARM_ENERGY_RATES,
     CONF_FARM_POOL_PRESETS,
     CONF_IP,
@@ -48,12 +51,18 @@ from .const import (
     DEFAULT_MIN_POWER,
     DEFAULT_SUBNET,
     DOMAIN,
+    FARM_ELEC_TARIFF_DUAL,
+    FARM_ELEC_TARIFF_FLAT,
+    FARM_ELEC_TARIFF_TRIPLE,
     SCAN_MAX_HOSTS,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
 from .farm_pool_presets import FARM_POOL_SLOT_COUNT
 from .farm_pool_presets import farm_pool_preset_slots
 from .farm_pool_presets import farm_pool_slots_from_user_input
+from .farm_elec_tou import farm_tariff_schema_fields
+from .farm_elec_tou import tou_zones_from_user_input
+from .farm_elec_tou import validate_tou_submission
 from .farm_energy_rates import farm_electricity_schema_fields
 from .farm_energy_rates import farm_energy_rates_from_user_input
 from .farm_pool_presets import strip_legacy_farm_pool_keys
@@ -815,6 +824,18 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            tariff_mode = str(
+                user_input.get(CONF_FARM_ELEC_TARIFF_MODE) or FARM_ELEC_TARIFF_FLAT
+            ).strip()
+            if tariff_mode not in (
+                FARM_ELEC_TARIFF_FLAT,
+                FARM_ELEC_TARIFF_DUAL,
+                FARM_ELEC_TARIFF_TRIPLE,
+            ):
+                tariff_mode = FARM_ELEC_TARIFF_FLAT
+            zones_tou: list[Any] = []
+            tou_currency_save = ""
+
             devices = user_input.get(CONF_FARM_DEVICE_IDS)
             if isinstance(devices, str):
                 devices = [devices]
@@ -906,6 +927,23 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             ):
                 errors["base"] = "farm_pool_mixed_algorithms"
 
+            if not errors and tariff_mode in (
+                FARM_ELEC_TARIFF_DUAL,
+                FARM_ELEC_TARIFF_TRIPLE,
+            ):
+                tc = str(
+                    user_input.get(CONF_FARM_ELEC_TOU_CURRENCY) or ""
+                ).strip().upper()
+                if not tc:
+                    errors["base"] = "farm_tou_currency_required"
+                else:
+                    zones_tou = tou_zones_from_user_input(user_input, tariff_mode)
+                    ve = validate_tou_submission(tariff_mode, zones_tou)
+                    if ve:
+                        errors["base"] = ve
+                    else:
+                        tou_currency_save = tc
+
             new_unique_id = self.config_entry.unique_id
             if not errors and devices:
                 key = ",".join(sorted(devices))
@@ -954,9 +992,21 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 new_options = {**self.config_entry.options}
                 new_options[CONF_FARM_AMBIENT_TEMP_ENTITIES] = list(ents)
                 new_options[CONF_FARM_POOL_PRESETS] = new_slots
-                new_options[CONF_FARM_ENERGY_RATES] = farm_energy_rates_from_user_input(
-                    user_input
-                )
+                new_options[CONF_FARM_ELEC_TARIFF_MODE] = tariff_mode
+                if tariff_mode == FARM_ELEC_TARIFF_FLAT:
+                    new_options[CONF_FARM_ENERGY_RATES] = (
+                        farm_energy_rates_from_user_input(user_input)
+                    )
+                    new_options[CONF_FARM_ELEC_ZONES] = []
+                    tc_keep = str(
+                        user_input.get(CONF_FARM_ELEC_TOU_CURRENCY) or ""
+                    ).strip().upper()
+                    if tc_keep:
+                        new_options[CONF_FARM_ELEC_TOU_CURRENCY] = tc_keep
+                else:
+                    new_options[CONF_FARM_ENERGY_RATES] = []
+                    new_options[CONF_FARM_ELEC_TOU_CURRENCY] = tou_currency_save
+                    new_options[CONF_FARM_ELEC_ZONES] = zones_tou
                 strip_legacy_farm_pool_keys(new_options)
 
                 new_data = {**self.config_entry.data, CONF_FARM_DEVICE_IDS: devices}
@@ -1083,6 +1133,9 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             ): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
         }
         fields.update(self._farm_pool_slots_vol(user_input))
+        fields.update(
+            farm_tariff_schema_fields(self.config_entry.options, user_input)
+        )
         fields.update(
             farm_electricity_schema_fields(self.config_entry.options, user_input)
         )

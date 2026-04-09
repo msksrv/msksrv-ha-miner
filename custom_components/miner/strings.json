@@ -80,16 +80,27 @@
     "step": {
       "farm_options": {
         "title": "Farm settings",
-        "description": "Up to 5 stratum presets per farm (each farm has its own list in its integration entry). Leave a slot's host empty to remove it. After save, presets are stored with the farm. In the worker field you can use per-miner IP tokens as documented in the integration README. On the farm device card, pick a preset and use Apply buttons. Optional electricity tariffs: up to three currency + price per kWh pairs; cost sensors integrate total farm power over time. After changing tariffs, reload this integration entry so entities match. Lifetime total is restored from the database after restart; hour/day/month reset on the calendar boundary.",
+        "description": "Up to 5 stratum presets per farm (each farm has its own list in its integration entry). Leave a slot's host empty to remove it. After save, presets are stored with the farm. In the worker field you can use per-miner IP tokens as documented in the integration README. On the farm device card, pick a preset and use Apply buttons. Electricity: flat mode uses up to three currency + price/kWh pairs; two- or three-zone modes use one currency and local time windows (end of day as 24:00). Cost sensors integrate total farm power. After changing tariffs, reload this integration entry so entities match. Lifetime total is restored from the database after restart; hour/day/month reset on the calendar boundary.",
         "data": {
           "farm_device_ids": "Miner devices",
           "farm_ambient_temp_entities": "Temperature sensors",
-          "farm_elec_currency_1": "Tariff 1 — currency (empty = off)",
-          "farm_elec_price_kwh_1": "Tariff 1 — price per kWh",
-          "farm_elec_currency_2": "Tariff 2 — currency (empty = off)",
-          "farm_elec_price_kwh_2": "Tariff 2 — price per kWh",
-          "farm_elec_currency_3": "Tariff 3 — currency (empty = off)",
-          "farm_elec_price_kwh_3": "Tariff 3 — price per kWh",
+          "farm_elec_tariff_mode": "Electricity accounting",
+          "farm_elec_tou_currency": "TOU mode — currency",
+          "farm_elec_z1_start": "Zone 1 — start (local time)",
+          "farm_elec_z1_end": "Zone 1 — end (local time)",
+          "farm_elec_z1_price": "Zone 1 — price per kWh",
+          "farm_elec_z2_start": "Zone 2 — start (local time)",
+          "farm_elec_z2_end": "Zone 2 — end (local time)",
+          "farm_elec_z2_price": "Zone 2 — price per kWh",
+          "farm_elec_z3_start": "Zone 3 — start (local time)",
+          "farm_elec_z3_end": "Zone 3 — end (local time)",
+          "farm_elec_z3_price": "Zone 3 — price per kWh",
+          "farm_elec_currency_1": "Flat mode — tariff 1 currency (empty = off)",
+          "farm_elec_price_kwh_1": "Flat mode — tariff 1 price per kWh",
+          "farm_elec_currency_2": "Flat mode — tariff 2 currency (empty = off)",
+          "farm_elec_price_kwh_2": "Flat mode — tariff 2 price per kWh",
+          "farm_elec_currency_3": "Flat mode — tariff 3 currency (empty = off)",
+          "farm_elec_price_kwh_3": "Flat mode — tariff 3 price per kWh",
           "pool_action": {
             "name": "Stratum pool (all members)",
             "description": "Leave unchanged, replace primary on each miner, or append a backup (max 3 pools each).",
@@ -140,7 +151,10 @@
       "farm_pool_no_members": "No linked miner coordinators for this farm.",
       "farm_pool_apply_failed": "Pool change failed on one or more miners (offline, rejected, or backup limit).",
       "farm_pool_apply_slot_invalid": "Choose a slot number that has a saved host and port.",
-      "farm_not_loaded": "Farm is not loaded; try again later."
+      "farm_not_loaded": "Farm is not loaded; try again later.",
+      "farm_tou_currency_required": "Choose a currency for time-of-use tariffs.",
+      "farm_tou_zones_dual": "Two-zone mode needs two zones with a positive price per kWh each.",
+      "farm_tou_zones_triple": "Three-zone mode needs three zones with a positive price per kWh each."
     }
   },
   "services": {

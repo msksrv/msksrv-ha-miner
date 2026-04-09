@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.components.sensor import SensorEntity
@@ -19,7 +19,14 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
+from .const import FARM_ELEC_TARIFF_DUAL
+from .const import FARM_ELEC_TARIFF_FLAT
 from .farm_coordinator import MinerFarmCoordinator
+from .farm_elec_tou import farm_tariff_mode
+from .farm_elec_tou import farm_tou_currency
+from .farm_elec_tou import farm_tou_zones_stored
+from .farm_elec_tou import integrate_tou_energy_cost
+from .farm_elec_tou import price_at_local_dt
 from .farm_energy_rates import farm_energy_rates_list
 
 PeriodKind = Literal["hour", "day", "month", "all"]
@@ -53,10 +60,12 @@ class FarmCostSensorBase(
         period: PeriodKind,
         translation_key: str,
         entity_key_suffix: str,
+        tou_zones: list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._currency = currency
         self._price_per_kwh = price_per_kwh
+        self._tou_zones = tou_zones
         self._period = period
         cur_safe = currency.lower()
         self._attr_unique_id = (
@@ -151,14 +160,20 @@ class FarmCostSensorBase(
             self._update_native_from_accum()
             return
 
-        dt_h = (now - self._last_ts).total_seconds() / 3600.0
+        t0 = self._last_ts
+        dt_h = (now - t0).total_seconds() / 3600.0
         self._last_ts = now
         if dt_h <= 0:
             self._update_native_from_accum()
             return
 
-        d_kwh = kw * dt_h
-        d_cost = d_kwh * price
+        if self._tou_zones:
+            d_cost = integrate_tou_energy_cost(
+                self.hass, kw, t0, now, self._tou_zones
+            )
+        else:
+            d_kwh = kw * dt_h
+            d_cost = d_kwh * price
 
         if self._period != "all":
             pk_now = _period_key_local(self._period, now)
@@ -188,11 +203,16 @@ class FarmCostAtCurrentPowerSensor(CoordinatorEntity[MinerFarmCoordinator], Sens
     _attr_should_poll = False
 
     def __init__(
-        self, coordinator: MinerFarmCoordinator, currency: str, price_per_kwh: float
+        self,
+        coordinator: MinerFarmCoordinator,
+        currency: str,
+        price_per_kwh: float,
+        tou_zones: list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(coordinator)
         self._currency = currency
         self._price_per_kwh = price_per_kwh
+        self._tou_zones = tou_zones
         cur_safe = currency.lower()
         self._attr_unique_id = (
             f"farm-{coordinator.config_entry.entry_id}-cost-now-{cur_safe}"
@@ -232,7 +252,12 @@ class FarmCostAtCurrentPowerSensor(CoordinatorEntity[MinerFarmCoordinator], Sens
             kw = float(data.get("total_power_kw") or 0.0)
         except (TypeError, ValueError):
             return None
-        return round(kw * self._current_price(), 4)
+        if self._tou_zones:
+            loc = dt_util.as_local(dt_util.utcnow())
+            p = price_at_local_dt(loc, self._tou_zones)
+        else:
+            p = self._current_price()
+        return round(kw * p, 4)
 
 
 def setup_farm_cost_sensors(
@@ -242,51 +267,91 @@ def setup_farm_cost_sensors(
 ) -> None:
     """Add cost sensors when at least one tariff is configured."""
     coordinator: MinerFarmCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    rates = farm_energy_rates_list(config_entry.options)
-    if not rates:
+    opts = config_entry.options
+    mode = farm_tariff_mode(opts)
+    entities: list[SensorEntity] = []
+
+    if mode == FARM_ELEC_TARIFF_FLAT:
+        rates = farm_energy_rates_list(opts)
+        if not rates:
+            return
+        for currency, price in rates:
+            entities.append(
+                FarmCostAtCurrentPowerSensor(coordinator, currency, price, None)
+            )
+            entities.append(
+                FarmCostSensorBase(
+                    coordinator,
+                    currency,
+                    price,
+                    "hour",
+                    "farm_cost_hour",
+                    "hour",
+                    None,
+                )
+            )
+            entities.append(
+                FarmCostSensorBase(
+                    coordinator,
+                    currency,
+                    price,
+                    "day",
+                    "farm_cost_day",
+                    "day",
+                    None,
+                )
+            )
+            entities.append(
+                FarmCostSensorBase(
+                    coordinator,
+                    currency,
+                    price,
+                    "month",
+                    "farm_cost_month",
+                    "month",
+                    None,
+                )
+            )
+            entities.append(
+                FarmCostSensorBase(
+                    coordinator,
+                    currency,
+                    price,
+                    "all",
+                    "farm_cost_total",
+                    "total",
+                    None,
+                )
+            )
+        async_add_entities(entities)
         return
 
-    entities: list[SensorEntity] = []
-    for currency, price in rates:
-        entities.append(FarmCostAtCurrentPowerSensor(coordinator, currency, price))
-        entities.append(
-            FarmCostSensorBase(
-                coordinator,
-                currency,
-                price,
-                "hour",
-                "farm_cost_hour",
-                "hour",
-            )
+    cur = farm_tou_currency(opts)
+    zones = farm_tou_zones_stored(opts)
+    need = 2 if mode == FARM_ELEC_TARIFF_DUAL else 3
+    if not cur or len(zones) != need:
+        return
+    max_p = max(float(z["price_kwh"]) for z in zones)
+
+    entities.append(FarmCostAtCurrentPowerSensor(coordinator, cur, max_p, zones))
+    entities.append(
+        FarmCostSensorBase(
+            coordinator, cur, max_p, "hour", "farm_cost_hour", "hour", zones
         )
-        entities.append(
-            FarmCostSensorBase(
-                coordinator,
-                currency,
-                price,
-                "day",
-                "farm_cost_day",
-                "day",
-            )
+    )
+    entities.append(
+        FarmCostSensorBase(
+            coordinator, cur, max_p, "day", "farm_cost_day", "day", zones
         )
-        entities.append(
-            FarmCostSensorBase(
-                coordinator,
-                currency,
-                price,
-                "month",
-                "farm_cost_month",
-                "month",
-            )
+    )
+    entities.append(
+        FarmCostSensorBase(
+            coordinator, cur, max_p, "month", "farm_cost_month", "month", zones
         )
-        entities.append(
-            FarmCostSensorBase(
-                coordinator,
-                currency,
-                price,
-                "all",
-                "farm_cost_total",
-                "total",
-            )
+    )
+    entities.append(
+        FarmCostSensorBase(
+            coordinator, cur, max_p, "all", "farm_cost_total", "total", zones
         )
+    )
     async_add_entities(entities)
