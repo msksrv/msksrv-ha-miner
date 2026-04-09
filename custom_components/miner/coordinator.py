@@ -95,6 +95,74 @@ def _primary_pool_metrics(pools):
     return pools[0]
 
 
+def _mining_profile_label(miner_data) -> str | None:
+    """Short label for the active mining profile across pyasic ``mining_mode`` types.
+
+    Covers the modes in ``pyasic.config.mining.MiningModeConfig`` as returned per vendor:
+
+    - **Preset** (VNish, LuxOS, …): ``active_preset.name``
+    - **Power tune** (WhatsMiner BTMiner, BOS+, …): ``power`` → ``NNN W``
+    - **Hashrate tune**: ``hashrate`` (numeric or hashrate type) → ``X.X TH/s`` or ``str(...)``
+    - **Manual** (VNish chains, Epic, …): ``global_freq`` / ``global_volt`` → ``Manual (…)``
+    - **Normal / Low / High / Sleep** (Antminer, WM, Goldshell levels, …): ``mode`` → title text
+    """
+    cfg = getattr(miner_data, "config", None)
+    if cfg is None:
+        return None
+    mm = getattr(cfg, "mining_mode", None)
+    if mm is None:
+        return None
+
+    try:
+        preset = mm.active_preset
+        name = getattr(preset, "name", None)
+        if name is not None and str(name).strip():
+            return str(name).strip()
+    except AttributeError:
+        pass
+
+    power = getattr(mm, "power", None)
+    if power is not None:
+        try:
+            return f"{int(power)} W"
+        except (TypeError, ValueError):
+            pass
+
+    hashrate = getattr(mm, "hashrate", None)
+    if hashrate is not None:
+        try:
+            hr_f = float(hashrate)
+            return f"{hr_f:.1f} TH/s"
+        except (TypeError, ValueError):
+            hr_s = str(hashrate).strip()
+            if hr_s:
+                return hr_s
+
+    gf = getattr(mm, "global_freq", None)
+    gv = getattr(mm, "global_volt", None)
+    if gf is not None or gv is not None:
+        try:
+            parts: list[str] = []
+            if gf is not None and float(gf) > 0:
+                parts.append(f"{float(gf):.0f} MHz")
+            if gv is not None and float(gv) > 0:
+                parts.append(f"{float(gv):.0f} mV")
+            if parts:
+                return f"Manual ({', '.join(parts)})"
+        except (TypeError, ValueError):
+            pass
+    if getattr(mm, "mode", None) == "manual":
+        return "Manual"
+
+    mode = getattr(mm, "mode", None)
+    if mode is not None:
+        s = str(mode).strip()
+        if s:
+            return s.replace("_", " ").title()
+
+    return None
+
+
 DEFAULT_DATA = {
     "hostname": None,
     "mac": None,
@@ -249,10 +317,7 @@ class MinerCoordinator(DataUpdateCoordinator):
         except (TypeError, ValueError):
             expected_hashrate = None
 
-        try:
-            active_preset = miner_data.config.mining_mode.active_preset.name
-        except AttributeError:
-            active_preset = None
+        active_preset = _mining_profile_label(miner_data)
 
         try:
             uptime = miner_data.uptime

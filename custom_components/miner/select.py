@@ -20,6 +20,39 @@ from .coordinator import MinerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
+_POWER_MODE_OPTIONS = ("Normal", "High", "Low")
+
+
+def _power_mode_current_option(
+    config: pyasic.MinerConfig | dict | None,
+) -> str | None:
+    """Map pyasic mining_mode to select option; None if not low/normal/high tri-state."""
+    if config is None or not isinstance(config, pyasic.MinerConfig):
+        return None
+    mm = getattr(config, "mining_mode", None)
+    if isinstance(mm, MiningModeNormal):
+        return "Normal"
+    if isinstance(mm, MiningModeLPM):
+        return "Low"
+    if isinstance(mm, MiningModeHPM):
+        return "High"
+    return None
+
+
+def _power_mode_state_label(config: pyasic.MinerConfig | dict | None) -> str | None:
+    """When not in low/normal/high, show current pyasic mode for the select UI."""
+    if not isinstance(config, pyasic.MinerConfig):
+        return None
+    if _power_mode_current_option(config) is not None:
+        return None
+    mm = getattr(config, "mining_mode", None)
+    if mm is None:
+        return None
+    mode = getattr(mm, "mode", None)
+    if mode is None:
+        return None
+    return str(mode).replace("_", " ").title()
+
 
 def _first_pool_group(cfg: pyasic.MinerConfig) -> PoolGroup:
     if not cfg.pools.groups:
@@ -93,14 +126,25 @@ class MinerPowerModeSelect(CoordinatorEntity[MinerCoordinator], SelectEntity):
 
     @property
     def options(self) -> list[str]:
-        return ["Normal", "High", "Low"]
+        cfg = self.coordinator.data.get("config")
+        extra = _power_mode_state_label(cfg)
+        base = list(_POWER_MODE_OPTIONS)
+        if extra and extra not in base:
+            return [extra, *base]
+        return base
 
     @property
     def current_option(self) -> str | None:
-        config: pyasic.MinerConfig = self.coordinator.data["config"]
-        return str(config.mining_mode.mode).title()
+        cfg = self.coordinator.data.get("config")
+        tri = _power_mode_current_option(cfg)
+        if tri is not None:
+            return tri
+        return _power_mode_state_label(cfg)
 
     async def async_select_option(self, option: str) -> None:
+        if option not in _POWER_MODE_OPTIONS:
+            _LOGGER.debug("Power mode: ignoring non-action option %r", option)
+            return
         option_map = {
             "High": MiningModeHPM,
             "Normal": MiningModeNormal,
@@ -109,6 +153,7 @@ class MinerPowerModeSelect(CoordinatorEntity[MinerCoordinator], SelectEntity):
         cfg = await self.coordinator.miner.get_config()
         cfg.mining_mode = option_map[option]()
         await self.coordinator.miner.send_config(cfg)
+        await self.coordinator.async_request_refresh()
 
 
 class MinerPoolPrioritySelect(CoordinatorEntity[MinerCoordinator], SelectEntity):
