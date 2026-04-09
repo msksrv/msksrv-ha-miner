@@ -20,7 +20,6 @@ from homeassistant.helpers.selector import BooleanSelector
 from homeassistant.helpers.selector import DeviceSelector, DeviceSelectorConfig
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 from homeassistant.helpers.selector import NumberSelector, NumberSelectorConfig
-from homeassistant.helpers.selector import NumberSelectorMode
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
@@ -87,10 +86,17 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_supports_options_flow(
         cls, config_entry: config_entries.ConfigEntry
     ) -> bool:
-        """Farm entries have no options UI yet."""
+        """Farm entries have no options UI yet.
+
+        Do not call super(): older HA cores have no ConfigFlow.async_supports_options_flow
+        and would raise AttributeError (500 on config flow).
+        """
         if config_entry.data.get(CONF_IS_FARM):
             return False
-        return super().async_supports_options_flow(config_entry)
+        return (
+            cls.async_get_options_flow
+            is not config_entries.ConfigFlow.async_get_options_flow
+        )
 
     @staticmethod
     @callback
@@ -606,6 +612,9 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ):
         """Manage miner options."""
+        if self.config_entry.data.get(CONF_IS_FARM):
+            return self.async_abort(reason="farm_no_options")
+
         if user_input is not None:
             errors: dict[str, str] = {}
             entity_id = user_input.get(CONF_POWER_SWITCH)
@@ -753,7 +762,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     NumberSelectorConfig(
                         min=1,
                         max=65535,
-                        mode=NumberSelectorMode.BOX,
+                        mode="box",
                     ),
                 ),
                 vol.Optional(

@@ -75,7 +75,8 @@
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
       "no_devices_found": "No miners found",
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "farm_no_options": "Farm has no options screen; delete and add the farm again to change miners."
     }
   },
   "options": {

@@ -19,8 +19,12 @@ jobs:
 
       - name: "Adjust version number"
         shell: "bash"
+        env:
+          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
-          yq -i -o json '.version="${{ github.event.release.tag_name }}"' \
+          # HA manifest expects semver without leading "v" (e.g. 1.4.0, not v1.4.0)
+          VERSION="${TAG_NAME#v}"
+          yq -i -o json ".version=\"${VERSION}\"" \
             "${{ github.workspace }}/custom_components/miner/manifest.json"
 
       - name: "ZIP the integration directory"
