@@ -25,6 +25,7 @@ async def async_setup_entry(
         [
             MinerRebootButton(coordinator=coordinator),
             MinerPowerOffButton(coordinator=coordinator),
+            MinerPowerOnButton(coordinator=coordinator),
         ]
     )
 
@@ -61,17 +62,14 @@ class MinerRebootButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
         return self.coordinator.available
 
 
-class MinerPowerOffButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
-    """Turn off a linked smart switch (cuts power to the miner)."""
+class _MinerLinkedSwitchButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
+    """Shared: linked HA switch from integration options (on/off power strip)."""
 
     _attr_has_entity_name = True
-    _attr_translation_key = "power_off"
-    _attr_icon = "mdi:power-plug-off"
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-power-off"
 
     @property
     def device_info(self) -> entity.DeviceInfo:
@@ -96,7 +94,6 @@ class MinerPowerOffButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
         return self.hass.states.get(eid) is not None
 
     async def async_added_to_hass(self) -> None:
-        """Register for config entry updates (options)."""
         await super().async_added_to_hass()
 
         async def _entry_updated(_hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -107,14 +104,46 @@ class MinerPowerOffButton(CoordinatorEntity[MinerCoordinator], ButtonEntity):
             self.coordinator.config_entry.add_update_listener(_entry_updated)
         )
 
+
+class MinerPowerOffButton(_MinerLinkedSwitchButton):
+    """Turn off the linked smart switch (cuts power to the miner)."""
+
+    _attr_translation_key = "power_off"
+    _attr_icon = "mdi:power-plug-off"
+
+    def __init__(self, coordinator: MinerCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.coordinator.data['mac']}-power-off"
+
     async def async_press(self) -> None:
-        """Turn off the configured power switch."""
         eid = self._power_switch_entity_id
         if not eid:
             return
         await self.hass.services.async_call(
             "switch",
             "turn_off",
+            {"entity_id": eid},
+            blocking=False,
+        )
+
+
+class MinerPowerOnButton(_MinerLinkedSwitchButton):
+    """Turn on the linked smart switch (restore power to the miner)."""
+
+    _attr_translation_key = "power_on"
+    _attr_icon = "mdi:power-plug"
+
+    def __init__(self, coordinator: MinerCoordinator) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{self.coordinator.data['mac']}-power-on"
+
+    async def async_press(self) -> None:
+        eid = self._power_switch_entity_id
+        if not eid:
+            return
+        await self.hass.services.async_call(
+            "switch",
+            "turn_on",
             {"entity_id": eid},
             blocking=False,
         )

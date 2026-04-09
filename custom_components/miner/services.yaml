@@ -68,6 +68,7 @@ set_pool:
           options:
             - "existing"
             - "manual"
+            - "append"
     pool_index:
       name: Existing pool index
       description: Pool index to activate when mode=existing (0-based).
@@ -81,13 +82,13 @@ set_pool:
           mode: box
     host:
       name: Pool host
-      description: Pool host name when mode=manual.
+      description: Pool host when mode is manual or append.
       required: false
       selector:
         text:
     port:
       name: Pool port
-      description: Pool port when mode=manual.
+      description: Pool port when mode is manual or append.
       required: false
       selector:
         number:

@@ -14,7 +14,11 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
 from homeassistant.core import split_entity_id
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.selector import BooleanSelector
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
+from homeassistant.helpers.selector import NumberSelector, NumberSelectorConfig
+from homeassistant.helpers.selector import NumberSelectorMode
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
@@ -43,6 +47,7 @@ from .discovery import (
     get_stable_identifier,
     normalize_model_name,
 )
+from . import pool_stratum
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -502,14 +507,14 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class MinerOptionsFlow(config_entries.OptionsFlow):
-    """Options for a Miner config entry (e.g. linked power switch)."""
+    """Options for a Miner config entry (power switch, stratum pool)."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ):
         """Manage miner options."""
         if user_input is not None:
-            new_options = {**self.config_entry.options}
+            errors: dict[str, str] = {}
             entity_id = user_input.get(CONF_POWER_SWITCH)
             if entity_id:
                 try:
@@ -519,14 +524,93 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 registry = er.async_get(self.hass)
                 entity = registry.async_get(entity_id)
                 if entity is None or ent_domain != "switch":
-                    return self.async_show_form(
-                        step_id="init",
-                        data_schema=self._options_schema(user_input),
-                        errors={"base": "invalid_switch"},
-                    )
+                    errors["base"] = "invalid_switch"
+
+            pool_action = str(user_input.get("pool_action", "none"))
+            if pool_action not in ("none", "replace_primary", "append_backup"):
+                pool_action = "none"
+
+            host = (user_input.get("pool_host") or "").strip()
+            port_raw = user_input.get("pool_port")
+            port_int: int | None = None
+
+            if pool_action != "none":
+                if not host or port_raw is None or port_raw == "":
+                    errors["pool_host"] = "pool_fields_required"
+                else:
+                    try:
+                        port_int = int(port_raw)
+                        if port_int < 1 or port_int > 65535:
+                            raise ValueError
+                    except (TypeError, ValueError):
+                        errors["pool_port"] = "invalid_pool_port"
+
+            if errors:
+                return self.async_show_form(
+                    step_id="init",
+                    data_schema=self._options_schema(user_input),
+                    errors=errors,
+                )
+
+            new_options = {**self.config_entry.options}
+            if entity_id:
                 new_options[CONF_POWER_SWITCH] = entity_id
             else:
                 new_options.pop(CONF_POWER_SWITCH, None)
+
+            entry_id = self.config_entry.entry_id
+            coordinator = self.hass.data.get(DOMAIN, {}).get(entry_id)
+            if pool_action != "none" and port_int is not None:
+                if coordinator is None:
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._options_schema(user_input),
+                        errors={"base": "miner_not_loaded"},
+                    )
+                miner = await coordinator.get_miner()
+                if miner is None:
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._options_schema(user_input),
+                        errors={"base": "miner_offline"},
+                    )
+                use_ssl = bool(user_input.get("pool_use_ssl"))
+                uname = str(user_input.get("pool_username") or "")
+                pwd = str(user_input.get("pool_password") or "")
+                try:
+                    if pool_action == "replace_primary":
+                        ok = await pool_stratum.async_apply_primary_stratum(
+                            miner,
+                            host,
+                            port_int,
+                            use_ssl,
+                            uname,
+                            pwd,
+                            force_user_password=True,
+                        )
+                    else:
+                        ok = await pool_stratum.async_append_stratum_pool(
+                            miner,
+                            host,
+                            port_int,
+                            use_ssl,
+                            uname,
+                            pwd,
+                        )
+                    if not ok:
+                        return self.async_show_form(
+                            step_id="init",
+                            data_schema=self._options_schema(user_input),
+                            errors={"base": "pool_apply_failed"},
+                        )
+                    await coordinator.async_request_refresh()
+                except Exception:
+                    _LOGGER.exception("Applying pool from options")
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._options_schema(user_input),
+                        errors={"base": "pool_apply_failed"},
+                    )
 
             return self.async_create_entry(title="", data=new_options)
 
@@ -545,10 +629,56 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         optional_kwargs: dict[str, Any] = {}
         if suggested:
             optional_kwargs["description"] = {"suggested_value": suggested}
+
+        pool_action_suggested = user_input.get("pool_action", "none")
+        pool_host_suggested = user_input.get("pool_host", "")
+        pool_port_suggested = user_input.get("pool_port")
+        pool_user_suggested = user_input.get("pool_username", "")
+        pool_pass_suggested = user_input.get("pool_password", "")
+
         return vol.Schema(
             {
                 vol.Optional(CONF_POWER_SWITCH, **optional_kwargs): EntitySelector(
                     EntitySelectorConfig(domain="switch"),
+                ),
+                vol.Optional(
+                    "pool_action",
+                    description={"suggested_value": pool_action_suggested},
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=["none", "replace_primary", "append_backup"],
+                    ),
+                ),
+                vol.Optional(
+                    "pool_host",
+                    description={"suggested_value": pool_host_suggested},
+                ): str,
+                vol.Optional(
+                    "pool_port",
+                    description={"suggested_value": pool_port_suggested},
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=1,
+                        max=65535,
+                        mode=NumberSelectorMode.BOX,
+                    ),
+                ),
+                vol.Optional(
+                    "pool_use_ssl",
+                    default=bool(user_input.get("pool_use_ssl", False)),
+                ): BooleanSelector(),
+                vol.Optional(
+                    "pool_username",
+                    description={"suggested_value": pool_user_suggested},
+                ): str,
+                vol.Optional(
+                    "pool_password",
+                    description={"suggested_value": pool_pass_suggested},
+                ): TextSelector(
+                    TextSelectorConfig(
+                        type=TextSelectorType.PASSWORD,
+                        autocomplete="new-password",
+                    ),
                 ),
             }
         )

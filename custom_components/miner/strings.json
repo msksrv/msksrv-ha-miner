@@ -64,14 +64,33 @@
     "step": {
       "init": {
         "title": "Miner options",
-        "description": "Link a smart switch that cuts power to this miner. The power-off button calls switch.turn_off on it.",
+        "description": "Power switch for the miner plug, and optional stratum pool changes (requires miner reachable).",
         "data": {
-          "power_switch": "Power switch"
+          "power_switch": "Power switch",
+          "pool_action": {
+            "name": "Stratum pool",
+            "description": "Leave unchanged, replace the primary slot, or add a backup (max 3 pools).",
+            "options": {
+              "none": "Do not change pools",
+              "replace_primary": "Set primary pool (host and port below)",
+              "append_backup": "Add backup pool (host and port below)"
+            }
+          },
+          "pool_host": "Stratum host",
+          "pool_port": "Stratum port",
+          "pool_use_ssl": "Use stratum+ssl",
+          "pool_username": "Worker username",
+          "pool_password": "Worker password"
         }
       }
     },
     "error": {
-      "invalid_switch": "The selected entity is missing or is not a switch"
+      "invalid_switch": "The selected entity is missing or is not a switch",
+      "pool_fields_required": "Enter both stratum host and port for this action.",
+      "invalid_pool_port": "Port must be between 1 and 65535.",
+      "pool_apply_failed": "The miner rejected the pool change or the backup limit was reached.",
+      "miner_offline": "Cannot reach the miner; pool was not changed.",
+      "miner_not_loaded": "Miner integration is not loaded; try again later."
     }
   },
   "services": {
@@ -89,13 +108,16 @@
     },
     "set_pool": {
       "name": "Set pool on miner",
-      "description": "Select an existing pool or set host/port manually and apply."
+      "description": "Reorder existing pools, replace the primary stratum URL, or append a backup slot (mode append, max 3 pools)."
     }
   },
   "entity": {
     "button": {
       "power_off": {
         "name": "Power off"
+      },
+      "power_on": {
+        "name": "Power on"
       }
     },
     "select": {

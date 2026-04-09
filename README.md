@@ -39,7 +39,7 @@
 | **Subnet scan** | Scan an IPv4 subnet (CIDR) with progress UI; pick a discovered host. Subnet size is capped for safety. |
 | **Manual IP** | Add a miner by address. |
 | **Credentials** | Optional RPC, web UI, and SSH credentials when the miner exposes those APIs. |
-| **Power switch (options)** | Link an existing Home Assistant **`switch`** (e.g. smart plug). The **Power off** button calls `switch.turn_off` on it. |
+| **Power switch & pool (options)** | Link a **`switch`** for plug control (**Power off** / **Power on**). Optionally **replace primary stratum** or **append a backup pool** (host, port, SSL, worker) when the miner is online. |
 
 ### Monitoring (sensors)
 
@@ -97,13 +97,14 @@ Copy the `custom_components/miner` folder into your Home Assistant
 3. Enter optional **RPC / Web / SSH** credentials if prompted.
 4. Set the **device name** (area / dashboard friendly).
 
-### Integration options (power switch)
+### Integration options (power + stratum)
 
 Open **Settings → Devices & services → Integrations** (not the “Devices” tab). Find **MSKSRV ASIC Miner**, open the **entry for this miner** (one tile per IP), then **Configure**.
 
-You should see **Power switch** — an entity picker limited to **`switch`** domains. **Power off** stays unavailable until you save a valid switch (or if that entity is removed from HA).
+- **Power switch** — picker limited to **`switch`**. **Power off** / **Power on** stay unavailable until you save a valid switch (or if that entity is removed). Clear the field and submit to unlink.
+- **Stratum pool** — choose **do nothing**, **set primary pool**, or **add backup pool**, then fill **host**, **port**, optional **SSL** and **worker** credentials. The miner must be **reachable** when you submit; up to **3** pools in the primary group (append fails if full).
 
-To clear the link, remove the selection in that field and submit again.
+Pool fields are applied **only when you submit** this form; they are not stored as long-lived options (only the power switch entity id is saved).
 
 ---
 
@@ -128,7 +129,7 @@ Naming follows `{device title} …`; board/fan indices depend on hardware.
 - **`select.*_power_mode`** — Low / Normal / High where supported.
 - **`select.*_pool_priority`** — pick primary pool among configured slots (≥2 pools).
 - **`button.*_reboot`** — software reboot.
-- **`button.*_power_off`** — turn off linked smart switch (`switch.turn_off`).
+- **`button.*_power_off`** / **`button.*_power_on`** — `switch.turn_off` / `switch.turn_on` on the linked switch.
 
 ---
 
@@ -141,7 +142,7 @@ All services accept **`device_id`** (Home Assistant device ID). Most support **m
 | **`miner.reboot`** | Reboot the miner. |
 | **`miner.restart_backend`** | Restart the mining process on the device. |
 | **`miner.set_work_mode`** | `mode`: `low` \| `normal` \| `high`. |
-| **`miner.set_pool`** | **Existing** — `pool_index` (0-based) becomes primary (reorder). **Manual** — set `host`, `port`, optional `use_ssl`, `username`, `password` on the primary slot. |
+| **`miner.set_pool`** | **Existing** — `pool_index` (0-based) becomes primary (reorder). **Manual** — set primary slot `host` / `port` / optional `use_ssl`, `username`, `password`. **Append** — add a backup slot (same fields; max 3 pools). |
 
 Use **Developer tools → Actions** or YAML automations. Pool behaviour depends on **firmware / model** and pyasic support for `get_config` / `send_config`.
 
@@ -176,7 +177,7 @@ DHCP-based discovery matches hostnames such as **Antminer**, **WhatsMiner**, **A
 
 - **Not every feature exists on every miner** — switches, power modes, autotuning, pool config, and sensors depend on the driver in pyasic and on firmware.
 - **Pool changes** — use **Pool priority** when multiple pools are configured; arbitrary URLs need **`miner.set_pool`** in manual mode.
-- **Power off** — only switches a **linked HA `switch`**; it does not replace miner-side shutdown APIs.
+- **Power off / on** — only drive a **linked HA `switch`**; they do not replace miner-side shutdown APIs.
 
 Supported device families in pyasic:
 

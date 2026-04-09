@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from urllib.parse import urlparse
 
 from homeassistant.const import CONF_DEVICE_ID
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -11,8 +10,6 @@ from homeassistant.helpers.device_registry import (
     async_get as async_get_device_registry,
 )
 from pyasic.config.mining import MiningModeConfig
-from pyasic.config.pools import Pool
-from pyasic.config.pools import PoolGroup
 
 from .const import (
     DOMAIN,
@@ -21,6 +18,9 @@ from .const import (
     SERVICE_SET_POOL,
     SERVICE_SET_WORK_MODE,
 )
+from .pool_stratum import async_append_stratum_pool
+from .pool_stratum import async_apply_primary_stratum
+from .pool_stratum import ensure_first_pool_group
 
 LOGGER = logging.getLogger(__name__)
 
@@ -89,15 +89,6 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     hass.services.async_register(DOMAIN, SERVICE_SET_WORK_MODE, set_work_mode)
 
-    def _build_pool_url(host: str, port: int, use_ssl: bool) -> str:
-        scheme = "stratum+ssl" if use_ssl else "stratum+tcp"
-        return f"{scheme}://{host}:{port}"
-
-    def _ensure_first_group(cfg) -> PoolGroup:
-        if not cfg.pools.groups:
-            cfg.pools.groups = [PoolGroup(pools=[])]
-        return cfg.pools.groups[0]
-
     async def set_pool(call: ServiceCall) -> None:
         targets = await get_targets(call)
         mode = str(call.data.get("mode", "existing")).lower()
@@ -109,10 +100,10 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         password = call.data.get("password")
 
         async def apply_pool(coordinator, miner):
-            cfg = await miner.get_config()
-            group = _ensure_first_group(cfg)
-
             if mode == "existing":
+                cfg = await miner.get_config()
+                group = ensure_first_pool_group(cfg)
+
                 if not group.pools:
                     LOGGER.error("Cannot set existing pool: miner has no configured pools.")
                     return
@@ -126,52 +117,46 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 if pool_index != 0:
                     selected = group.pools.pop(pool_index)
                     group.pools.insert(0, selected)
+                await miner.send_config(cfg)
             elif mode == "manual":
                 if not host or port is None:
                     LOGGER.error("Manual pool mode requires both host and port.")
                     return
-
-                try:
-                    port_int = int(port)
-                    if port_int <= 0 or port_int > 65535:
-                        raise ValueError
-                except (TypeError, ValueError):
-                    LOGGER.error("Invalid pool port: %s", port)
+                ok = await async_apply_primary_stratum(
+                    miner,
+                    str(host),
+                    int(port),
+                    use_ssl_override,
+                    username,
+                    password,
+                )
+                if not ok:
+                    LOGGER.error("Manual pool: invalid host/port.")
                     return
-
-                if not group.pools:
-                    group.pools.append(
-                        Pool(
-                            url=_build_pool_url(
-                                str(host).strip(), port_int, bool(use_ssl_override)
-                            ),
-                            user=str(username or ""),
-                            password=str(password or ""),
-                        )
+            elif mode == "append":
+                if not host or port is None:
+                    LOGGER.error("Append pool mode requires both host and port.")
+                    return
+                use_ssl = bool(use_ssl_override) if use_ssl_override is not None else False
+                ok = await async_append_stratum_pool(
+                    miner,
+                    str(host),
+                    int(port),
+                    use_ssl,
+                    username,
+                    password,
+                )
+                if not ok:
+                    LOGGER.error(
+                        "Append pool failed (invalid host/port or max pools reached)."
                     )
-                else:
-                    pool = group.pools[0]
-                    parsed = urlparse(str(pool.url or ""))
-                    current_use_ssl = parsed.scheme == "stratum+ssl"
-                    use_ssl = (
-                        bool(use_ssl_override)
-                        if use_ssl_override is not None
-                        else current_use_ssl
-                    )
-                    pool.url = _build_pool_url(
-                        str(host).strip(), port_int, use_ssl
-                    )
-                    if username is not None:
-                        pool.user = str(username)
-                    if password is not None:
-                        pool.password = str(password)
+                    return
             else:
                 LOGGER.error("Unsupported pool mode: %s", mode)
                 return
 
-            await miner.send_config(cfg)
             await coordinator.async_request_refresh()
 
-        await asyncio.gather(*(apply_pool(coordinator, miner) for coordinator, miner in targets))
+        await asyncio.gather(*(apply_pool(c, m) for c, m in targets))
 
     hass.services.async_register(DOMAIN, SERVICE_SET_POOL, set_pool)
