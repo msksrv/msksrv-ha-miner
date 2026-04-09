@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import ipaddress
 import logging
 import socket
@@ -13,8 +14,10 @@ from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
 from homeassistant.core import callback
 from homeassistant.core import split_entity_id
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import BooleanSelector
+from homeassistant.helpers.selector import DeviceSelector, DeviceSelectorConfig
 from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
 from homeassistant.helpers.selector import NumberSelector, NumberSelectorConfig
 from homeassistant.helpers.selector import NumberSelectorMode
@@ -23,7 +26,9 @@ from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, Tex
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .const import (
+    CONF_FARM_DEVICE_IDS,
     CONF_IP,
+    CONF_IS_FARM,
     CONF_MAX_POWER,
     CONF_MIN_POWER,
     CONF_POWER_SWITCH,
@@ -76,6 +81,16 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Miner."""
 
     VERSION = 1
+
+    @classmethod
+    @callback
+    def async_supports_options_flow(
+        cls, config_entry: config_entries.ConfigEntry
+    ) -> bool:
+        """Farm entries have no options UI yet."""
+        if config_entry.data.get(CONF_IS_FARM):
+            return False
+        return super().async_supports_options_flow(config_entry)
 
     @staticmethod
     @callback
@@ -217,8 +232,86 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Show entry mode menu."""
         return self.async_show_menu(
             step_id="user",
-            menu_options=["scan", "manual"],
+            menu_options=["scan", "manual", "farm"],
             sort=False,
+        )
+
+    def _farm_schema(self, user_input: dict[str, Any] | None = None) -> vol.Schema:
+        user_input = user_input or {}
+        return vol.Schema(
+            {
+                vol.Required(
+                    CONF_TITLE, default=user_input.get(CONF_TITLE, "")
+                ): str,
+                vol.Required(
+                    CONF_FARM_DEVICE_IDS,
+                    description={
+                        "suggested_value": user_input.get(CONF_FARM_DEVICE_IDS)
+                    },
+                ): DeviceSelector(
+                    DeviceSelectorConfig(integration=DOMAIN, multiple=True),
+                ),
+            }
+        )
+
+    async def async_step_farm(self, user_input=None):
+        """Add a farm device aggregating existing miner devices."""
+        errors: dict[str, str] = {}
+
+        if user_input is None:
+            return self.async_show_form(
+                step_id="farm",
+                data_schema=self._farm_schema(),
+            )
+
+        title = str(user_input.get(CONF_TITLE, "")).strip()
+        devices = user_input.get(CONF_FARM_DEVICE_IDS)
+        if isinstance(devices, str):
+            devices = [devices]
+
+        if not title:
+            errors["base"] = "farm_no_title"
+        if not devices:
+            errors["base"] = "farm_no_devices"
+
+        if not errors:
+            dev_reg = dr.async_get(self.hass)
+            for did in devices:
+                dev = dev_reg.async_get(did)
+                if dev is None:
+                    errors["base"] = "farm_invalid_device"
+                    break
+                ce = self.hass.config_entries.async_get_entry(
+                    dev.primary_config_entry
+                )
+                if (
+                    ce is None
+                    or ce.domain != DOMAIN
+                    or ce.data.get(CONF_IS_FARM)
+                    or not ce.data.get(CONF_IP)
+                ):
+                    errors["base"] = "farm_only_miner_devices"
+                    break
+
+        if errors:
+            return self.async_show_form(
+                step_id="farm",
+                data_schema=self._farm_schema(user_input),
+                errors=errors,
+            )
+
+        key = ",".join(sorted(devices))
+        uid_digest = hashlib.sha256(key.encode()).hexdigest()[:20]
+        await self.async_set_unique_id(f"farm_{uid_digest}")
+        self._abort_if_unique_id_configured()
+
+        return self.async_create_entry(
+            title=title,
+            data={
+                CONF_IS_FARM: True,
+                CONF_TITLE: title,
+                CONF_FARM_DEVICE_IDS: devices,
+            },
         )
 
     async def async_step_manual(self, user_input=None):

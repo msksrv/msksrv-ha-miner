@@ -18,10 +18,12 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from .const import CONF_IS_FARM
 from .const import DOMAIN
 from .const import JOULES_PER_TERA_HASH
 from .const import TERA_HASH_PER_SECOND
 from .coordinator import MinerCoordinator
+from .farm_sensor import async_setup_farm_sensors
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -193,6 +195,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add sensors for passed config_entry in HA."""
+    if config_entry.data.get(CONF_IS_FARM):
+        await async_setup_farm_sensors(hass, config_entry, async_add_entities)
+        return
+
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     def _create_miner_entity(sensor: str) -> MinerSensor:

@@ -14,6 +14,8 @@ CONF_MAX_POWER = "max_power"
 CONF_SUBNET = "subnet"
 CONF_SELECTED_MINER = "selected_miner"
 CONF_POWER_SWITCH = "power_switch"
+CONF_IS_FARM = "is_farm"
+CONF_FARM_DEVICE_IDS = "farm_device_ids"
 
 SERVICE_REBOOT = "reboot"
 SERVICE_RESTART_BACKEND = "restart_backend"

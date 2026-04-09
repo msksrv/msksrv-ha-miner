@@ -9,8 +9,11 @@ from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_POWER_SWITCH, DOMAIN
+from .const import CONF_IS_FARM
+from .const import CONF_POWER_SWITCH
+from .const import DOMAIN
 from .coordinator import MinerCoordinator
+from .farm_button import async_setup_farm_buttons
 
 
 async def async_setup_entry(
@@ -19,6 +22,10 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Miner button entities."""
+    if config_entry.data.get(CONF_IS_FARM):
+        await async_setup_farm_buttons(hass, config_entry, async_add_entities)
+        return
+
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     await coordinator.async_config_entry_first_refresh()
     async_add_entities(

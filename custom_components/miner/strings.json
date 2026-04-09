@@ -5,11 +5,21 @@
       "user": {
         "menu_options": {
           "scan": "Scan local network",
-          "manual": "Enter IP manually"
+          "manual": "Enter IP manually",
+          "farm": "Farm (aggregate miners)"
         },
         "menu_option_descriptions": {
           "scan": "Search miners in the local subnet",
-          "manual": "Connect directly to a miner by IP address"
+          "manual": "Connect directly to a miner by IP address",
+          "farm": "One device with total hashrate, power, and emergency stop for linked miners"
+        }
+      },
+      "farm": {
+        "title": "Farm",
+        "description": "Pick miner devices already added to Home Assistant. Configure a power switch on each miner in integration options for emergency stop.",
+        "data": {
+          "title": "[%key:common::config_flow::data::title%]",
+          "farm_device_ids": "Miner devices"
         }
       },
       "scan": {
@@ -52,7 +62,11 @@
     "error": {
       "cannot_connect": "Failed to connect to miner",
       "invalid_subnet": "Invalid subnet. Use IPv4 CIDR like 192.168.1.0/24",
-      "scan_failed": "Network scan failed"
+      "scan_failed": "Network scan failed",
+      "farm_no_title": "Enter a name for the farm",
+      "farm_no_devices": "Select at least one miner device",
+      "farm_invalid_device": "A selected device no longer exists",
+      "farm_only_miner_devices": "Only individual miner devices can be added (not another farm)"
     },
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
@@ -118,6 +132,26 @@
       },
       "power_on": {
         "name": "Power on"
+      },
+      "farm_emergency_stop": {
+        "name": "Emergency stop"
+      }
+    },
+    "sensor": {
+      "farm_total_hashrate": {
+        "name": "Total hashrate"
+      },
+      "farm_total_power_kw": {
+        "name": "Total power"
+      },
+      "farm_miner_count": {
+        "name": "Miner count"
+      },
+      "farm_miners_online": {
+        "name": "Miners online"
+      },
+      "farm_algorithm": {
+        "name": "Algorithm"
       }
     },
     "select": {
