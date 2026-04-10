@@ -101,16 +101,11 @@
           "farm_elec_price_kwh_2": "Flat mode — tariff 2 price per kWh",
           "farm_elec_currency_3": "Flat mode — tariff 3 currency (empty = off)",
           "farm_elec_price_kwh_3": "Flat mode — tariff 3 price per kWh",
-          "pool_action": {
-            "name": "Stratum pool (all members)",
-            "description": "Leave unchanged, replace primary on each miner, or append a backup (max 3 pools each).",
-            "options": {
-              "none": "Do not change pools",
-              "replace_primary": "Set primary pool (host and port below)",
-              "append_backup": "Add backup pool (host and port below)"
-            }
-          },
+          "pool_action": "Stratum pool (all members)",
           "pool_apply_slot": "Slot to apply (1–5)"
+        },
+        "data_description": {
+          "pool_action": "Leave unchanged, replace primary on each miner, or append a backup (max 3 pools each)."
         }
       },
       "init": {
@@ -118,20 +113,15 @@
         "description": "Power switch for the miner plug, and optional stratum pool changes (requires miner reachable).",
         "data": {
           "power_switch": "Power switch",
-          "pool_action": {
-            "name": "Stratum pool",
-            "description": "Leave unchanged, replace the primary slot, or add a backup (max 3 pools).",
-            "options": {
-              "none": "Do not change pools",
-              "replace_primary": "Set primary pool (host and port below)",
-              "append_backup": "Add backup pool (host and port below)"
-            }
-          },
+          "pool_action": "Stratum pool",
           "pool_host": "Stratum host",
           "pool_port": "Stratum port",
           "pool_use_ssl": "Use stratum+ssl",
           "pool_username": "Worker username",
           "pool_password": "Worker password"
+        },
+        "data_description": {
+          "pool_action": "Leave unchanged, replace the primary slot, or add a backup (max 3 pools)."
         }
       }
     },
@@ -238,6 +228,15 @@
       },
       "pool_priority": {
         "name": "Pool priority"
+      }
+    }
+  },
+  "selector": {
+    "pool_action": {
+      "options": {
+        "none": "Do not change pools",
+        "replace_primary": "Set primary pool (host and port below)",
+        "append_backup": "Add backup pool (host and port below)"
       }
     }
   }

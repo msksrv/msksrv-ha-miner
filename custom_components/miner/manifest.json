@@ -13,13 +13,13 @@
   ],
   "dhcp": [
     {
-      "macaddress": "E0A509"
+      "macaddress": "E0A509*"
     },
     {
-      "macaddress": "C41025"
+      "macaddress": "C41025*"
     },
     {
-      "macaddress": "C80831"
+      "macaddress": "C80831*"
     },
     {
       "hostname": "whatsminer*"
@@ -52,5 +52,5 @@
       "registered_devices": true
     }
   ],
-  "version": "1.6.0"
+  "version": "1.6.1"
 }

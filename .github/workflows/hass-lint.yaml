@@ -7,8 +7,6 @@ on:
       - master
       - dev
   pull_request:
-  schedule:
-    - cron: "0 0 * * *"
 
 jobs:
   hacs: # https://github.com/hacs/action
