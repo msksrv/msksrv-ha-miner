@@ -2,7 +2,7 @@
 
 **Language:** [Русский](README.md) · **English**
 
-**MSKSRV ASIC Miner** is a **[Home Assistant](https://www.home-assistant.io/)** custom integration for **local monitoring and control of ASIC Bitcoin miners** (Antminer, WhatsMiner, Avalon, Innosilicon, Goldshell, IceRiver, BitAxe, and others supported by [**pyasic**](https://github.com/UpstreamData/pyasic)). Install via **[HACS](https://www.hacs.xyz/)** or manually; one **config entry per miner IP**, optional **RPC / web / SSH** credentials, **stratum pool** tools, and an optional **farm** device that aggregates hashrate, power, and **bulk pool apply** across many miners.
+**MSKSRV ASIC Miner** is a **[Home Assistant](https://www.home-assistant.io/)** custom integration for **local monitoring and control of ASIC Bitcoin miners** (Antminer, WhatsMiner, Avalon, Innosilicon, Goldshell, IceRiver, BitAxe, and others supported by [**pyasic**](https://github.com/UpstreamData/pyasic)). Install via **[HACS](https://www.hacs.xyz/)** or manually; one **config entry per miner IP**, optional **RPC / web / SSH** credentials, **stratum pool** tools, and an optional **farm** device that aggregates hashrate, power, and **bulk pool apply** across many miners. The farm also supports **optional electricity cost tracking**: **flat** tariffs (up to three currencies) or **two / three time-of-use zones** in **Home Assistant local time**.
 
 [![GitHub Release](https://img.shields.io/github/v/release/msksrv/msksrv-ha-miner?style=for-the-badge)](https://github.com/msksrv/msksrv-ha-miner/releases)
 [![License: Non-Commercial](https://img.shields.io/badge/License-Non--Commercial-red?style=for-the-badge)](LICENSE)
@@ -47,7 +47,7 @@
 | **DHCP discovery** | Home Assistant matches **lowercase DHCP hostname** globs (`whatsminer*`, `antminer*`, …) and/or known **MAC OUIs**; then the integration probes the miner API with limited retries (see [Discovery](#discovery)). |
 | **Subnet scan** | Scan an IPv4 subnet (CIDR) with progress UI; pick a discovered host. Subnet size is capped for safety. |
 | **Manual IP** | Add a miner by address. |
-| **Farm** | Second-level device: select existing **miner** devices → **total hashrate (TH/s)**, **total power (kW)**, **miner count / online**, **algorithm** summary, **Emergency stop** (calls `switch.turn_off` on each member’s **power switch** set via **⚙️ Configure** on **that member’s** integration tile). **⚙️ Configure** on the **farm** tile can apply the **same stratum primary or backup** to every member when they share one reported algorithm. |
+| **Farm** | Second-level device: select existing **miner** devices → **total hashrate (TH/s)**, **total power (kW)**, **miner count / online**, **algorithm** summary, **Emergency stop** (calls `switch.turn_off` on each member’s **power switch** set via **⚙️ Configure** on **that member’s** integration tile). **⚙️ Configure** on the **farm** tile can apply the **same stratum primary or backup** to every member when they share one reported algorithm. Optionally — **electricity tariffs** (flat or **2 / 3 TOU zones** in local time) and **cost** sensors from total farm power. |
 | **Credentials** | Optional RPC, web UI, and SSH credentials when the miner exposes those APIs. |
 | **Power switch & pool (options)** | In **⚙️ Configure** on the miner tile: link a **`switch`** for plug control (**Power off** / **Power on**), and optionally **replace primary stratum** or **append a backup pool** (host, port, SSL, worker) when the miner is online. |
 
@@ -62,6 +62,7 @@ Poll interval is **10 seconds** (`local_polling`). Typical data includes:
 - **Fans** — RPM per fan
 - **Pool** — primary pool host/port, **pool worker** (stratum user from the active or first pool slot), accepted/rejected shares, reject rate
 - **Device** — model, firmware, uptime (formatted), board count, IP, MAC
+- **Farm (optional)** — when tariffs are set under **⚙️ Configure** on the farm entry: **electricity cost** sensors (this hour, today, this month, lifetime, and **cost at current draw**) in the chosen currency; in zone mode the active **price follows HA local time**.
 
 When the miner is temporarily unreachable, the integration keeps entities alive with **degraded / zeroed** data on the first failure, then marks the device unavailable on repeated failures.
 
@@ -152,7 +153,9 @@ To **add or remove miners** on an existing farm, open **⚙️ Configure** on th
 - **Dashboard** — on the **farm** **device page** (“Devices” tab): **Preset to apply** (select) and **Apply preset as primary pool** / **… as backup pool** (buttons) — **without** **⚙️ Configure** under Integrations. Buttons log an error if apply fails (e.g. mixed algorithms, offline miner).
 - **Secrets** — presets live in HA **config storage** with the farm entry; include them in your **backup** threat model.
 
-Farm sensors include **total hashrate / power**, **miner count / online**, **algorithm summary** (from pyasic per miner; if miners differ, shown as e.g. `SHA256d (3), Scrypt (1)`; if none report an algorithm, **SHA256d** is assumed as label only), **effective chips %** (sum of working chips vs expected chips across **online** members’ hashboards), and any linked **ambient temperature** sensors.
+**Electricity (cost)** — under **⚙️ Configure** on the **farm** tile, the electricity section: **flat** mode (up to three currency + price/kWh pairs) or **two / three zones** in **Home Assistant local time** (one currency; each zone has start, end, and price/kWh). Use **24:00** for end-of-day when you need the last minute of the day inside a zone. Cost sensors are created only when the selected mode is filled in validly. After **changing tariff mode or zones**, **reload the farm integration entry** (**🧩 Integrations** → farm row → **⋯** → Reload) so entities match the new settings.
+
+Farm sensors include **total hashrate / power**, **miner count / online**, **algorithm summary** (from pyasic per miner; if miners differ, shown as e.g. `SHA256d (3), Scrypt (1)`; if none report an algorithm, **SHA256d** is assumed as label only), **effective chips %** (sum of working chips vs expected chips across **online** members’ hashboards), any linked **ambient temperature** sensors, and when tariffs are configured — **electricity cost** sensors (see above).
 
 ---
 
@@ -323,6 +326,7 @@ The integration loads **pyasic only when needed** (single-miner setup, scan, ser
 | **Farm pool apply fails for one member** | Logs show `Farm stratum:` — offline miner, mixed algorithms, or duplicate device entries on the farm (fix the device list via **⚙️ Configure** on the **farm** tile). |
 | **DHCP discovery never starts** | Hostname patterns are **lowercase** in `manifest.json`; HA lowercases DHCP hostnames before match. |
 | **Ghost sidebar item “MSKSRV…” after upgrade** | Older betas registered a custom panel; disable it under **👤 Profile → sidebar**, or restart HA after updating to **1.4.x**. |
+| **No farm cost sensors** | Set tariffs under **⚙️ Configure** on the farm entry. In **two / three zone** mode you need a currency and that many zones with a **positive** price. After changes, **reload the farm integration entry**. |
 | **PyPI / pyasic install errors** | Network, corporate proxy, Python version; see [Requirements](#requirements). |
 
 **Issues & feature requests:** [GitHub Issues](https://github.com/msksrv/msksrv-ha-miner/issues).
@@ -343,14 +347,14 @@ https://pyasic.readthedocs.io/en/latest/miners/supported_types/
 
 ## Releases {#releases}
 
-**Current stable line: 1.4.x** — farm stratum improvements (deduplicated members, fallback when a coordinator is missing), **pool worker** sensor, config-flow fixes for DHCP “already configured”, and removal of the experimental custom sidebar panel (use HA’s own sidebar settings).
+**Current stable line: 1.6.x** — **farm electricity cost**: **flat** mode (up to three currencies) and **two / three time-of-use zones** in **local time**; power integrated across zone boundaries; updated option-form strings (English and Russian). Earlier **1.4.x–1.5.x** brought farm stratum work, **pool worker** sensor, config-flow/DHCP fixes.
 
 ### Automatic release (GitHub Actions)
 
 Push a version tag:
 
-- **Stable:** `v1.4.0` → full **Release**, `miner.zip` attached, `manifest.json` version updated in the workflow to match the tag (without leading `v`).
-- **Beta / RC:** `v1.5.0b1`, `v1.5.0rc1`, etc. → **Pre-release** (same ZIP workflow).
+- **Stable:** `v1.6.0` (or the next semver tag) → full **Release**, `miner.zip` attached, `manifest.json` version updated in the workflow to match the tag (without leading `v`).
+- **Beta / RC:** `v1.7.0b1`, `v1.7.0rc1`, etc. → **Pre-release** (same ZIP workflow).
 
 Workflows: **Create release from tag** (drafts the GitHub release) and **Release** (on publish: patch manifest version in the artifact, zip `custom_components/miner`, upload **`miner.zip`**).
 
