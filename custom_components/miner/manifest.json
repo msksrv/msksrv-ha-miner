@@ -5,12 +5,6 @@
     "@msksrv"
   ],
   "config_flow": true,
-  "documentation": "https://github.com/msksrv/msksrv-ha-miner",
-  "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/msksrv/msksrv-ha-miner/issues",
-  "requirements": [
-    "pyasic>=0.78.9,<0.79"
-  ],
   "dhcp": [
     {
       "macaddress": "E0A509*"
@@ -52,5 +46,11 @@
       "registered_devices": true
     }
   ],
-  "version": "1.6.1"
+  "documentation": "https://github.com/msksrv/msksrv-ha-miner",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/msksrv/msksrv-ha-miner/issues",
+  "requirements": [
+    "pyasic>=0.78.9,<0.79"
+  ],
+  "version": "1.6.2"
 }
