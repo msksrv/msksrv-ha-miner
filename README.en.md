@@ -20,6 +20,7 @@
 
 - [Features](#features)
 - [Installation](#installation)
+- [HACS icon](#hacs-icon-brand)
 - [Configuration](#configuration)
 - [Farm device](#farm-device)
 - [Entities](#entities)
@@ -101,6 +102,14 @@ When the miner is temporarily unreachable, the integration keeps entities alive 
 
 Copy the `custom_components/miner` folder into your Home Assistant  
 `config/custom_components/` directory, then restart.
+
+### HACS (“Icon not available”) {#hacs-icon-brand}
+
+In the **HACS repository list**, images are loaded from the **[Home Assistant brands CDN](https://brands.home-assistant.io/)**, not from this GitHub repo. Until domain **`miner`** exists under **`custom_integrations/miner/`** in **[home-assistant/brands](https://github.com/home-assistant/brands)**, HACS shows *Icon not available*. That is expected for custom integrations before a brands PR is merged.
+
+After installation, Home Assistant can use icons from **`custom_components/miner/`** (`icon.png` and the **`brand/`** folder).
+
+**To get the icon in HACS:** open a PR to `home-assistant/brands` using the files in **[`brands_submission/`](brands_submission/)** (README there), or run **`scripts/submit_brands_pr.ps1`**.
 
 ---
 

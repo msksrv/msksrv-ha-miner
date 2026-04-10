@@ -20,6 +20,7 @@
 
 - [Возможности](#features)
 - [Установка](#installation)
+- [Иконка в HACS](#hacs-icon-brand)
 - [Настройка](#configuration)
 - [Устройство «ферма»](#farm-device)
 - [Сущности](#entities)
@@ -101,6 +102,14 @@
 
 Скопируйте каталог `custom_components/miner` в каталог  
 `config/custom_components/` вашего Home Assistant, затем перезапустите систему.
+
+### Иконка в HACS («Icon not available») {#hacs-icon-brand}
+
+В **списке репозиториев HACS** картинка берётся с **[бренд-сервера Home Assistant](https://brands.home-assistant.io/)**, а не из этого GitHub-репозитория. Пока для домена **`miner`** нет папки **`custom_integrations/miner/`** в репозитории **[home-assistant/brands](https://github.com/home-assistant/brands)**, HACS покажет заглушку *Icon not available*. Это **нормально** для кастомных интеграций до принятия PR в brands.
+
+После установки интеграции иконка в интерфейсе HA обычно подхватывается из **`custom_components/miner/`** (`icon.png` и каталог **`brand/`**).
+
+**Что сделать, чтобы иконка появилась в HACS:** подать PR в `home-assistant/brands` с файлами из каталога **[`brands_submission/`](brands_submission/)** (там же инструкция) или запустить **`scripts/submit_brands_pr.ps1`**.
 
 ---
 
