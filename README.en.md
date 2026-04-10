@@ -20,7 +20,6 @@
 
 - [Features](#features)
 - [Installation](#installation)
-- [HACS icon](#hacs-icon-brand)
 - [Configuration](#configuration)
 - [Farm device](#farm-device)
 - [Entities](#entities)
@@ -39,7 +38,7 @@
 
 ---
 
-## Features {#features}
+## Features
 
 ### Setup & discovery
 
@@ -88,7 +87,7 @@ When the miner is temporarily unreachable, the integration keeps entities alive 
 
 ---
 
-## Installation {#installation}
+## Installation
 
 ### HACS (recommended)
 
@@ -98,22 +97,16 @@ When the miner is temporarily unreachable, the integration keeps entities alive 
 3. Or use the **“Open repository in HACS”** button at the top of this README.
 4. Install **MSKSRV ASIC Miner** and **restart Home Assistant**.
 
+If the HACS list shows no icon for this repo, that is common for custom integrations. After installation, on **Home Assistant 2026.3 or newer**, the icon usually appears under **Settings → Devices & services → Integrations**.
+
 ### Manual
 
 Copy the `custom_components/miner` folder into your Home Assistant  
 `config/custom_components/` directory, then restart.
 
-### HACS (“Icon not available”) {#hacs-icon-brand}
-
-In the **HACS repository list**, images are loaded from the **[Home Assistant brands CDN](https://brands.home-assistant.io/)**, not from this GitHub repo. Until domain **`miner`** exists under **`custom_integrations/miner/`** in **[home-assistant/brands](https://github.com/home-assistant/brands)**, HACS shows *Icon not available*. That is expected for custom integrations before a brands PR is merged.
-
-After installation, Home Assistant can use icons from **`custom_components/miner/`** (`icon.png` and the **`brand/`** folder).
-
-**To get the icon in HACS:** open a PR to `home-assistant/brands` using the files in **[`brands_submission/`](brands_submission/)** (README there), or run **`scripts/submit_brands_pr.ps1`**.
-
 ---
 
-## Configuration {#configuration}
+## Configuration
 
 ### Home Assistant UI icons
 
@@ -147,7 +140,7 @@ Pool fields are applied **only when you submit** this form; they are not stored 
 
 Use Home Assistant’s **built-in** tools: **👤 Profile** → **sidebar** visibility/order, and/or create a **Lovelace** view with miner cards and enable **Show in sidebar** on that dashboard. This integration does **not** register its own sidebar panel (avoids duplicate menu entries).
 
-### Farm device {#farm-device}
+### Farm device
 
 Add **Farm** from the same integration menu, enter a **name**, and multi-select **miner devices** (only entries created as single miners, not other farms).  
 **Emergency stop** is **available** only if at least one member has a **power switch** set via **⚙️ Configure** on **that member’s** miner tile and that `switch` exists in HA. It sends **`switch.turn_off`** to **all** such switches (parallel, non-blocking).
@@ -168,7 +161,7 @@ Farm sensors include **total hashrate / power**, **miner count / online**, **alg
 
 ---
 
-## Entities {#entities}
+## Entities
 
 ### Sensors (examples)
 
@@ -193,7 +186,7 @@ Naming follows `{device title} …`; board/fan indices depend on hardware.
 
 ---
 
-## Automation examples (YAML) {#automation-examples-yaml}
+## Automation examples (YAML)
 
 Replace `device_id` values with IDs from **🛠️ Developer tools → Devices** (or use the UI automation editor’s device selector — it fills the correct id).
 
@@ -279,7 +272,7 @@ automation:
 
 ---
 
-## Services {#services}
+## Services
 
 All services accept **`device_id`** (Home Assistant device ID). Miner services support **multiple** miners in one call; **`miner.set_farm_pool`** targets **farm** devices (one or more).
 
@@ -295,7 +288,7 @@ Use **🛠️ Developer tools → Actions** or YAML automations. Pool behaviour 
 
 ---
 
-## Device actions {#device-actions}
+## Device actions
 
 For automations tied to a **device** (not raw entity IDs), the integration exposes:
 
@@ -307,7 +300,7 @@ For automations tied to a **device** (not raw entity IDs), the integration expos
 
 ---
 
-## Discovery {#discovery}
+## Discovery
 
 DHCP uses **both** paths (as in v1.2.x): **hostname** globs in **lowercase** only — Home Assistant lowercases the DHCP name before `fnmatch`, so e.g. `WhatsMiner` → `whatsminer*` (patterns like `WhatsMiner*` would **not** match). Plus **MAC OUI** prefixes (**Bitmain** `E0A509`, **WhatsMiner-class** `C41025` / `C80831`) for devices with empty or generic hostnames, and **`registered_devices`** when that MAC is already in the device registry.
 
@@ -315,7 +308,7 @@ When a device matches, the integration calls the miner API **up to 3 times** (6 
 
 ---
 
-## Requirements {#requirements}
+## Requirements
 
 - **Home Assistant** ≥ **2025.1.0** (see `hacs.json`).
 - **Python dependency**: **pyasic** `0.78.x` (range in [`manifest.json`](custom_components/miner/manifest.json); installed automatically by Home Assistant).
@@ -326,7 +319,7 @@ The integration loads **pyasic only when needed** (single-miner setup, scan, ser
 
 ---
 
-## Troubleshooting {#troubleshooting}
+## Troubleshooting
 
 | Symptom | What to check |
 |--------|----------------|
@@ -342,7 +335,7 @@ The integration loads **pyasic only when needed** (single-miner setup, scan, ser
 
 ---
 
-## Limitations {#limitations}
+## Limitations
 
 - **Not every feature exists on every miner** — switches, power modes, autotuning, pool config, and sensors depend on the driver in pyasic and on firmware.
 - **Pool changes** — use **Pool priority** when multiple pools are configured; arbitrary URLs need **`miner.set_pool`** in manual mode.
@@ -354,7 +347,7 @@ https://pyasic.readthedocs.io/en/latest/miners/supported_types/
 
 ---
 
-## Releases {#releases}
+## Releases
 
 **Current stable line: 1.6.x** — **farm electricity cost**: **flat** mode (up to three currencies) and **two / three time-of-use zones** in **local time**; power integrated across zone boundaries; updated option-form strings (English and Russian). Earlier **1.4.x–1.5.x** brought farm stratum work, **pool worker** sensor, config-flow/DHCP fixes.
 
@@ -373,13 +366,13 @@ You can create a release in the GitHub UI: choose the tag, optionally **Set as a
 
 ---
 
-## License {#license}
+## License
 
 This project is licensed for **non-commercial use only** — see [`LICENSE`](LICENSE). Commercial use requires **prior written permission** from the copyright holders.
 
 ---
 
-## Credits {#credits}
+## Credits
 
 - **[pyasic](https://github.com/UpstreamData/pyasic)** — miner communication layer.
 - Fork / evolution of ideas from **[hass-miner](https://github.com/Schnitzel/hass-miner)** (Schnitzel).

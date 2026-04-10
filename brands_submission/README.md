@@ -1,24 +1,19 @@
-# Brand images for `home-assistant/brands`
+# Deprecated: no PR to `home-assistant/brands`
 
-HACS and the Home Assistant UI load integration icons from **https://brands.home-assistant.io/**.  
-Custom integrations are listed under **`custom_integrations/<domain>/`**.
+Home Assistant **no longer accepts** brand image PRs for custom integrations in [home-assistant/brands](https://github.com/home-assistant/brands). Since **Home Assistant 2026.3.0**, custom integrations ship icons in their own package.
 
-This folder mirrors what you should add in a PR to **[home-assistant/brands](https://github.com/home-assistant/brands)**:
+**Announcement:** [Brands proxy API / custom integration brands](https://developers.home-assistant.io/blog/2026/02/24/brands-proxy-api)
 
-- `custom_integrations/miner/icon.png` — square icon (here 512×512)
-- `custom_integrations/miner/logo.png` — logo for wider placements (same artwork here)
+## Where icons live in this integration
 
-## Quick steps
+Use the files already in the repo:
 
-1. Fork **https://github.com/home-assistant/brands**
-2. Create branch from `master`, copy the contents of `custom_integrations/miner/` from this directory into the same path in the fork
-3. Open a PR titled e.g. *Add brand images for miner custom integration (MSKSRV ASIC Miner)*  
-   Follow [brands PR requirements](https://github.com/home-assistant/brands/blob/master/README.md)
-4. After the PR is **merged**, wait for CDN cache (can be hours). Then HACS should show the icon instead of *Icon not available*.
-5. Optional: in this repo, remove `ignore: brands` from `.github/workflows/hass-lint.yaml` so HACS Action validates brands too.
+- `custom_components/miner/brand/icon.png`
+- `custom_components/miner/brand/logo.png`
+- `custom_components/miner/icon.png` (legacy fallback)
 
-Or run **`scripts/submit_brands_pr.ps1`** from the repo root (after cloning `brands` it copies these files into the clone).
+After installation, Home Assistant serves them via `/api/brands/integration/miner/...`.
 
----
+**HACS:** the store may still show a placeholder until HACS catches up with local brand resolution; the icon should appear in **Settings → Integrations** after the integration is installed (on HA **2026.3+**).
 
-**RU:** Иконка в каталоге HACS не берётся из твоего репозитория — только с CDN брендов Home Assistant. Нужен **PR в `home-assistant/brands`** с файлами из этой папки; после мержа и обновления кэша иконка появится.
+This folder previously held copies for a brands PR; those files were removed as unnecessary.

@@ -20,7 +20,7 @@ jobs:
         uses: "hacs/action@main"
         with:
           category: "integration"
-          # Remove this 'ignore' key when you have added brand images for your integration to https://github.com/home-assistant/brands
+          # Custom integrations ship brand/ in-package (HA 2026.3+); brands repo no longer accepts them. HACS action still expects CDN unless ignored.
           ignore: "brands"
 
   hassfest: # https://developers.home-assistant.io/blog/2020/04/16/hassfest

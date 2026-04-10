@@ -1,2 +1,2 @@
-# Local clone of home-assistant/brands (for preparing PR)
+# Optional local clone of home-assistant/brands (legacy; custom integration icons ship in-package since HA 2026.3)
 brands/
