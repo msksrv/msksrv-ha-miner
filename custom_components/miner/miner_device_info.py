@@ -22,6 +22,7 @@ def get_miner_device_info(coordinator: MinerCoordinator) -> entity.DeviceInfo:
     if ip is not None:
         ip = str(ip).strip() or None
     mac = data.get("mac")
+    identifier = mac or entry.entry_id
 
     connections: set[tuple[str, str]] = set()
     if ip:
@@ -30,7 +31,7 @@ def get_miner_device_info(coordinator: MinerCoordinator) -> entity.DeviceInfo:
         connections.add((device_registry.CONNECTION_NETWORK_MAC, mac))
 
     return entity.DeviceInfo(
-        identifiers={(DOMAIN, mac)},
+        identifiers={(DOMAIN, identifier)},
         connections=connections if connections else None,
         configuration_url=f"http://{ip}" if ip else None,
         manufacturer=data.get("make"),

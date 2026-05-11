@@ -37,6 +37,7 @@ set_work_mode:
       selector:
         device:
           integration: miner
+          multiple: true
     mode:
       required: true
       example: "low"

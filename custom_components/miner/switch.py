@@ -33,7 +33,8 @@ async def async_setup_entry(
         created.add(key)
 
     await coordinator.async_config_entry_first_refresh()
-    if coordinator.miner.supports_shutdown:
+    miner = await coordinator.get_miner()
+    if miner is not None and miner.supports_shutdown:
         async_add_entities(
             [
                 MinerActiveSwitch(
@@ -52,7 +53,7 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-active"
+        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-active"
         self._attr_is_on = self.coordinator.data["is_mining"]
         self.updating_switch = False
         self._last_mining_mode = None
@@ -60,7 +61,7 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
     @property
     def name(self) -> str | None:
         """Return name of the entity."""
-        return f"{self.coordinator.config_entry.title} active"
+        return f"{self.coordinator.config_entry.title} Active"
 
     @property
     def device_info(self) -> entity.DeviceInfo:

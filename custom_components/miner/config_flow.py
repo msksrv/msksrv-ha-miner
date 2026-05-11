@@ -581,13 +581,14 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         schema_data = {}
 
-        if self._miner.rpc is not None and self._miner.rpc.pwd is not None:
+        api = getattr(self._miner, "api", None) or getattr(self._miner, "rpc", None)
+        if api is not None and getattr(api, "pwd", None) is not None:
             schema_data[
                 vol.Optional(
                     CONF_RPC_PASSWORD,
                     default=user_input.get(
                         CONF_RPC_PASSWORD,
-                        self._miner.rpc.pwd or "",
+                        api.pwd or "",
                     ),
                 )
             ] = TextSelector(
@@ -659,8 +660,9 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_title(self, user_input=None):
         """Get entity title."""
-        if self._miner.api is not None and self._miner.api.pwd is not None:
-            self._miner.api.pwd = self._data.get(CONF_RPC_PASSWORD, "")
+        api = getattr(self._miner, "api", None) or getattr(self._miner, "rpc", None)
+        if api is not None and getattr(api, "pwd", None) is not None:
+            api.pwd = self._data.get(CONF_RPC_PASSWORD, "")
 
         if self._miner.web is not None:
             self._miner.web.username = self._data.get(CONF_WEB_USERNAME, "")

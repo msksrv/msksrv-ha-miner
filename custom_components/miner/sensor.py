@@ -273,7 +273,21 @@ async def async_setup_entry(
     ]:
         sensors.append(_create_miner_entity(s))
 
-    for board in range(coordinator.miner.expected_hashboards or 3):
+    board_keys = []
+    try:
+        board_keys = sorted(coordinator.data.get("board_sensors", {}).keys())
+    except Exception:
+        board_keys = []
+
+    if not board_keys:
+        expected_hashboards = (
+            getattr(coordinator.miner, "expected_hashboards", None)
+            if coordinator.miner
+            else None
+        )
+        board_keys = list(range(expected_hashboards or 3))
+
+    for board in board_keys:
         for s in [
             "board_temperature",
             "chip_temperature",
@@ -285,7 +299,17 @@ async def async_setup_entry(
         ]:
             sensors.append(_create_board_entity(board, s))
 
-    for fan in range(coordinator.miner.expected_fans or 4):
+    fan_keys = []
+    try:
+        fan_keys = sorted(coordinator.data.get("fan_sensors", {}).keys())
+    except Exception:
+        fan_keys = []
+
+    if not fan_keys:
+        expected_fans = getattr(coordinator.miner, "expected_fans", None) if coordinator.miner else None
+        fan_keys = list(range(expected_fans or 4))
+
+    for fan in fan_keys:
         for s in ["fan_speed"]:
             sensors.append(_create_fan_entity(fan, s))
 
@@ -305,7 +329,7 @@ class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-{sensor}"
+        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-{sensor}"
         self._sensor = sensor
         self.entity_description = entity_description
 
@@ -355,7 +379,9 @@ class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-{board_num}-{sensor}"
+        self._attr_unique_id = (
+            f"{self.coordinator.config_entry.entry_id}-board-{board_num}-{sensor}"
+        )
         self._board_num = board_num
         self._sensor = sensor
         self.entity_description = entity_description
@@ -371,7 +397,10 @@ class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     @property
     def name(self) -> str | None:
         """Return name of the entity."""
-        return f"{self.coordinator.config_entry.title} Board #{self._board_num} {self.entity_description.key}"
+        return (
+            f"{self.coordinator.config_entry.title} "
+            f"Board #{self._board_num} {self.entity_description.key}"
+        )
 
     @property
     def device_info(self) -> entity.DeviceInfo:
@@ -403,7 +432,9 @@ class MinerFanSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-{fan_num}-{sensor}"
+        self._attr_unique_id = (
+            f"{self.coordinator.config_entry.entry_id}-fan-{fan_num}-{sensor}"
+        )
         self._fan_num = fan_num
         self._sensor = sensor
         self.entity_description = entity_description
@@ -420,7 +451,10 @@ class MinerFanSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     @property
     def name(self) -> str | None:
         """Return name of the entity."""
-        return f"{self.coordinator.config_entry.title} Fan #{self._fan_num} {self.entity_description.key}"
+        return (
+            f"{self.coordinator.config_entry.title} "
+            f"Fan #{self._fan_num} {self.entity_description.key}"
+        )
 
     @property
     def device_info(self) -> entity.DeviceInfo:

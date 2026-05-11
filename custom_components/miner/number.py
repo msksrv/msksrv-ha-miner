@@ -42,7 +42,8 @@ async def async_setup_entry(
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     await coordinator.async_config_entry_first_refresh()
-    if coordinator.miner.supports_autotuning:
+    miner = await coordinator.get_miner()
+    if miner is not None and miner.supports_autotuning:
         async_add_entities(
             [
                 MinerPowerLimitNumber(
@@ -62,6 +63,7 @@ class MinerPowerLimitNumber(CoordinatorEntity[MinerCoordinator], NumberEntity):
         """Initialize the PowerLimit entity."""
         super().__init__(coordinator=coordinator)
         self._attr_native_value = self.coordinator.data["miner_sensors"]["power_limit"]
+        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-power_limit"
         self.entity_description = entity_description
 
     @property
@@ -73,11 +75,6 @@ class MinerPowerLimitNumber(CoordinatorEntity[MinerCoordinator], NumberEntity):
     def device_info(self) -> entity.DeviceInfo:
         """Return device info."""
         return get_miner_device_info(self.coordinator)
-
-    @property
-    def unique_id(self) -> str | None:
-        """Return device UUID."""
-        return f"{self.coordinator.data['mac']}-power_limit"
 
     @property
     def native_min_value(self) -> float | None:
@@ -97,7 +94,7 @@ class MinerPowerLimitNumber(CoordinatorEntity[MinerCoordinator], NumberEntity):
     @property
     def native_unit_of_measurement(self):
         """Return device unit of measurement."""
-        return "W"
+        return UnitOfPower.WATT
 
     async def async_set_native_value(self, value):
         """Update the current value."""

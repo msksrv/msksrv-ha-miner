@@ -96,9 +96,11 @@ async def async_setup_entry(
 
     await coordinator.async_config_entry_first_refresh()
     to_add: list[SelectEntity] = [MinerPoolPrioritySelect(coordinator=coordinator)]
+    miner = await coordinator.get_miner()
     if (
-        coordinator.miner.supports_power_modes
-        and not coordinator.miner.supports_autotuning
+        miner is not None
+        and miner.supports_power_modes
+        and not miner.supports_autotuning
     ):
         to_add.append(MinerPowerModeSelect(coordinator=coordinator))
     async_add_entities(to_add)
@@ -109,7 +111,7 @@ class MinerPowerModeSelect(CoordinatorEntity[MinerCoordinator], SelectEntity):
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-power-mode"
+        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-power-mode"
 
     @property
     def name(self) -> str | None:

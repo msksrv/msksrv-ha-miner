@@ -34,6 +34,9 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         if not miner_ids:
             return []
 
+        if isinstance(miner_ids, str):
+            miner_ids = [miner_ids]
+
         registry = async_get_device_registry(hass)
 
         tasks = []

@@ -223,20 +223,24 @@ class MinerCoordinator(DataUpdateCoordinator):
     @property
     def available(self):
         """Return if device is available or not."""
-        return self.miner is not None
+        return self.last_update_success
 
     async def get_miner(self):
         """Get a valid Miner instance."""
         miner_ip = self.config_entry.data[CONF_IP]
-        miner = await pyasic.get_miner(miner_ip)
+        if self.miner is not None and getattr(self.miner, "ip", None) == miner_ip:
+            miner = self.miner
+        else:
+            miner = await pyasic.get_miner(miner_ip)
         if miner is None:
+            self.miner = None
             return None
 
         self.miner = miner
 
-        if self.miner.api is not None:
-            if self.miner.api.pwd is not None:
-                self.miner.api.pwd = self.config_entry.data.get(CONF_RPC_PASSWORD, "")
+        api = getattr(self.miner, "api", None) or getattr(self.miner, "rpc", None)
+        if api is not None and getattr(api, "pwd", None) is not None:
+            api.pwd = self.config_entry.data.get(CONF_RPC_PASSWORD, "")
 
         if self.miner.web is not None:
             self.miner.web.username = self.config_entry.data.get(CONF_WEB_USERNAME, "")
@@ -361,7 +365,10 @@ class MinerCoordinator(DataUpdateCoordinator):
             pass
 
         try:
-            reject_rate = round((float(rejected) / float(accepted)) * 100, 2) if accepted else 0
+            total = (float(accepted) if accepted is not None else 0.0) + (
+                float(rejected) if rejected is not None else 0.0
+            )
+            reject_rate = round((float(rejected) / total) * 100, 2) if total else 0
         except Exception:
             reject_rate = 0
 
