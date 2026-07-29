@@ -93,6 +93,7 @@
       "farm_invalid_device": "A selected device no longer exists",
       "farm_only_miner_devices": "Only individual miner devices can be added (not another farm)",
       "farm_device_set_conflict": "Another farm already uses this exact set of miners",
+      "farm_emergency_stop_active": "Clear the farm emergency stop before changing member devices",
       "farm_mixed_algorithms": "Selected miners use different mining algorithms; a farm can only include miners with the same algorithm.",
       "farm_algorithm_unknown": "Could not determine the algorithm for one of the miners. Wait until it connects and try again.",
       "invalid_temp_entity": "Each entry must be an existing sensor entity",
@@ -185,6 +186,27 @@
               "repair_recovery_seconds": "How long the condition must stay normal before the repair clears. Default 240 s (4 min).",
               "repair_confirm_temperature_seconds": "Optional override for critical temperature repairs (default 180 s if unset).",
               "repair_confirm_offline_seconds": "Optional override for offline repairs (default 600 s if unset)."
+            }
+          },
+          "auto_recovery": {
+            "name": "Automatic recovery",
+            "description": "Optional hashrate recovery via software reboot and, if explicitly enabled, a linked power switch. Disabled by default. Uses the hashrate threshold from health settings above.",
+            "data": {
+              "auto_recovery_enabled": "Enable automatic recovery",
+              "auto_recovery_pre_action_seconds": "Pre-action dwell (s)",
+              "auto_recovery_post_reboot_seconds": "Wait after reboot (s)",
+              "auto_recovery_power_cycle_enabled": "Allow hardware power cycle",
+              "auto_recovery_power_off_pause_seconds": "Power-off pause (s)",
+              "auto_recovery_post_power_on_seconds": "Wait after power on (s)",
+              "auto_recovery_max_reboots": "Max software reboots",
+              "auto_recovery_max_power_cycles": "Max power cycles",
+              "auto_recovery_cooldown_seconds": "Cooldown after recovery (s)"
+            },
+            "data_description": {
+              "auto_recovery_enabled": "Off by default. Only attempts recovery when hashrate stays below the configured threshold.",
+              "auto_recovery_power_cycle_enabled": "Requires a linked smart switch and explicit consent. Never enabled automatically.",
+              "auto_recovery_pre_action_seconds": "How long low hashrate must persist before any action (default 600 s).",
+              "auto_recovery_cooldown_seconds": "After any completed recovery (success or lock), block further auto recovery (default 21600 s = 6 h)."
             }
           },
           "stratum_pool": {
@@ -388,6 +410,7 @@
       "farm_invalid_device": "A selected device no longer exists",
       "farm_only_miner_devices": "Only individual miner devices can be added (not another farm)",
       "farm_device_set_conflict": "Another farm already uses this exact set of miners",
+      "farm_emergency_stop_active": "Clear the farm emergency stop before changing member devices",
       "invalid_switch": "The selected entity is missing or is not a switch",
       "invalid_temp_entity": "Each entry must be an existing sensor entity",
       "pool_fields_required": "Enter both stratum host and port for this action.",
@@ -446,6 +469,9 @@
       "farm_emergency_stop": {
         "name": "Emergency stop"
       },
+      "farm_clear_emergency_stop": {
+        "name": "Clear emergency stop"
+      },
       "farm_apply_pool_primary": {
         "name": "Apply preset as primary pool"
       },
@@ -457,6 +483,9 @@
       },
       "baseline_accept": {
         "name": "Add current to baseline"
+      },
+      "recovery_reset": {
+        "name": "Reset recovery lock"
       }
     },
     "event": {
@@ -726,6 +755,14 @@
     "miner_recovery": {
       "title": "{name}: slow recovery after reboot",
       "description": "Hashrate {current_hashrate} TH/s ({recovery_pct}% of baseline {baseline_hashrate} TH/s)."
+    },
+    "miner_recovery_failed": {
+      "title": "{name}: automatic recovery did not help",
+      "description": "After software reboot and optional power cycle, hashrate is still {current_hashrate} TH/s (expected about {expected_hashrate} TH/s)."
+    },
+    "miner_power_restore_failed": {
+      "title": "{name}: could not restore power",
+      "description": "Power switch {power_switch} stayed off or could not be turned on after an automatic power cycle."
     },
     "miner_reject": {
       "title": "{name}: high reject rate",

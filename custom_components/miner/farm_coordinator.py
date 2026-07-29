@@ -79,6 +79,20 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         )
         self.events = FarmEventManager(hass, entry)
         self.repairs = FarmRepairManager(hass, entry)
+        self._recovery_active_miner: str | None = None
+        self._emergency_stop_active = False
+        self._emergency_clear_armed_until: float | None = None
+
+    def try_claim_recovery(self, miner_entry_id: str) -> bool:
+        """Allow at most one auto-recovery on this farm at a time."""
+        if self._recovery_active_miner in (None, miner_entry_id):
+            self._recovery_active_miner = miner_entry_id
+            return True
+        return False
+
+    def release_recovery(self, miner_entry_id: str) -> None:
+        if self._recovery_active_miner == miner_entry_id:
+            self._recovery_active_miner = None
 
     def _iter_miner_member_pairs(
         self,
@@ -300,6 +314,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             ],
             "ambient_temperatures": self._ambient_temperature_map(),
             "emergency_stop_available": self.emergency_stop_available,
+            "emergency_stop_active": self._emergency_stop_active,
         }
 
     def linked_power_switches(self) -> list[str]:
@@ -326,8 +341,66 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                 return True
         return False
 
+    @property
+    def emergency_stop_active(self) -> bool:
+        return self._emergency_stop_active
+
+    async def async_refresh_emergency_stop_cache(self) -> None:
+        """Load emergency latch state once (startup); not polled every cycle."""
+        from .health.recovery.emergency import async_entry_emergency_latched
+
+        active = False
+        for entry, _coord in self._iter_miner_member_pairs(self.device_ids):
+            if await async_entry_emergency_latched(self.hass, entry.entry_id):
+                active = True
+                break
+        self._emergency_stop_active = active
+
+    def arm_emergency_clear(self) -> None:
+        import time
+
+        self._emergency_clear_armed_until = time.monotonic() + 30.0
+
+    @property
+    def emergency_clear_armed(self) -> bool:
+        import time
+
+        if self._emergency_clear_armed_until is None:
+            return False
+        if time.monotonic() > self._emergency_clear_armed_until:
+            self._emergency_clear_armed_until = None
+            return False
+        return True
+
+    async def async_clear_emergency_stop(self) -> None:
+        """Clear emergency stop latch on all farm members (explicit confirm)."""
+        from .health.recovery.emergency import async_clear_emergency_latch
+
+        pairs = list(self._iter_miner_member_pairs(self.device_ids))
+        for entry, member in pairs:
+            await async_clear_emergency_latch(self.hass, entry.entry_id)
+            if member is not None and hasattr(member, "recovery"):
+                await member.recovery.async_clear_emergency_latch()
+        self._emergency_stop_active = False
+        self._emergency_clear_armed_until = None
+        self.events.async_emit_emergency_stop_cleared(len(pairs))
+        await self.async_request_refresh()
+
     async def async_emergency_power_off(self) -> None:
-        """Turn off every linked smart switch (miner power strips)."""
+        """Latch recovery on all members, then turn off linked switches."""
+        from .health.recovery.actions import async_power_off
+        from .health.recovery.emergency import async_latch_emergency_stop
+
+        pairs = list(self._iter_miner_member_pairs(self.device_ids))
+        for entry, member in pairs:
+            await async_latch_emergency_stop(self.hass, entry.entry_id)
+            if member is not None and hasattr(member, "recovery"):
+                await member.recovery.async_sync_emergency_latch()
+
+        self._recovery_active_miner = None
+        self._emergency_stop_active = True
+        self._emergency_clear_armed_until = None
+
         switches = [
             eid
             for eid in self.linked_power_switches()
@@ -335,30 +408,43 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         ]
         if not switches:
             _LOGGER.warning("Emergency stop: no linked switches available")
+            self.events.async_emit_emergency_power_off_failed(reason="no_switches")
+            await self.async_request_refresh()
             return
 
-        failures = 0
-        for eid in switches:
-            try:
-                await self.hass.services.async_call(
-                    "switch",
-                    "turn_off",
-                    {"entity_id": eid},
-                    blocking=True,
-                )
-            except Exception:
-                failures += 1
-                _LOGGER.exception("Emergency stop failed for %s", eid)
+        async def _turn_off(entity_id: str) -> tuple[str, bool]:
+            ok = await async_power_off(self.hass, entity_id)
+            return entity_id, ok
 
-        if failures:
+        results = await asyncio.gather(*(_turn_off(eid) for eid in switches))
+        failed_switches: list[str] = []
+        successes = 0
+        for eid, ok in results:
+            if ok:
+                successes += 1
+            else:
+                failed_switches.append(eid)
+                _LOGGER.error("Emergency stop failed for %s", eid)
+
+        failures = len(failed_switches)
+        if failures == 0:
+            _LOGGER.info("Emergency stop: turned off %s switch(es)", successes)
+            self.events.async_emit_emergency_power_off(successes)
+        elif successes == 0:
+            _LOGGER.error("Emergency stop: all %s switch(es) failed", len(switches))
+            self.events.async_emit_emergency_power_off_failed(failed_switches)
+        else:
             _LOGGER.error(
                 "Emergency stop: %s of %s switch(es) failed",
                 failures,
                 len(switches),
             )
-        else:
-            _LOGGER.info("Emergency stop: turned off %s switch(es)", len(switches))
-            self.events.async_emit_emergency_power_off(len(switches))
+            self.events.async_emit_emergency_power_off_partial_failure(
+                success_count=successes,
+                failure_count=failures,
+                failed_switches=failed_switches,
+            )
+        await self.async_request_refresh()
 
     def _reported_algorithms_for_device_ids(self, device_ids: list[str]) -> set[str]:
         from .farm_validation import reported_algorithms_for_device_ids

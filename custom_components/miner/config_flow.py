@@ -863,6 +863,8 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             coord = self.hass.data.get(DOMAIN, {}).get(reconfigure_entry.entry_id)
             if coord is not None and hasattr(coord, "events"):
                 coord.events.async_emit_ip_changed(old_ip, host)
+            if coord is not None and hasattr(coord, "recovery"):
+                coord.recovery.notify_ip_changed()
         return self.async_update_reload_and_abort(
             reconfigure_entry,
             data_updates=new_data,

@@ -13,11 +13,26 @@ MINER_EVENT_TYPES = [
     "pool_changed",
     "work_mode_changed",
     "reboot_command_sent",
+    "recovery_reboot_command_sent",
     "ip_changed",
+    "recovery_started",
+    "recovery_cancelled",
+    "reboot_recovery_succeeded",
+    "reboot_recovery_failed",
+    "power_cycle_started",
+    "power_off_command_sent",
+    "power_on_command_sent",
+    "power_cycle_succeeded",
+    "power_cycle_failed",
+    "recovery_locked",
+    "recovery_manually_reset",
 ]
 
 FARM_EVENT_TYPES = [
     "emergency_power_off",
+    "emergency_power_off_partial_failure",
+    "emergency_power_off_failed",
+    "emergency_stop_cleared",
     "preset_applied",
     "preset_partial_failure",
     "preset_failed",
@@ -33,6 +48,8 @@ PROBLEM_TYPES = frozenset(
         "reject",
         "power",
         "recovery",
+        "recovery_failed",
+        "power_restore_failed",
     }
 )
 
@@ -100,6 +117,7 @@ def build_problem_payload(
         RepairType.REJECT: REJECT_ANOMALY_REASONS,
         RepairType.POOL: POOL_ANOMALY_REASONS,
         RepairType.RECOVERY: RECOVERY_ANOMALY_REASONS,
+        "recovery_failed": HASHRATE_ANOMALY_REASONS,
     }
     repair_health_flags: dict[str, tuple[str, ...]] = {
         RepairType.TEMPERATURE: ("temperature_high",),
@@ -109,6 +127,7 @@ def build_problem_payload(
         RepairType.FAN: ("fan_problem",),
         RepairType.POOL: ("pool_problem",),
         RepairType.REJECT: ("reject_rate_high",),
+        "recovery_failed": ("hashrate_low",),
     }
 
     payload: dict[str, Any] = {

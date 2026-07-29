@@ -1,5 +1,58 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b18 (beta)
+
+### Added (Automatic recovery — point 7)
+
+- **Strict FSM** in `health/recovery/`: arming → reboot → optional power cycle → lock.
+- **Per-miner options:** enable (default off), dwell, post-reboot/power waits, power cycle consent, attempt limits, cooldown.
+- **HA Store persistence** for recovery state across reloads.
+- **Farm mutex:** at most one auto-recovery per farm.
+- **Events:** recovery_started/cancelled/locked, reboot/power cycle success/failure, manual reset.
+- **Repair `recovery_failed`** when automatic attempts are exhausted (separate from hashrate repair).
+- **Reset recovery lock** button and repair actions.
+
+### Protections
+
+- No auto-recovery for board/temp/fan/power/pool/offline faults.
+- Manual reboot/power → cooldown; pool/mode/IP change → temporary block.
+- Power cycle only with explicit option + linked switch; switch state verified after commands.
+
+### Fixed (point 7 review)
+
+- **Offline-tolerant wait states:** reboot/power waits continue while miner is unreachable; `POWER_OFF_WAIT` always proceeds to power-on.
+- **`POWER_ON_PENDING`:** mandatory turn-on retries (5×) with `power_restore_failed` Repair on failure.
+- **Max reboot/cycle settings:** retry until limits before lock or next phase.
+- **Cooldown after success** prevents immediate re-entry loops.
+- **Strict hashrate recovery check** requires current, expected, and threshold values.
+- **Farm slot** re-claimed after HA reload; released on miner unload.
+- **Config block** persisted to Store; power-critical states finish restore first.
+- **`recovery_reboot_command_sent`** event carries attempt context.
+
+### Fixed (point 7 review — round 2)
+
+- **Disable/unload/remove** during power-critical states restores switch before cancel.
+- **Manual power** during `POWER_OFF_WAIT`/`POWER_ON_PENDING` no longer cancels until switch is on.
+- **`async_prepare_unload`** for integration reload/delete safety.
+- **Config block** ignored during power-critical FSM states.
+- **Reboot send failures** count as attempts with retry delay.
+- **Event attempt numbers** reflect the upcoming action attempt.
+- **Farm lock rollback** when a second farm rejects the claim.
+- **Emergency stop** cancels member auto-recovery (intentional off, no power restore).
+
+### Fixed (point 7 review — round 3)
+
+- **Emergency stop ordering:** latch all recovery stores (loaded and unloaded miners) before any `turn_off`; cancel pending FSM actions synchronously.
+- **Persisted `emergency_stop_latched`:** blocks `turn_on` in recovery, unload, reload, and entry removal until explicitly cleared.
+- **Clear emergency stop** farm button with two-step confirm (30 s); manual switch on does not clear the latch.
+- **Farm events:** `emergency_power_off_partial_failure` and `emergency_power_off_failed` with per-switch details.
+- **Entry removal:** skip power restore when latched; keep recovery store if power restore fails during critical state.
+- **Emergency power off** verifies switch state via `async_power_off` (parallel); `emergency_stop_cleared` and `no_switches` failure event.
+- **Farm membership** cannot change while emergency stop is active.
+- **Clear emergency stop** resets recovery cooldown; UI refreshes immediately after stop/clear.
+
+---
+
 ## v1.7.0b17 (beta)
 
 ### Added (Events — point 6)

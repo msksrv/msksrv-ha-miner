@@ -27,6 +27,15 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_AUTO_RECOVERY_COOLDOWN_SECONDS,
+    CONF_AUTO_RECOVERY_ENABLED,
+    CONF_AUTO_RECOVERY_MAX_POWER_CYCLES,
+    CONF_AUTO_RECOVERY_MAX_REBOOTS,
+    CONF_AUTO_RECOVERY_POST_POWER_ON_SECONDS,
+    CONF_AUTO_RECOVERY_POST_REBOOT_SECONDS,
+    CONF_AUTO_RECOVERY_POWER_CYCLE_ENABLED,
+    CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS,
+    CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS,
     CONF_FARM_AMBIENT_TEMP_ENTITIES,
     CONF_FARM_DEVICE_IDS,
     CONF_FARM_ELEC_TARIFF_MODE,
@@ -51,6 +60,7 @@ from .const import (
 )
 from .device_resolution import async_get_miner_config_entry_for_device
 from .health.profiles import health_threshold_defaults_for_ui
+from .health.recovery.definitions import DEFAULTS as AUTO_RECOVERY_DEFAULTS
 from .health.thresholds import HealthThresholds
 from .farm_elec_tou import (
     FARM_TARIFF_MODE_OPTIONS,
@@ -493,6 +503,21 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 if algo_error:
                     errors["base"] = algo_error
             if not errors:
+                current_raw = self.config_entry.data.get(CONF_FARM_DEVICE_IDS) or []
+                if isinstance(current_raw, str):
+                    current = [current_raw]
+                else:
+                    current = list(current_raw)
+                if sorted(devices) != sorted(current):
+                    farm_coord = self.hass.data.get(DOMAIN, {}).get(
+                        self.config_entry.entry_id
+                    )
+                    if (
+                        farm_coord is not None
+                        and getattr(farm_coord, "emergency_stop_active", False)
+                    ):
+                        errors["base"] = "farm_emergency_stop_active"
+            if not errors:
                 key = ",".join(sorted(devices))
                 uid_digest = hashlib.sha256(key.encode()).hexdigest()[:20]
                 new_unique_id = f"farm_{uid_digest}"
@@ -803,6 +828,25 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             else:
                 new_options.pop(CONF_REPAIR_CONFIRM_OVERRIDES, None)
 
+            for key in AUTO_RECOVERY_DEFAULTS:
+                if key in (
+                    CONF_AUTO_RECOVERY_ENABLED,
+                    CONF_AUTO_RECOVERY_POWER_CYCLE_ENABLED,
+                ):
+                    new_options[key] = bool(flat.get(key, AUTO_RECOVERY_DEFAULTS[key]))
+                    continue
+                try:
+                    val = float(flat.get(key, AUTO_RECOVERY_DEFAULTS[key]))
+                except (TypeError, ValueError):
+                    val = float(AUTO_RECOVERY_DEFAULTS[key])
+                if key in (
+                    CONF_AUTO_RECOVERY_MAX_REBOOTS,
+                    CONF_AUTO_RECOVERY_MAX_POWER_CYCLES,
+                ):
+                    new_options[key] = int(val)
+                else:
+                    new_options[key] = val
+
             if pool_action != "none" and port_int is not None:
                 entry_id = self.config_entry.entry_id
                 coordinator = self.hass.data.get(DOMAIN, {}).get(entry_id)
@@ -922,6 +966,132 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 NumberSelectorConfig(min=lo, max=hi, mode="box", step=1)
             )
 
+        opts = self.config_entry.options
+        auto_recovery_fields: dict[Any, Any] = {
+            vol.Optional(
+                CONF_AUTO_RECOVERY_ENABLED,
+                default=bool(
+                    ui.get(
+                        CONF_AUTO_RECOVERY_ENABLED,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_ENABLED,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_ENABLED],
+                        ),
+                    )
+                ),
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS],
+                        ),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=60, max=3600, mode="box", step=60)
+            ),
+            vol.Optional(
+                CONF_AUTO_RECOVERY_POST_REBOOT_SECONDS,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_AUTO_RECOVERY_POST_REBOOT_SECONDS,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_POST_REBOOT_SECONDS,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_POST_REBOOT_SECONDS],
+                        ),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=120, max=3600, mode="box", step=60)
+            ),
+            vol.Optional(
+                CONF_AUTO_RECOVERY_POWER_CYCLE_ENABLED,
+                default=bool(
+                    ui.get(
+                        CONF_AUTO_RECOVERY_POWER_CYCLE_ENABLED,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_POWER_CYCLE_ENABLED,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_POWER_CYCLE_ENABLED],
+                        ),
+                    )
+                ),
+            ): BooleanSelector(),
+            vol.Optional(
+                CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS],
+                        ),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=10, max=120, mode="box", step=5)
+            ),
+            vol.Optional(
+                CONF_AUTO_RECOVERY_POST_POWER_ON_SECONDS,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_AUTO_RECOVERY_POST_POWER_ON_SECONDS,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_POST_POWER_ON_SECONDS,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_POST_POWER_ON_SECONDS],
+                        ),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=120, max=3600, mode="box", step=60)
+            ),
+            vol.Optional(
+                CONF_AUTO_RECOVERY_MAX_REBOOTS,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_AUTO_RECOVERY_MAX_REBOOTS,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_MAX_REBOOTS,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_MAX_REBOOTS],
+                        ),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=0, max=3, mode="box", step=1)
+            ),
+            vol.Optional(
+                CONF_AUTO_RECOVERY_MAX_POWER_CYCLES,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_AUTO_RECOVERY_MAX_POWER_CYCLES,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_MAX_POWER_CYCLES,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_MAX_POWER_CYCLES],
+                        ),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=0, max=3, mode="box", step=1)
+            ),
+            vol.Optional(
+                CONF_AUTO_RECOVERY_COOLDOWN_SECONDS,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_AUTO_RECOVERY_COOLDOWN_SECONDS,
+                        opts.get(
+                            CONF_AUTO_RECOVERY_COOLDOWN_SECONDS,
+                            AUTO_RECOVERY_DEFAULTS[CONF_AUTO_RECOVERY_COOLDOWN_SECONDS],
+                        ),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=3600, max=86400, mode="box", step=3600)
+            ),
+        }
+
         return vol.Schema(
             {
                 vol.Required("linked_switch"): section(
@@ -940,6 +1110,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 ),
                 vol.Required("repair_timing"): section(
                     vol.Schema(repair_fields),
+                    SectionConfig(collapsed=True),
+                ),
+                vol.Required("auto_recovery"): section(
+                    vol.Schema(auto_recovery_fields),
                     SectionConfig(collapsed=True),
                 ),
                 vol.Required("stratum_pool"): section(

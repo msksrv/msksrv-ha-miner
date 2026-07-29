@@ -42,6 +42,7 @@ async def async_setup_entry(
             MinerPowerOnButton(coordinator=coordinator),
             MinerBaselineResetButton(coordinator=coordinator),
             MinerBaselineAcceptButton(coordinator=coordinator),
+            MinerRecoveryResetButton(coordinator=coordinator),
         ]
     )
 
@@ -135,6 +136,9 @@ class MinerPowerOffButton(_MinerLinkedSwitchButton):
             {"entity_id": eid},
             blocking=False,
         )
+        from .health.recovery.manager import RecoveryManager
+
+        RecoveryManager.notify_manual_power(self.coordinator)
 
 
 class MinerPowerOnButton(_MinerLinkedSwitchButton):
@@ -160,6 +164,9 @@ class MinerPowerOnButton(_MinerLinkedSwitchButton):
             {"entity_id": eid},
             blocking=False,
         )
+        from .health.recovery.manager import RecoveryManager
+
+        RecoveryManager.notify_manual_power(self.coordinator)
 
 
 class MinerBaselineResetButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
@@ -212,3 +219,32 @@ class MinerBaselineAcceptButton(CoordinatorEntity["MinerCoordinator"], ButtonEnt
     @property
     def available(self) -> bool:
         return self.coordinator.available and bool(self.coordinator.data.get("is_mining"))
+
+
+class MinerRecoveryResetButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
+    """Clear automatic recovery lock after failed auto-recovery."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "recovery_reset"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:lock-open-variant"
+
+    def __init__(self, coordinator: MinerCoordinator) -> None:
+        super().__init__(coordinator=coordinator)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}-recovery-reset"
+
+    @property
+    def device_info(self) -> entity.DeviceInfo:
+        return get_miner_device_info(self.coordinator)
+
+    async def async_press(self) -> None:
+        await self.coordinator.recovery.async_reset_lock()
+
+    @property
+    def available(self) -> bool:
+        from .health.recovery.definitions import RecoveryState
+
+        return (
+            self.coordinator.available
+            and self.coordinator.recovery.record.state == RecoveryState.LOCKED
+        )

@@ -9,13 +9,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
-from ...const import CONF_IP, DOMAIN
+from ...const import CONF_IP, CONF_POWER_SWITCH, DOMAIN
 from ..baseline.detector import AnomalyFinding, AnomalyState
 from .definitions import (
     BOARD_ANOMALY_REASONS,
     FAN_ANOMALY_REASONS,
     HASHRATE_ANOMALY_REASONS,
     LEARN_MORE_URL,
+    ALL_MINER_REPAIR_TYPES,
     MINER_REPAIR_TYPES,
     POOL_ANOMALY_REASONS,
     RECOVERY_ANOMALY_REASONS,
@@ -55,7 +56,7 @@ class RepairManager:
         sync_open_from_registry(
             hass,
             entry.entry_id,
-            MINER_REPAIR_TYPES,
+            ALL_MINER_REPAIR_TYPES,
             miner_issue_id,
             self._lifecycle,
             self._open,
@@ -102,16 +103,100 @@ class RepairManager:
     @callback
     def async_clear_all(self) -> None:
         """Remove all issues for this miner (config entry removal only)."""
-        for rtype in MINER_REPAIR_TYPES:
+        for rtype in ALL_MINER_REPAIR_TYPES:
             ir.async_delete_issue(
                 self.hass, DOMAIN, miner_issue_id(self.entry_id, rtype)
             )
         self._open.clear()
         self._lifecycle.reset_all()
 
+    def open_recovery_failed(
+        self, data: dict[str, Any], record: Any
+    ) -> None:
+        """Open repair when automatic recovery attempts are exhausted."""
+        rtype = RepairType.RECOVERY_FAILED
+        if rtype in self._open:
+            return
+        name = self._device_name(data)
+        ms = data.get("miner_sensors") or {}
+        current = _fmt(_f(ms.get("hashrate")), "—")
+        expected = _fmt(
+            _f(getattr(record, "expected_hashrate", None))
+            or _f(ms.get("ideal_hashrate")),
+            "—",
+        )
+        placeholders = {
+            "name": name,
+            "current_hashrate": current,
+            "expected_hashrate": expected,
+        }
+        self._create_or_update(rtype, "miner_recovery_failed", placeholders)
+        self._open.add(rtype)
+        if self._events is not None:
+            from ..baseline.detector import AnomalyState
+
+            empty = AnomalyState(
+                score=0,
+                confidence=0,
+                detected=False,
+                severity=None,
+                reason=None,
+                message=None,
+            )
+            self._events.async_emit_problem_detected(rtype, data, empty)
+
+    def open_power_restore_failed(
+        self, data: dict[str, Any], record: Any
+    ) -> None:
+        """Open repair when power-on could not be restored after power-off."""
+        rtype = RepairType.POWER_RESTORE_FAILED
+        if rtype in self._open:
+            return
+        name = self._device_name(data)
+        switch = self.entry.options.get(CONF_POWER_SWITCH) or "—"
+        placeholders = {
+            "name": name,
+            "power_switch": str(switch),
+        }
+        self._create_or_update(rtype, "miner_power_restore_failed", placeholders)
+        self._open.add(rtype)
+        if self._events is not None:
+            from ..baseline.detector import AnomalyState
+
+            empty = AnomalyState(
+                score=0,
+                confidence=0,
+                detected=False,
+                severity=None,
+                reason=None,
+                message=None,
+            )
+            self._events.async_emit_problem_detected(rtype, data or {}, empty)
+
+    def clear_recovery_failed(self) -> None:
+        """Close recovery-failed repair after manual reset."""
+        rtype = RepairType.RECOVERY_FAILED
+        if rtype not in self._open:
+            return
+        key = miner_issue_id(self.entry_id, rtype)
+        ir.async_delete_issue(self.hass, DOMAIN, key)
+        self._open.discard(rtype)
+        if self._events is not None:
+            self._events.async_emit_problem_cleared(rtype)
+
+    def clear_power_restore_failed(self) -> None:
+        rtype = RepairType.POWER_RESTORE_FAILED
+        if rtype not in self._open:
+            return
+        key = miner_issue_id(self.entry_id, rtype)
+        ir.async_delete_issue(self.hass, DOMAIN, key)
+        self._open.discard(rtype)
+        if self._events is not None:
+            self._events.async_emit_problem_cleared(rtype)
+
     def dismiss_repair(self, repair_type: str) -> None:
         """User acknowledged via repair flow — reset timers and clear issue."""
-        if repair_type not in MINER_REPAIR_TYPES:
+        if repair_type not in ALL_MINER_REPAIR_TYPES:
             return
         key = miner_issue_id(self.entry_id, repair_type)
         self._lifecycle.reset_key(key)

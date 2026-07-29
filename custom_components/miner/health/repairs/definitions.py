@@ -47,6 +47,8 @@ class RepairType:
     OFFLINE = "offline"
     POOL = "pool"
     RECOVERY = "recovery"
+    RECOVERY_FAILED = "recovery_failed"
+    POWER_RESTORE_FAILED = "power_restore_failed"
     REJECT = "reject"
     POWER = "power"
 
@@ -84,6 +86,16 @@ REPAIR_DEFINITIONS: dict[str, RepairDefinition] = {
     RepairType.RECOVERY: RepairDefinition(
         RepairType.RECOVERY, "miner_recovery", CONFIRM_SECONDS["recovery"]
     ),
+    RepairType.RECOVERY_FAILED: RepairDefinition(
+        RepairType.RECOVERY_FAILED,
+        "miner_recovery_failed",
+        CONFIRM_SECONDS["recovery"],
+    ),
+    RepairType.POWER_RESTORE_FAILED: RepairDefinition(
+        RepairType.POWER_RESTORE_FAILED,
+        "miner_power_restore_failed",
+        CONFIRM_SECONDS["recovery"],
+    ),
     RepairType.REJECT: RepairDefinition(
         RepairType.REJECT, "miner_reject", CONFIRM_SECONDS["reject"]
     ),
@@ -110,6 +122,13 @@ MINER_REPAIR_TYPES: tuple[str, ...] = (
     RepairType.POWER,
 )
 
+MINER_MANUAL_REPAIR_TYPES: tuple[str, ...] = (
+    RepairType.RECOVERY_FAILED,
+    RepairType.POWER_RESTORE_FAILED,
+)
+
+ALL_MINER_REPAIR_TYPES: tuple[str, ...] = MINER_REPAIR_TYPES + MINER_MANUAL_REPAIR_TYPES
+
 FARM_REPAIR_TYPES: tuple[str, ...] = (FarmRepairType.OFFLINE,)
 
 
@@ -125,7 +144,7 @@ def parse_issue_id(issue_id_str: str) -> tuple[str, str, str] | None:
     """Return (scope, entry_id, repair_type) where scope is miner|farm."""
     if issue_id_str.startswith(f"{MINER_ISSUE_PREFIX}_"):
         scope = "miner"
-        types = MINER_REPAIR_TYPES
+        types = ALL_MINER_REPAIR_TYPES
         prefix_len = len(MINER_ISSUE_PREFIX) + 1
     elif issue_id_str.startswith(f"{FARM_ISSUE_PREFIX}_"):
         scope = "farm"

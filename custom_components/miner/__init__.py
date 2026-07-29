@@ -1,6 +1,8 @@
 """MSKSRV ASIC Miner integration."""
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -8,6 +10,8 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 
 from .const import CONF_IS_FARM, DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -51,6 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
         coordinator = MinerFarmCoordinator(hass, config_entry)
         hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
+        await coordinator.async_refresh_emergency_stop_cache()
         await coordinator.async_config_entry_first_refresh()
 
         async def _farm_options_changed(
@@ -74,6 +79,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     coordinator = MinerCoordinator(hass, config_entry)
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
     await coordinator.baseline.async_load()
+    await coordinator.recovery.async_load()
 
     try:
         await coordinator.async_config_entry_first_refresh()
@@ -99,8 +105,11 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     )
     if unload_ok:
         coord = hass.data.get(DOMAIN, {}).get(config_entry.entry_id)
-        if coord is not None and hasattr(coord, "baseline"):
-            await coord.baseline.async_save(force=True)
+        if coord is not None:
+            if hasattr(coord, "baseline"):
+                await coord.baseline.async_save(force=True)
+            if hasattr(coord, "recovery"):
+                await coord.recovery.async_prepare_unload()
         hass.data[DOMAIN].pop(config_entry.entry_id, None)
 
     return unload_ok
@@ -111,8 +120,8 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     from homeassistant.helpers import issue_registry as ir
 
     from .health.repairs.definitions import (
+        ALL_MINER_REPAIR_TYPES,
         FARM_REPAIR_TYPES,
-        MINER_REPAIR_TYPES,
         farm_issue_id,
         miner_issue_id,
     )
@@ -124,11 +133,36 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
             )
         return
 
-    for rtype in MINER_REPAIR_TYPES:
+    for rtype in ALL_MINER_REPAIR_TYPES:
         ir.async_delete_issue(
             hass, DOMAIN, miner_issue_id(config_entry.entry_id, rtype)
         )
 
     from .health.baseline.manager import BaselineManager
+    from .health.recovery.actions import async_power_on
+    from .health.recovery.definitions import POWER_CRITICAL_STATES
+    from .health.recovery.storage import RecoveryStorage
+    from .const import CONF_POWER_SWITCH
+
+    storage = RecoveryStorage(hass, config_entry.entry_id)
+    await storage.async_load()
+    if storage.record.emergency_stop_latched:
+        await storage.async_remove()
+        await BaselineManager(hass, config_entry.entry_id).async_remove()
+        return
+
+    if storage.record.state in POWER_CRITICAL_STATES:
+        switch = config_entry.options.get(CONF_POWER_SWITCH)
+        if switch:
+            restored = await async_power_on(hass, str(switch).strip())
+            if not restored:
+                _LOGGER.error(
+                    "Could not restore power for %s before entry removal; "
+                    "keeping recovery store",
+                    config_entry.title,
+                )
+                await BaselineManager(hass, config_entry.entry_id).async_remove()
+                return
 
     await BaselineManager(hass, config_entry.entry_id).async_remove()
+    await storage.async_remove()

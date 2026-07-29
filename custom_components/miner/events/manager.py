@@ -131,6 +131,12 @@ class MinerEventManager:
         self._dispatcher.async_emit("reboot_command_sent", {})
 
     @callback
+    def async_emit_recovery_event(
+        self, event_type: str, payload: dict[str, Any]
+    ) -> None:
+        self._dispatcher.async_emit(event_type, payload)
+
+    @callback
     def async_emit_ip_changed(self, old_ip: str, new_ip: str) -> None:
         self._dispatcher.async_emit(
             "ip_changed",
@@ -214,6 +220,50 @@ class FarmEventManager:
         self._dispatcher.async_emit(
             "emergency_power_off",
             sanitize_event_data({"switch_count": switch_count}),
+        )
+
+    @callback
+    def async_emit_emergency_power_off_partial_failure(
+        self,
+        *,
+        success_count: int,
+        failure_count: int,
+        failed_switches: list[str],
+    ) -> None:
+        self._dispatcher.async_emit(
+            "emergency_power_off_partial_failure",
+            sanitize_event_data(
+                {
+                    "success_count": success_count,
+                    "failure_count": failure_count,
+                    "failed_switches": failed_switches,
+                }
+            ),
+        )
+
+    @callback
+    def async_emit_emergency_power_off_failed(
+        self,
+        failed_switches: list[str] | None = None,
+        *,
+        reason: str | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {}
+        if failed_switches is not None:
+            payload["failure_count"] = len(failed_switches)
+            payload["failed_switches"] = failed_switches
+        if reason is not None:
+            payload["reason"] = reason
+        self._dispatcher.async_emit(
+            "emergency_power_off_failed",
+            sanitize_event_data(payload),
+        )
+
+    @callback
+    def async_emit_emergency_stop_cleared(self, miner_count: int) -> None:
+        self._dispatcher.async_emit(
+            "emergency_stop_cleared",
+            sanitize_event_data({"miner_count": miner_count}),
         )
 
     @callback

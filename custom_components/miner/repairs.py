@@ -13,7 +13,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers import selector
 
-from .const import CONF_HEALTH_THRESHOLDS, CONF_POWER_SWITCH, DOMAIN
+from .const import (
+    CONF_AUTO_RECOVERY_ENABLED,
+    CONF_HEALTH_THRESHOLDS,
+    CONF_POWER_SWITCH,
+    DOMAIN,
+)
 from .farm_coordinator import MinerFarmCoordinator
 from .health.profiles import health_threshold_defaults_for_ui
 from .health.repairs.definitions import parse_issue_id
@@ -35,6 +40,8 @@ ACTION_RESTART_BACKEND = "restart_backend"
 ACTION_THRESHOLDS = "thresholds"
 ACTION_CHECK_POWER = "check_power"
 ACTION_CHECK_PROFILE = "check_profile"
+ACTION_RESET_RECOVERY = "reset_recovery"
+ACTION_DISABLE_AUTO_RECOVERY = "disable_auto_recovery"
 
 _ACTION_LABELS: dict[str, dict[str, str]] = {
     "en": {
@@ -47,6 +54,8 @@ _ACTION_LABELS: dict[str, dict[str, str]] = {
         ACTION_THRESHOLDS: "Adjust health thresholds",
         ACTION_CHECK_POWER: "Check power supply",
         ACTION_CHECK_PROFILE: "Check power profile",
+        ACTION_RESET_RECOVERY: "Reset recovery lock",
+        ACTION_DISABLE_AUTO_RECOVERY: "Disable automatic recovery",
     },
     "ru": {
         ACTION_REBOOT: "Перезагрузить майнер",
@@ -58,6 +67,8 @@ _ACTION_LABELS: dict[str, dict[str, str]] = {
         ACTION_THRESHOLDS: "Настроить пороги состояния",
         ACTION_CHECK_POWER: "Проверить питание",
         ACTION_CHECK_PROFILE: "Проверить профиль мощности",
+        ACTION_RESET_RECOVERY: "Сбросить блокировку восстановления",
+        ACTION_DISABLE_AUTO_RECOVERY: "Отключить автоматическое восстановление",
     },
 }
 
@@ -69,6 +80,20 @@ _REPAIR_ACTIONS: dict[str, tuple[str, ...]] = {
     "offline": (ACTION_RETRY, ACTION_POWER_ON, ACTION_CHECKED),
     "pool": (ACTION_RETRY, ACTION_REBOOT, ACTION_RESTART_BACKEND, ACTION_CHECKED),
     "recovery": (ACTION_CHECKED,),
+    "recovery_failed": (
+        ACTION_REBOOT,
+        ACTION_POWER_OFF,
+        ACTION_POWER_ON,
+        ACTION_CHECKED,
+        ACTION_RESET_RECOVERY,
+        ACTION_DISABLE_AUTO_RECOVERY,
+    ),
+    "power_restore_failed": (
+        ACTION_POWER_ON,
+        ACTION_CHECKED,
+        ACTION_RESET_RECOVERY,
+        ACTION_DISABLE_AUTO_RECOVERY,
+    ),
     "reject": (ACTION_THRESHOLDS, ACTION_CHECKED),
     "power": (
         ACTION_CHECK_POWER,
@@ -145,6 +170,10 @@ class MinerRepairFlow(RepairsFlow):
                 return await self.async_step_check_power()
             if action == ACTION_CHECK_PROFILE:
                 return await self.async_step_check_profile()
+            if action == ACTION_RESET_RECOVERY:
+                return await self._async_reset_recovery()
+            if action == ACTION_DISABLE_AUTO_RECOVERY:
+                return await self._async_disable_auto_recovery()
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -389,6 +418,25 @@ class MinerRepairFlow(RepairsFlow):
             else "Miner"
         )
         return {"name": name}
+
+    async def _async_reset_recovery(self) -> data_entry_flow.FlowResult:
+        coordinator = self._coordinator()
+        if coordinator is not None and hasattr(coordinator, "recovery"):
+            await coordinator.recovery.async_reset_lock()
+        return self.async_create_entry(title="", data={})
+
+    async def _async_disable_auto_recovery(self) -> data_entry_flow.FlowResult:
+        coordinator = self._coordinator()
+        if coordinator is not None:
+            entry = coordinator.config_entry
+            new_options = {
+                **entry.options,
+                CONF_AUTO_RECOVERY_ENABLED: False,
+            }
+            self._hass.config_entries.async_update_entry(entry, options=new_options)
+            if hasattr(coordinator, "recovery"):
+                coordinator.recovery.reload_options()
+        return self.async_create_entry(title="", data={})
 
     async def _async_dismiss(self) -> data_entry_flow.FlowResult:
         coordinator = self._coordinator()

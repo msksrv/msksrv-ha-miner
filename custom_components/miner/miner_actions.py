@@ -8,7 +8,9 @@ if TYPE_CHECKING:
     from .coordinator import MinerCoordinator
 
 
-async def async_send_reboot_command(coordinator: MinerCoordinator) -> None:
+async def async_send_reboot_command(
+    coordinator: MinerCoordinator, *, manual: bool = True
+) -> None:
     """Reboot miner and emit reboot_command_sent when the command succeeds."""
     if coordinator.miner is None:
         miner = await coordinator.get_miner()
@@ -18,3 +20,7 @@ async def async_send_reboot_command(coordinator: MinerCoordinator) -> None:
     await coordinator.miner.reboot()
     coordinator.baseline.notify_reboot()
     coordinator.events.async_emit_reboot_command_sent()
+    if manual:
+        from .health.recovery.manager import RecoveryManager
+
+        RecoveryManager.notify_manual_reboot(coordinator)

@@ -93,6 +93,7 @@
       "farm_invalid_device": "Одно из выбранных устройств больше не существует",
       "farm_only_miner_devices": "Можно добавлять только отдельные майнеры, не другую ферму",
       "farm_device_set_conflict": "Другая ферма уже собрана из того же набора майнеров",
+      "farm_emergency_stop_active": "Сначала снимите аварийный стоп фермы, затем меняйте состав",
       "farm_mixed_algorithms": "Выбранные майнеры используют разные алгоритмы; в одну ферму можно добавлять только майнеры с одним алгоритмом.",
       "farm_algorithm_unknown": "Не удалось определить алгоритм одного из майнеров. Дождитесь его подключения и повторите.",
       "invalid_temp_entity": "Каждая запись должна быть существующей сущностью sensor",
@@ -185,6 +186,27 @@
               "repair_recovery_seconds": "Сколько секунд норма должна держаться перед закрытием repair (обычно 240 с = 4 мин).",
               "repair_confirm_temperature_seconds": "Отдельная выдержка для температуры (по умолчанию 180 с, если не задано).",
               "repair_confirm_offline_seconds": "Отдельная выдержка для offline (по умолчанию 600 с, если не задано)."
+            }
+          },
+          "auto_recovery": {
+            "name": "Автоматическое восстановление",
+            "description": "Опциональное восстановление хешрейта программной перезагрузкой и, при явном разрешении, циклом питания через привязанный выключатель. По умолчанию выключено. Использует порог хешрейта из настроек состояния выше.",
+            "data": {
+              "auto_recovery_enabled": "Включить автоматическое восстановление",
+              "auto_recovery_pre_action_seconds": "Выдержка перед действием (с)",
+              "auto_recovery_post_reboot_seconds": "Ожидание после перезагрузки (с)",
+              "auto_recovery_power_cycle_enabled": "Разрешить аппаратный цикл питания",
+              "auto_recovery_power_off_pause_seconds": "Пауза без питания (с)",
+              "auto_recovery_post_power_on_seconds": "Ожидание после включения (с)",
+              "auto_recovery_max_reboots": "Макс. программных перезагрузок",
+              "auto_recovery_max_power_cycles": "Макс. циклов питания",
+              "auto_recovery_cooldown_seconds": "Cooldown после завершения восстановления (с)"
+            },
+            "data_description": {
+              "auto_recovery_enabled": "По умолчанию выключено. Действует только при устойчивом низком хешрейте.",
+              "auto_recovery_power_cycle_enabled": "Требует привязанный smart switch и явное согласие.",
+              "auto_recovery_pre_action_seconds": "Сколько секунд низкий хешрейт должен держаться перед действием (по умолчанию 600 с).",
+              "auto_recovery_cooldown_seconds": "После любого завершённого восстановления (успех или блокировка) — пауза перед новым циклом (по умолчанию 21600 с = 6 ч)."
             }
           },
           "stratum_pool": {
@@ -388,6 +410,7 @@
       "farm_invalid_device": "Одно из выбранных устройств больше не существует",
       "farm_only_miner_devices": "Можно добавлять только отдельные майнеры, не другую ферму",
       "farm_device_set_conflict": "Другая ферма уже собрана из того же набора майнеров",
+      "farm_emergency_stop_active": "Сначала снимите аварийный стоп фермы, затем меняйте состав",
       "invalid_switch": "Выбранная сущность не найдена или не является switch",
       "invalid_temp_entity": "Каждая запись должна быть существующей сущностью sensor",
       "pool_fields_required": "Укажите хост и порт stratum для этого действия.",
@@ -446,6 +469,9 @@
       "farm_emergency_stop": {
         "name": "Аварийный стоп"
       },
+      "farm_clear_emergency_stop": {
+        "name": "Снять аварийный стоп"
+      },
       "farm_apply_pool_primary": {
         "name": "Применить пресет как основной пул"
       },
@@ -457,6 +483,9 @@
       },
       "baseline_accept": {
         "name": "Добавить текущие значения в эталон"
+      },
+      "recovery_reset": {
+        "name": "Сбросить блокировку восстановления"
       }
     },
     "event": {
@@ -726,6 +755,14 @@
     "miner_recovery": {
       "title": "{name}: медленное восстановление после перезагрузки",
       "description": "Хешрейт {current_hashrate} TH/s ({recovery_pct}% от обычных {baseline_hashrate} TH/s)."
+    },
+    "miner_recovery_failed": {
+      "title": "{name}: автоматическое восстановление не помогло",
+      "description": "После программной перезагрузки и опционального цикла питания хешрейт всё ещё {current_hashrate} TH/s (ожидается около {expected_hashrate} TH/s)."
+    },
+    "miner_power_restore_failed": {
+      "title": "{name}: не удалось восстановить питание",
+      "description": "Выключатель {power_switch} остался выключенным или не удалось его включить после автоматического цикла питания."
     },
     "miner_reject": {
       "title": "{name}: высокий процент отклонённых шар",

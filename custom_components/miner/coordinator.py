@@ -24,6 +24,7 @@ from .const import (
 from .health.baseline import BaselineManager
 from .events import MinerEventManager
 from .health.profiles import format_profile_name, resolve_health_thresholds
+from .health.recovery import RecoveryManager
 from .health.repairs import RepairManager
 from .health.scoring import compute_health
 
@@ -219,6 +220,7 @@ class MinerCoordinator(DataUpdateCoordinator):
         self.baseline = BaselineManager(hass, entry.entry_id)
         self.events = MinerEventManager(hass, entry)
         self.repairs = RepairManager(hass, entry, self.events)
+        self.recovery = RecoveryManager(hass, entry, self, self.events, self.repairs)
         super().__init__(
             hass=hass,
             logger=_LOGGER,
@@ -249,6 +251,9 @@ class MinerCoordinator(DataUpdateCoordinator):
                 self.data,
                 self.baseline.anomaly,
                 available=False,
+            )
+            await self.recovery.async_process_update(
+                self.data, self.baseline.anomaly, available=False
             )
 
     async def get_miner(self):
@@ -534,6 +539,9 @@ class MinerCoordinator(DataUpdateCoordinator):
         anomaly = self.baseline.process_update(data)
         self.repairs.process_update(
             data, anomaly, available=self.last_update_success
+        )
+        await self.recovery.async_process_update(
+            data, anomaly, available=True
         )
         data["anomaly"] = {
             "score": anomaly.score,

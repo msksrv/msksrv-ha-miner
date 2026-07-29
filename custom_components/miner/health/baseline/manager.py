@@ -124,6 +124,12 @@ class BaselineManager:
         self._last_accepted_shares = None
         self._last_share_at_monotonic = None
 
+    def reboot_recently(self) -> bool:
+        """True while post-reboot warmup is active."""
+        if self._reboot_warmup_until is None:
+            return False
+        return time.monotonic() < self._reboot_warmup_until
+
     def reset_all(self) -> None:
         self._profiles.clear()
         self._rule_timers.clear()
