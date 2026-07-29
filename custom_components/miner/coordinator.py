@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.debounce import Debouncer
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_IP,
@@ -20,6 +21,7 @@ from .const import (
     CONF_WEB_USERNAME,
     DOMAIN,
 )
+from .health.scoring import compute_health
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -206,6 +208,8 @@ class MinerCoordinator(DataUpdateCoordinator):
         """Initialize MinerCoordinator object."""
         self.miner = None
         self._failure_count = 0
+        self._last_accepted_shares: float | None = None
+        self._last_share_at = None
         super().__init__(
             hass=hass,
             logger=_LOGGER,
@@ -280,6 +284,8 @@ class MinerCoordinator(DataUpdateCoordinator):
                     pyasic.DataOptions.CONFIG,
                     pyasic.DataOptions.POOLS,
                     pyasic.DataOptions.UPTIME,
+                    pyasic.DataOptions.ERRORS,
+                    pyasic.DataOptions.FAULT_LIGHT,
                 ]
             )
         except Exception as err:
@@ -326,6 +332,7 @@ class MinerCoordinator(DataUpdateCoordinator):
         pool_worker = None
         accepted = None
         rejected = None
+        pool_health: dict = {}
 
         try:
             first_pool = _primary_pool_metrics(miner_data.pools)
@@ -336,6 +343,16 @@ class MinerCoordinator(DataUpdateCoordinator):
                 raw_user = getattr(first_pool, "user", None)
                 if raw_user is not None:
                     pool_worker = str(raw_user).strip() or None
+
+                pool_health = {
+                    "active": getattr(first_pool, "active", None),
+                    "alive": getattr(first_pool, "alive", None),
+                    "get_failures": getattr(first_pool, "get_failures", None),
+                    "remote_failures": getattr(first_pool, "remote_failures", None),
+                    "pool_stale_percent": getattr(
+                        first_pool, "pool_stale_percent", None
+                    ),
+                }
 
                 if pool:
                     pool_no_proto = str(pool).replace("stratum+tcp://", "").replace(
@@ -366,6 +383,31 @@ class MinerCoordinator(DataUpdateCoordinator):
         if algorithm is not None:
             algorithm = str(algorithm).strip() or None
 
+        seconds_since_share = None
+        if accepted is not None:
+            try:
+                acc_f = float(accepted)
+                if (
+                    self._last_accepted_shares is None
+                    or acc_f > self._last_accepted_shares
+                ):
+                    self._last_share_at = dt_util.utcnow()
+                self._last_accepted_shares = acc_f
+                if self._last_share_at is not None:
+                    seconds_since_share = (
+                        dt_util.utcnow() - self._last_share_at
+                    ).total_seconds()
+            except (TypeError, ValueError):
+                pass
+
+        errors_raw = getattr(miner_data, "errors", None) or []
+        errors_list = (
+            [str(e) for e in errors_raw if e is not None]
+            if isinstance(errors_raw, list)
+            else []
+        )
+        fault_light = getattr(miner_data, "fault_light", None)
+
         data = {
             "hostname": miner_data.hostname,
             "mac": miner_data.mac,
@@ -385,6 +427,10 @@ class MinerCoordinator(DataUpdateCoordinator):
             "accepted_shares": accepted,
             "rejected_shares": rejected,
             "reject_rate": reject_rate,
+            "pool_health": pool_health,
+            "seconds_since_share": seconds_since_share,
+            "errors": errors_list,
+            "fault_light": fault_light,
             "miner_sensors": {
                 "hashrate": hashrate,
                 "ideal_hashrate": expected_hashrate,
@@ -413,6 +459,8 @@ class MinerCoordinator(DataUpdateCoordinator):
                         and board.expected_chips > 0
                         else None
                     ),
+                    "board_missing": getattr(board, "missing", None),
+                    "board_tuned": getattr(board, "tuned", None),
                 }
                 for board in miner_data.hashboards
             },
@@ -424,5 +472,11 @@ class MinerCoordinator(DataUpdateCoordinator):
                 "min": self.config_entry.data.get(CONF_MIN_POWER, 15),
                 "max": self.config_entry.data.get(CONF_MAX_POWER, 10000),
             },
+        }
+        health = compute_health(data)
+        data["health"] = {
+            "score": health.score,
+            "components": health.components,
+            "flags": health.flags,
         }
         return data

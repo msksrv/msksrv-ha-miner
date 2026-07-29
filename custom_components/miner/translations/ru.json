@@ -432,6 +432,9 @@
       "reject_rate": {
         "name": "Процент отклонений"
       },
+      "health_score": {
+        "name": "Оценка здоровья"
+      },
       "farm_total_hashrate": {
         "name": "Суммарный хешрейт"
       },
@@ -464,6 +467,32 @@
       },
       "farm_cost_total": {
         "name": "Электроэнергия всего ({currency})"
+      }
+    },
+    "binary_sensor": {
+      "health_hashrate_low": {
+        "name": "Низкий хешрейт"
+      },
+      "health_temperature_high": {
+        "name": "Высокая температура"
+      },
+      "health_fan_problem": {
+        "name": "Проблема с вентилятором"
+      },
+      "health_board_problem": {
+        "name": "Проблема с платой"
+      },
+      "health_reject_rate_high": {
+        "name": "Высокий процент отклонений"
+      },
+      "health_pool_problem": {
+        "name": "Проблема с пулом"
+      },
+      "health_power_anomaly": {
+        "name": "Аномалия мощности"
+      },
+      "health_maintenance_required": {
+        "name": "Требуется обслуживание"
       }
     },
     "select": {

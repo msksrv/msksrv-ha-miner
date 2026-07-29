@@ -18,6 +18,8 @@ Push a version tag. The workflow [`.github/workflows/publish-tag-release.yml`](.
 | `v1.7.0`, `v1.6.16`, … | Stable release |
 | `v1.7.0b1`, `v1.7.0rc1`, … | Pre-release |
 
+Beta/release notes for the 1.7 line: [`CHANGELOG-1.7.md`](CHANGELOG-1.7.md). Copy the relevant section into the GitHub Release description when publishing betas.
+
 ```bash
 git tag v1.6.16
 git push origin v1.6.16

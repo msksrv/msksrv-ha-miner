@@ -11,6 +11,7 @@ from .const import CONF_IS_FARM, DOMAIN
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
+    Platform.BINARY_SENSOR,
     Platform.SWITCH,
     Platform.NUMBER,
     Platform.SELECT,

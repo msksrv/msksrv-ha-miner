@@ -328,6 +328,10 @@ async def async_setup_entry(
         for s in ["fan_speed"]:
             sensors.append(_create_fan_entity(fan, s))
 
+    from .health_sensor import MinerHealthScoreSensor
+
+    sensors.append(MinerHealthScoreSensor(coordinator))
+
     async_add_entities(sensors)
 
 

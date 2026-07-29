@@ -432,6 +432,9 @@
       "reject_rate": {
         "name": "Reject rate"
       },
+      "health_score": {
+        "name": "Health score"
+      },
       "farm_total_hashrate": {
         "name": "Total hashrate"
       },
@@ -464,6 +467,32 @@
       },
       "farm_cost_total": {
         "name": "Electricity cost total ({currency})"
+      }
+    },
+    "binary_sensor": {
+      "health_hashrate_low": {
+        "name": "Hashrate low"
+      },
+      "health_temperature_high": {
+        "name": "Temperature high"
+      },
+      "health_fan_problem": {
+        "name": "Fan problem"
+      },
+      "health_board_problem": {
+        "name": "Board problem"
+      },
+      "health_reject_rate_high": {
+        "name": "Reject rate high"
+      },
+      "health_pool_problem": {
+        "name": "Pool problem"
+      },
+      "health_power_anomaly": {
+        "name": "Power anomaly"
+      },
+      "health_maintenance_required": {
+        "name": "Maintenance required"
       }
     },
     "select": {
