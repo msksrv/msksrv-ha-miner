@@ -12,7 +12,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import MinerCoordinator
-from .device_resolution import miner_entity_unique_suffix
 from .miner_device_info import get_miner_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,10 +57,7 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        suffix = miner_entity_unique_suffix(
-            coordinator.config_entry, coordinator.data.get("mac")
-        )
-        self._attr_unique_id = f"{suffix}-active"
+        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-active"
         self._attr_is_on = self.coordinator.data["is_mining"]
         self.updating_switch = False
         self._last_mining_mode = _mining_mode_from_data(

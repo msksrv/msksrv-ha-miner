@@ -59,6 +59,12 @@ jobs:
             -x "*__pycache__/*" \
             -x "*.pyc" \
             -x "*.pyo"
+          if zipinfo -1 miner.zip | grep -qE '__pycache__|\.pyc$|\.pyo$'; then
+            echo "::error::miner.zip contains Python bytecode — fix zip exclusions"
+            zipinfo -1 miner.zip | grep -E '__pycache__|\.pyc$|\.pyo$' || true
+            exit 1
+          fi
+          echo "miner.zip size: $(wc -c < miner.zip) bytes, files: $(zipinfo -1 miner.zip | wc -l)"
 
       - name: Create GitHub Release with miner.zip
         uses: softprops/action-gh-release@v3.0.0
