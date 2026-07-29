@@ -60,6 +60,25 @@
         "data": {
           "title": "[%key:common::config_flow::data::title%]"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure {name}",
+        "description": "Update IP address, credentials, or expected power range. Leave password fields empty to keep the current values.",
+        "data": {
+          "ip": "[%key:common::config_flow::data::ip%]",
+          "min_power": "[%key:common::config_flow::data::min_power%]",
+          "max_power": "[%key:common::config_flow::data::max_power%]",
+          "rpc_password": "[%key:common::config_flow::data::rpc_password%]",
+          "web_username": "[%key:common::config_flow::data::web_username%]",
+          "web_password": "[%key:common::config_flow::data::web_password%]",
+          "ssh_username": "[%key:common::config_flow::data::ssh_username%]",
+          "ssh_password": "[%key:common::config_flow::data::ssh_password%]"
+        },
+        "data_description": {
+          "rpc_password": "Leave empty to keep the current password.",
+          "web_password": "Leave empty to keep the current password.",
+          "ssh_password": "Leave empty to keep the current password."
+        }
       }
     },
     "progress": {
@@ -81,44 +100,38 @@
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
       "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]",
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "reconfigure_successful": "Connection settings updated.",
+      "reconfigure_not_supported": "Farm entries cannot be reconfigured here; use Options instead."
     }
   },
   "options": {
     "step": {
-      "farm_options": {
-        "title": "Farm settings",
-        "description": "Link miners, optional stratum presets, electricity tariffs, and temperature sensors. Reload the integration entry after changing tariffs.",
-        "data": {
-          "farm_device_ids": "Miner devices",
-          "farm_ambient_temp_entities": "Temperature sensors",
-          "farm_elec_tariff_mode": "Electricity accounting",
-          "farm_elec_tou_currency": "TOU mode — currency",
-          "farm_elec_z1_start": "Zone 1 — start (local time)",
-          "farm_elec_z1_end": "Zone 1 — end (local time)",
-          "farm_elec_z1_price": "Zone 1 — price per kWh",
-          "farm_elec_z2_start": "Zone 2 — start (local time)",
-          "farm_elec_z2_end": "Zone 2 — end (local time)",
-          "farm_elec_z2_price": "Zone 2 — price per kWh",
-          "farm_elec_z3_start": "Zone 3 — start (local time)",
-          "farm_elec_z3_end": "Zone 3 — end (local time)",
-          "farm_elec_z3_price": "Zone 3 — price per kWh",
-          "farm_elec_currency_1": "Flat mode — tariff 1 currency (empty = off)",
-          "farm_elec_price_kwh_1": "Flat mode — tariff 1 price per kWh",
-          "farm_elec_currency_2": "Flat mode — tariff 2 currency (empty = off)",
-          "farm_elec_price_kwh_2": "Flat mode — tariff 2 price per kWh",
-          "farm_elec_currency_3": "Flat mode — tariff 3 currency (empty = off)",
-          "farm_elec_price_kwh_3": "Flat mode — tariff 3 price per kWh",
-          "pool_action": "Stratum pool (all members)",
-          "pool_apply_slot": "Slot to apply (1–5)"
-        },
-        "data_description": {
-          "pool_action": "Leave unchanged, replace primary on each miner, or append a backup (max 3 pools each)."
-        }
-      },
       "init": {
-        "title": "Miner options",
+        "title": "Settings",
+        "menu_options": {
+          "farm_members": "Farm members",
+          "farm_ambient": "Room temperature sensors",
+          "farm_pools": "Pools and workers",
+          "farm_tariff": "Electricity tariff",
+          "farm_actions": "Apply settings to miners"
+        },
+        "menu_option_descriptions": {
+          "farm_members": "Choose which miner devices belong to this farm",
+          "farm_ambient": "Optional room temperature sensors for ambient readings",
+          "farm_pools": "Save up to five stratum presets for this farm",
+          "farm_tariff": "Flat or time-of-use electricity tariffs for cost estimates",
+          "farm_actions": "Apply a saved pool preset to all farm members"
+        },
         "description": "Power switch for the miner plug, and optional stratum pool changes (requires miner reachable).",
+        "sections": {
+          "linked_switch": {
+            "name": "Power switch"
+          },
+          "stratum_pool": {
+            "name": "Stratum pool"
+          }
+        },
         "data": {
           "power_switch": "Power switch",
           "pool_action": "Stratum pool",
@@ -129,7 +142,136 @@
           "pool_password": "Worker password"
         },
         "data_description": {
-          "pool_action": "Leave unchanged, replace the primary slot, or add a backup (max 3 pools)."
+          "pool_action": "Leave unchanged, replace the primary slot, or add a backup (max 3 pools).",
+          "pool_password": "Leave empty if the pool does not require a password."
+        }
+      },
+      "farm_members": {
+        "title": "Farm members",
+        "description": "Select miner devices to include in this farm.",
+        "data": {
+          "farm_device_ids": "Miner devices"
+        }
+      },
+      "farm_ambient": {
+        "title": "Room temperature sensors",
+        "description": "Optional sensors used for ambient temperature on the farm device.",
+        "data": {
+          "farm_ambient_temp_entities": "Temperature sensors"
+        }
+      },
+      "farm_pools": {
+        "title": "Pools and workers",
+        "description": "Save stratum presets here; apply them to all miners from Mass actions.",
+        "sections": {
+          "pool_presets": {
+            "name": "Pool presets (slots 1–5)"
+          }
+        },
+        "data": {
+          "pool_slot_0_host": "Slot 1 — host",
+          "pool_slot_0_port": "Slot 1 — port",
+          "pool_slot_0_use_ssl": "Slot 1 — stratum+ssl",
+          "pool_slot_0_username": "Slot 1 — worker",
+          "pool_slot_0_password": "Slot 1 — password",
+          "pool_slot_1_host": "Slot 2 — host",
+          "pool_slot_1_port": "Slot 2 — port",
+          "pool_slot_1_use_ssl": "Slot 2 — stratum+ssl",
+          "pool_slot_1_username": "Slot 2 — worker",
+          "pool_slot_1_password": "Slot 2 — password",
+          "pool_slot_2_host": "Slot 3 — host",
+          "pool_slot_2_port": "Slot 3 — port",
+          "pool_slot_2_use_ssl": "Slot 3 — stratum+ssl",
+          "pool_slot_2_username": "Slot 3 — worker",
+          "pool_slot_2_password": "Slot 3 — password",
+          "pool_slot_3_host": "Slot 4 — host",
+          "pool_slot_3_port": "Slot 4 — port",
+          "pool_slot_3_use_ssl": "Slot 4 — stratum+ssl",
+          "pool_slot_3_username": "Slot 4 — worker",
+          "pool_slot_3_password": "Slot 4 — password",
+          "pool_slot_4_host": "Slot 5 — host",
+          "pool_slot_4_port": "Slot 5 — port",
+          "pool_slot_4_use_ssl": "Slot 5 — stratum+ssl",
+          "pool_slot_4_username": "Slot 5 — worker",
+          "pool_slot_4_password": "Slot 5 — password"
+        },
+        "data_description": {
+          "pool_slot_0_password": "Leave empty to keep the current password.",
+          "pool_slot_1_password": "Leave empty to keep the current password.",
+          "pool_slot_2_password": "Leave empty to keep the current password.",
+          "pool_slot_3_password": "Leave empty to keep the current password.",
+          "pool_slot_4_password": "Leave empty to keep the current password."
+        }
+      },
+      "farm_tariff": {
+        "title": "Electricity tariff",
+        "description": "Choose how electricity cost is estimated for this farm.",
+        "data": {
+          "farm_elec_tariff_mode": "Tariff type"
+        }
+      },
+      "farm_tariff_flat": {
+        "title": "Flat electricity tariff",
+        "description": "Set one or more fixed prices per kWh.",
+        "sections": {
+          "farm_tariff_flat": {
+            "name": "Flat tariffs"
+          }
+        },
+        "data": {
+          "farm_elec_tou_currency": "Currency",
+          "farm_elec_currency_1": "Tariff 1 currency (empty = off)",
+          "farm_elec_price_kwh_1": "Tariff 1 price per kWh",
+          "farm_elec_currency_2": "Tariff 2 currency (empty = off)",
+          "farm_elec_price_kwh_2": "Tariff 2 price per kWh",
+          "farm_elec_currency_3": "Tariff 3 currency (empty = off)",
+          "farm_elec_price_kwh_3": "Tariff 3 price per kWh"
+        }
+      },
+      "farm_tariff_tou": {
+        "title": "Time-of-use electricity tariff",
+        "description": "Configure day/night or three-zone pricing.",
+        "sections": {
+          "farm_tariff_tou": {
+            "name": "Time zones"
+          }
+        },
+        "data": {
+          "farm_elec_tou_currency": "Currency",
+          "farm_elec_z1_start": "Zone 1 — start (local time)",
+          "farm_elec_z1_end": "Zone 1 — end (local time)",
+          "farm_elec_z1_price": "Zone 1 — price per kWh",
+          "farm_elec_z2_start": "Zone 2 — start (local time)",
+          "farm_elec_z2_end": "Zone 2 — end (local time)",
+          "farm_elec_z2_price": "Zone 2 — price per kWh",
+          "farm_elec_z3_start": "Zone 3 — start (local time)",
+          "farm_elec_z3_end": "Zone 3 — end (local time)",
+          "farm_elec_z3_price": "Zone 3 — price per kWh"
+        }
+      },
+      "farm_actions": {
+        "title": "Apply settings to miners",
+        "description": "Push a saved pool preset to every miner in this farm. This changes live miner configuration.",
+        "data": {
+          "pool_action": "Stratum pool (all members)",
+          "pool_apply_slot": "Preset slot to apply (1–5)"
+        },
+        "data_description": {
+          "pool_action": "Replace primary or append a backup on each member (max 3 pools each)."
+        }
+      },
+      "farm_actions_confirm": {
+        "title": "Confirm mass pool change",
+        "description": "Apply pool action «{action}» to all farm members? Miners must be online and use the same algorithm.",
+        "data": {
+          "confirm": "I understand this changes every linked miner"
+        }
+      },
+      "miner_pool_confirm": {
+        "title": "Confirm pool change",
+        "description": "Apply this stratum change to the miner now?",
+        "data": {
+          "confirm": "Apply pool change"
         }
       }
     },

@@ -60,6 +60,25 @@
         "data": {
           "title": "Название устройства"
         }
+      },
+      "reconfigure": {
+        "title": "Перенастроить {name}",
+        "description": "Измените IP, учётные данные или ожидаемый диапазон мощности. Оставьте поля пароля пустыми, чтобы сохранить текущие значения.",
+        "data": {
+          "ip": "IP-адрес",
+          "min_power": "Минимальная мощность (Вт)",
+          "max_power": "Максимальная мощность (Вт)",
+          "rpc_password": "Пароль RPC",
+          "web_username": "Имя пользователя веб-интерфейса",
+          "web_password": "Пароль веб-интерфейса",
+          "ssh_username": "Имя пользователя SSH",
+          "ssh_password": "Пароль SSH"
+        },
+        "data_description": {
+          "rpc_password": "Оставьте пустым, чтобы сохранить текущий пароль.",
+          "web_password": "Оставьте пустым, чтобы сохранить текущий пароль.",
+          "ssh_password": "Оставьте пустым, чтобы сохранить текущий пароль."
+        }
       }
     },
     "progress": {
@@ -81,44 +100,38 @@
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
       "no_devices_found": "Майнеры не найдены",
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
+      "reconfigure_successful": "Параметры подключения обновлены.",
+      "reconfigure_not_supported": "Ферму нельзя перенастроить здесь — используйте «Настроить»."
     }
   },
   "options": {
     "step": {
-      "farm_options": {
-        "title": "Настройки фермы",
-        "description": "Привязка майнеров, пресеты stratum, тарифы на электроэнергию и датчики температуры. После смены тарифов перезагрузите запись интеграции.",
-        "data": {
-          "farm_device_ids": "Устройства-майнеры",
-          "farm_ambient_temp_entities": "Датчики температуры",
-          "farm_elec_tariff_mode": "Учёт электроэнергии",
-          "farm_elec_tou_currency": "Режим зон — валюта",
-          "farm_elec_z1_start": "Зона 1 — начало (местное время)",
-          "farm_elec_z1_end": "Зона 1 — конец (местное время)",
-          "farm_elec_z1_price": "Зона 1 — цена за кВт·ч",
-          "farm_elec_z2_start": "Зона 2 — начало (местное время)",
-          "farm_elec_z2_end": "Зона 2 — конец (местное время)",
-          "farm_elec_z2_price": "Зона 2 — цена за кВт·ч",
-          "farm_elec_z3_start": "Зона 3 — начало (местное время)",
-          "farm_elec_z3_end": "Зона 3 — конец (местное время)",
-          "farm_elec_z3_price": "Зона 3 — цена за кВт·ч",
-          "farm_elec_currency_1": "Плоский тариф — валюта 1 (пусто = выкл.)",
-          "farm_elec_price_kwh_1": "Плоский тариф — цена 1 за кВт·ч",
-          "farm_elec_currency_2": "Плоский тариф — валюта 2 (пусто = выкл.)",
-          "farm_elec_price_kwh_2": "Плоский тариф — цена 2 за кВт·ч",
-          "farm_elec_currency_3": "Плоский тариф — валюта 3 (пусто = выкл.)",
-          "farm_elec_price_kwh_3": "Плоский тариф — цена 3 за кВт·ч",
-          "pool_action": "Stratum-пул (все майнеры)",
-          "pool_apply_slot": "Какой слот (1–5) применить"
-        },
-        "data_description": {
-          "pool_action": "Не менять, заменить основной на каждом майнере или добавить резервный (до 3 пулов на майнер)."
-        }
-      },
       "init": {
-        "title": "Настройки майнера",
-        "description": "Выключатель питания и при необходимости смена stratum-пула (майнер должен быть доступен для применения пула).",
+        "title": "Настройки",
+        "menu_options": {
+          "farm_members": "Состав фермы",
+          "farm_ambient": "Датчики температуры",
+          "farm_pools": "Пулы и воркеры",
+          "farm_tariff": "Тариф электроэнергии",
+          "farm_actions": "Массовые действия"
+        },
+        "menu_option_descriptions": {
+          "farm_members": "Выберите майнеры, входящие в эту ферму",
+          "farm_ambient": "Датчики температуры помещения для ambient-метрик",
+          "farm_pools": "До пяти пресетов stratum для этой фермы",
+          "farm_tariff": "Плоский или зональный тариф для оценки стоимости",
+          "farm_actions": "Применить сохранённый пресет пула ко всем майнерам"
+        },
+        "description": "Выключатель питания и при необходимости смена stratum-пула (майнер должен быть доступен).",
+        "sections": {
+          "linked_switch": {
+            "name": "Выключатель питания"
+          },
+          "stratum_pool": {
+            "name": "Stratum-пул"
+          }
+        },
         "data": {
           "power_switch": "Выключатель питания",
           "pool_action": "Stratum-пул",
@@ -129,7 +142,136 @@
           "pool_password": "Пароль воркера"
         },
         "data_description": {
-          "pool_action": "Не менять, заменить основной слот или добавить резервный (до 3 пулов)."
+          "pool_action": "Не менять, заменить основной слот или добавить резервный (до 3 пулов).",
+          "pool_password": "Оставьте пустым, если пул не требует пароль."
+        }
+      },
+      "farm_members": {
+        "title": "Состав фермы",
+        "description": "Выберите устройства-майнеры для этой фермы.",
+        "data": {
+          "farm_device_ids": "Устройства-майнеры"
+        }
+      },
+      "farm_ambient": {
+        "title": "Датчики температуры",
+        "description": "Необязательные датчики температуры помещения для фермы.",
+        "data": {
+          "farm_ambient_temp_entities": "Датчики температуры"
+        }
+      },
+      "farm_pools": {
+        "title": "Пулы и воркеры",
+        "description": "Сохраните пресеты stratum здесь; примените их через «Массовые действия».",
+        "sections": {
+          "pool_presets": {
+            "name": "Пресеты пулов (слоты 1–5)"
+          }
+        },
+        "data": {
+          "pool_slot_0_host": "Слот 1 — хост",
+          "pool_slot_0_port": "Слот 1 — порт",
+          "pool_slot_0_use_ssl": "Слот 1 — stratum+ssl",
+          "pool_slot_0_username": "Слот 1 — воркер",
+          "pool_slot_0_password": "Слот 1 — пароль",
+          "pool_slot_1_host": "Слот 2 — хост",
+          "pool_slot_1_port": "Слот 2 — порт",
+          "pool_slot_1_use_ssl": "Слот 2 — stratum+ssl",
+          "pool_slot_1_username": "Слот 2 — воркер",
+          "pool_slot_1_password": "Слот 2 — пароль",
+          "pool_slot_2_host": "Слот 3 — хост",
+          "pool_slot_2_port": "Слот 3 — порт",
+          "pool_slot_2_use_ssl": "Слот 3 — stratum+ssl",
+          "pool_slot_2_username": "Слот 3 — воркер",
+          "pool_slot_2_password": "Слот 3 — пароль",
+          "pool_slot_3_host": "Слот 4 — хост",
+          "pool_slot_3_port": "Слот 4 — порт",
+          "pool_slot_3_use_ssl": "Слот 4 — stratum+ssl",
+          "pool_slot_3_username": "Слот 4 — воркер",
+          "pool_slot_3_password": "Слот 4 — пароль",
+          "pool_slot_4_host": "Слот 5 — хост",
+          "pool_slot_4_port": "Слот 5 — порт",
+          "pool_slot_4_use_ssl": "Слот 5 — stratum+ssl",
+          "pool_slot_4_username": "Слот 5 — воркер",
+          "pool_slot_4_password": "Слот 5 — пароль"
+        },
+        "data_description": {
+          "pool_slot_0_password": "Оставьте пустым, чтобы сохранить текущий пароль.",
+          "pool_slot_1_password": "Оставьте пустым, чтобы сохранить текущий пароль.",
+          "pool_slot_2_password": "Оставьте пустым, чтобы сохранить текущий пароль.",
+          "pool_slot_3_password": "Оставьте пустым, чтобы сохранить текущий пароль.",
+          "pool_slot_4_password": "Оставьте пустым, чтобы сохранить текущий пароль."
+        }
+      },
+      "farm_tariff": {
+        "title": "Тариф электроэнергии",
+        "description": "Выберите способ оценки стоимости электроэнергии для фермы.",
+        "data": {
+          "farm_elec_tariff_mode": "Тип тарифа"
+        }
+      },
+      "farm_tariff_flat": {
+        "title": "Плоский тариф",
+        "description": "Задайте одну или несколько фиксированных цен за kВt·ч.",
+        "sections": {
+          "farm_tariff_flat": {
+            "name": "Плоские тарифы"
+          }
+        },
+        "data": {
+          "farm_elec_tou_currency": "Валюта",
+          "farm_elec_currency_1": "Тариф 1 — валюта (пусто = выкл.)",
+          "farm_elec_price_kwh_1": "Тариф 1 — цена за kВt·ч",
+          "farm_elec_currency_2": "Тариф 2 — валюта (пусто = выкл.)",
+          "farm_elec_price_kwh_2": "Тариф 2 — цена за kВt·ч",
+          "farm_elec_currency_3": "Тариф 3 — валюта (пусто = выкл.)",
+          "farm_elec_price_kwh_3": "Тариф 3 — цена за kВt·ч"
+        }
+      },
+      "farm_tariff_tou": {
+        "title": "Зональный тариф",
+        "description": "Настройка тарифа день/ночь или трёх зон.",
+        "sections": {
+          "farm_tariff_tou": {
+            "name": "Временные зоны"
+          }
+        },
+        "data": {
+          "farm_elec_tou_currency": "Валюта",
+          "farm_elec_z1_start": "Зона 1 — начало (местное время)",
+          "farm_elec_z1_end": "Зона 1 — конец (местное время)",
+          "farm_elec_z1_price": "Зона 1 — цена за kВt·ч",
+          "farm_elec_z2_start": "Зона 2 — начало (местное время)",
+          "farm_elec_z2_end": "Зона 2 — конец (местное время)",
+          "farm_elec_z2_price": "Зона 2 — цена за kВt·ч",
+          "farm_elec_z3_start": "Зона 3 — начало (местное время)",
+          "farm_elec_z3_end": "Зона 3 — конец (местное время)",
+          "farm_elec_z3_price": "Зона 3 — цена за kВt·ч"
+        }
+      },
+      "farm_actions": {
+        "title": "Массовые действия",
+        "description": "Применить сохранённый пресет пула ко всем майнерам фермы. Это меняет живую конфигурацию майнеров.",
+        "data": {
+          "pool_action": "Stratum-пул (все майнеры)",
+          "pool_apply_slot": "Слот пресета (1–5)"
+        },
+        "data_description": {
+          "pool_action": "Заменить основной или добавить резервный на каждом майнере (до 3 пулов)."
+        }
+      },
+      "farm_actions_confirm": {
+        "title": "Подтверждение массовой смены пула",
+        "description": "Применить действие «{action}» ко всем майнерам фермы? Майнеры должны быть онлайн и использовать один алгоритм.",
+        "data": {
+          "confirm": "Я понимаю, что это изменит все связанные майнеры"
+        }
+      },
+      "miner_pool_confirm": {
+        "title": "Подтверждение смены пула",
+        "description": "Применить это изменение stratum к майнеру сейчас?",
+        "data": {
+          "confirm": "Применить смену пула"
         }
       }
     },

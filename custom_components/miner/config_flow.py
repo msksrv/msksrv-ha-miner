@@ -11,16 +11,12 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
-from homeassistant.core import callback, split_entity_id
+from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
-    BooleanSelector,
     DeviceSelector,
     DeviceSelectorConfig,
-    EntitySelector,
-    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     SelectSelector,
@@ -31,19 +27,13 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
+from .config_flow_options import MinerOptionsFlow
 from .const import (
-    CONF_FARM_AMBIENT_TEMP_ENTITIES,
     CONF_FARM_DEVICE_IDS,
-    CONF_FARM_ELEC_TARIFF_MODE,
-    CONF_FARM_ELEC_TOU_CURRENCY,
-    CONF_FARM_ELEC_ZONES,
-    CONF_FARM_ENERGY_RATES,
-    CONF_FARM_POOL_PRESETS,
     CONF_IP,
     CONF_IS_FARM,
     CONF_MAX_POWER,
     CONF_MIN_POWER,
-    CONF_POWER_SWITCH,
     CONF_RPC_PASSWORD,
     CONF_SELECTED_MINER,
     CONF_SSH_PASSWORD,
@@ -56,9 +46,6 @@ from .const import (
     DEFAULT_MIN_POWER,
     DEFAULT_SUBNET,
     DOMAIN,
-    FARM_ELEC_TARIFF_DUAL,
-    FARM_ELEC_TARIFF_FLAT,
-    FARM_ELEC_TARIFF_TRIPLE,
     SCAN_MAX_HOSTS,
 )
 from .device_resolution import (
@@ -72,23 +59,18 @@ from .discovery import (
     get_stable_identifier,
     normalize_model_name,
 )
-from .farm_elec_tou import (
-    farm_tariff_schema_fields,
-    tou_zones_from_user_input,
-    validate_tou_submission,
-)
-from .farm_energy_rates import (
-    farm_electricity_schema_fields,
-    farm_energy_rates_from_user_input,
-)
-from .farm_pool_presets import (
-    FARM_POOL_SLOT_COUNT,
-    farm_pool_preset_slots,
-    farm_pool_slots_from_user_input,
-    strip_legacy_farm_pool_keys,
-)
 
 _LOGGER = logging.getLogger(__name__)
+
+_POWER_SELECTOR = NumberSelector(
+    NumberSelectorConfig(
+        min=15,
+        max=10000,
+        step=1,
+        unit_of_measurement="W",
+        mode="box",
+    )
+)
 
 # DHCP discovery: probe miner API a few times (miner may boot slower than DHCP).
 _DHCP_PROBE_ATTEMPTS = 3
@@ -179,16 +161,28 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(
                     CONF_SUBNET,
-                    default=user_input.get(CONF_SUBNET, self._default_subnet()),
-                ): str,
+                    description={
+                        "suggested_value": user_input.get(
+                            CONF_SUBNET, self._default_subnet()
+                        )
+                    },
+                ): TextSelector(TextSelectorConfig()),
                 vol.Optional(
                     CONF_MIN_POWER,
-                    default=user_input.get(CONF_MIN_POWER, DEFAULT_MIN_POWER),
-                ): vol.All(vol.Coerce(int), vol.Range(min=15, max=10000)),
+                    description={
+                        "suggested_value": user_input.get(
+                            CONF_MIN_POWER, DEFAULT_MIN_POWER
+                        )
+                    },
+                ): _POWER_SELECTOR,
                 vol.Optional(
                     CONF_MAX_POWER,
-                    default=user_input.get(CONF_MAX_POWER, DEFAULT_MAX_POWER),
-                ): vol.All(vol.Coerce(int), vol.Range(min=15, max=10000)),
+                    description={
+                        "suggested_value": user_input.get(
+                            CONF_MAX_POWER, DEFAULT_MAX_POWER
+                        )
+                    },
+                ): _POWER_SELECTOR,
             }
         )
 
@@ -201,17 +195,91 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return vol.Schema(
             {
-                vol.Required(CONF_IP, default=ip_default): str,
+                vol.Required(
+                    CONF_IP,
+                    description={"suggested_value": ip_default},
+                ): TextSelector(TextSelectorConfig()),
                 vol.Optional(
                     CONF_MIN_POWER,
-                    default=user_input.get(CONF_MIN_POWER, DEFAULT_MIN_POWER),
-                ): vol.All(vol.Coerce(int), vol.Range(min=15, max=10000)),
+                    description={
+                        "suggested_value": user_input.get(
+                            CONF_MIN_POWER, DEFAULT_MIN_POWER
+                        )
+                    },
+                ): _POWER_SELECTOR,
                 vol.Optional(
                     CONF_MAX_POWER,
-                    default=user_input.get(CONF_MAX_POWER, DEFAULT_MAX_POWER),
-                ): vol.All(vol.Coerce(int), vol.Range(min=15, max=10000)),
+                    description={
+                        "suggested_value": user_input.get(
+                            CONF_MAX_POWER, DEFAULT_MAX_POWER
+                        )
+                    },
+                ): _POWER_SELECTOR,
             }
         )
+
+    def _reconfigure_schema(self, entry_data: dict[str, Any]) -> vol.Schema:
+        """Schema for reconfiguring an existing miner connection."""
+        return vol.Schema(
+            {
+                vol.Required(
+                    CONF_IP,
+                    description={"suggested_value": entry_data.get(CONF_IP, "")},
+                ): TextSelector(TextSelectorConfig()),
+                vol.Optional(
+                    CONF_MIN_POWER,
+                    description={
+                        "suggested_value": entry_data.get(
+                            CONF_MIN_POWER, DEFAULT_MIN_POWER
+                        )
+                    },
+                ): _POWER_SELECTOR,
+                vol.Optional(
+                    CONF_MAX_POWER,
+                    description={
+                        "suggested_value": entry_data.get(
+                            CONF_MAX_POWER, DEFAULT_MAX_POWER
+                        )
+                    },
+                ): _POWER_SELECTOR,
+                vol.Optional(CONF_RPC_PASSWORD): TextSelector(
+                    TextSelectorConfig(
+                        type=TextSelectorType.PASSWORD,
+                        autocomplete="new-password",
+                    )
+                ),
+                vol.Optional(
+                    CONF_WEB_USERNAME,
+                    description={
+                        "suggested_value": entry_data.get(CONF_WEB_USERNAME, "")
+                    },
+                ): TextSelector(TextSelectorConfig(autocomplete="username")),
+                vol.Optional(CONF_WEB_PASSWORD): TextSelector(
+                    TextSelectorConfig(
+                        type=TextSelectorType.PASSWORD,
+                        autocomplete="new-password",
+                    )
+                ),
+                vol.Optional(
+                    CONF_SSH_USERNAME,
+                    description={
+                        "suggested_value": entry_data.get(CONF_SSH_USERNAME, "")
+                    },
+                ): TextSelector(TextSelectorConfig(autocomplete="username")),
+                vol.Optional(CONF_SSH_PASSWORD): TextSelector(
+                    TextSelectorConfig(
+                        type=TextSelectorType.PASSWORD,
+                        autocomplete="new-password",
+                    )
+                ),
+            }
+        )
+
+    @staticmethod
+    def _merge_secret(value: Any, stored: str) -> str:
+        if value is not None and str(value).strip():
+            return str(value)
+        return stored
 
     def _has_entry_with_host(self, host: str) -> bool:
         """Check if host is already configured."""
@@ -335,8 +403,9 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return vol.Schema(
             {
                 vol.Required(
-                    CONF_TITLE, default=user_input.get(CONF_TITLE, "")
-                ): str,
+                    CONF_TITLE,
+                    description={"suggested_value": user_input.get(CONF_TITLE, "")},
+                ): TextSelector(TextSelectorConfig()),
                 vol.Required(
                     CONF_FARM_DEVICE_IDS,
                     description={
@@ -518,24 +587,28 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors={"base": scan_error},
             )
 
-        options = {
-            item.ip: (
-                f"{item.model} — {item.ip}"
-                + (f" — {item.hostname}" if item.hostname else "")
-            )
+        options = [
+            {
+                "value": item.ip,
+                "label": (
+                    f"{item.model} — {item.ip}"
+                    + (f" — {item.hostname}" if item.hostname else "")
+                ),
+            }
             for item in self._scan_results
-        }
+        ]
+        default_ip = (
+            user_input.get(CONF_SELECTED_MINER)
+            if user_input
+            else self._scan_results[0].ip
+        )
 
         schema = vol.Schema(
             {
                 vol.Required(
                     CONF_SELECTED_MINER,
-                    default=(
-                        user_input.get(CONF_SELECTED_MINER)
-                        if user_input
-                        else next(iter(options))
-                    ),
-                ): vol.In(options),
+                    description={"suggested_value": default_ip},
+                ): SelectSelector(SelectSelectorConfig(options=options)),
             }
         )
 
@@ -611,12 +684,14 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             schema_data[
                 vol.Optional(
                     CONF_WEB_USERNAME,
-                    default=user_input.get(
-                        CONF_WEB_USERNAME,
-                        self._miner.web.username,
-                    ),
+                    description={
+                        "suggested_value": user_input.get(
+                            CONF_WEB_USERNAME,
+                            self._miner.web.username,
+                        )
+                    },
                 )
-            ] = str
+            ] = TextSelector(TextSelectorConfig(autocomplete="username"))
             schema_data[
                 vol.Optional(
                     CONF_WEB_PASSWORD,
@@ -636,12 +711,14 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             schema_data[
                 vol.Required(
                     CONF_SSH_USERNAME,
-                    default=user_input.get(
-                        CONF_SSH_USERNAME,
-                        self._miner.ssh.username,
-                    ),
+                    description={
+                        "suggested_value": user_input.get(
+                            CONF_SSH_USERNAME,
+                            self._miner.ssh.username,
+                        )
+                    },
                 )
-            ] = str
+            ] = TextSelector(TextSelectorConfig(autocomplete="username"))
             schema_data[
                 vol.Optional(
                     CONF_SSH_PASSWORD,
@@ -696,8 +773,8 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(
                     CONF_TITLE,
-                    default=user_input.get(CONF_TITLE, title),
-                ): str,
+                    description={"suggested_value": user_input.get(CONF_TITLE, title)},
+                ): TextSelector(TextSelectorConfig()),
             }
         )
 
@@ -710,507 +787,71 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data=self._data,
         )
 
-
-class MinerOptionsFlow(config_entries.OptionsFlow):
-    """Options for a Miner config entry (power switch, stratum pool)."""
-
-    async def async_step_init(
+    async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ):
-        """Manage miner options."""
-        if self.config_entry.data.get(CONF_IS_FARM):
-            return await self.async_step_farm_options(user_input)
+    ) -> config_entries.FlowResult:
+        """Reconfigure miner connection settings (IP, credentials, power range)."""
+        reconfigure_entry = self._get_reconfigure_entry()
+        if reconfigure_entry.data.get(CONF_IS_FARM):
+            return self.async_abort(reason="reconfigure_not_supported")
 
-        if user_input is not None:
-            errors: dict[str, str] = {}
-            entity_id = user_input.get(CONF_POWER_SWITCH)
-            if entity_id:
-                try:
-                    ent_domain, _ = split_entity_id(entity_id)
-                except ValueError:
-                    ent_domain = ""
-                registry = er.async_get(self.hass)
-                entity = registry.async_get(entity_id)
-                if entity is None or ent_domain != "switch":
-                    errors["base"] = "invalid_switch"
+        entry_data = dict(reconfigure_entry.data)
+        if user_input is None:
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=self._reconfigure_schema(entry_data),
+                description_placeholders={"name": reconfigure_entry.title},
+            )
 
-            pool_action = str(user_input.get("pool_action", "none"))
-            if pool_action not in ("none", "replace_primary", "append_backup"):
-                pool_action = "none"
-
-            host = (user_input.get("pool_host") or "").strip()
-            port_raw = user_input.get("pool_port")
-            port_int: int | None = None
-
-            if pool_action != "none":
-                if not host or port_raw is None or port_raw == "":
-                    errors["pool_host"] = "pool_fields_required"
-                else:
-                    try:
-                        port_int = int(port_raw)
-                        if port_int < 1 or port_int > 65535:
-                            raise ValueError
-                    except (TypeError, ValueError):
-                        errors["pool_port"] = "invalid_pool_port"
-
-            if errors:
-                return self.async_show_form(
-                    step_id="init",
-                    data_schema=self._options_schema(user_input),
-                    errors=errors,
-                )
-
-            new_options = {**self.config_entry.options}
-            if entity_id:
-                new_options[CONF_POWER_SWITCH] = entity_id
-            else:
-                new_options.pop(CONF_POWER_SWITCH, None)
-            entry_id = self.config_entry.entry_id
-            coordinator = self.hass.data.get(DOMAIN, {}).get(entry_id)
-            if pool_action != "none" and port_int is not None:
-                if coordinator is None:
-                    return self.async_show_form(
-                        step_id="init",
-                        data_schema=self._options_schema(user_input),
-                        errors={"base": "miner_not_loaded"},
-                    )
-                miner = await coordinator.get_miner()
-                if miner is None:
-                    return self.async_show_form(
-                        step_id="init",
-                        data_schema=self._options_schema(user_input),
-                        errors={"base": "miner_offline"},
-                    )
-                use_ssl = bool(user_input.get("pool_use_ssl"))
-                uname = str(user_input.get("pool_username") or "")
-                pwd = str(user_input.get("pool_password") or "")
-                try:
-                    from . import pool_stratum
-
-                    if pool_action == "replace_primary":
-                        ok = await pool_stratum.async_apply_primary_stratum(
-                            miner,
-                            host,
-                            port_int,
-                            use_ssl,
-                            uname,
-                            pwd,
-                            force_user_password=True,
-                        )
-                    else:
-                        ok = await pool_stratum.async_append_stratum_pool(
-                            miner,
-                            host,
-                            port_int,
-                            use_ssl,
-                            uname,
-                            pwd,
-                        )
-                    if not ok:
-                        return self.async_show_form(
-                            step_id="init",
-                            data_schema=self._options_schema(user_input),
-                            errors={"base": "pool_apply_failed"},
-                        )
-                    await coordinator.async_request_refresh()
-                except Exception:
-                    _LOGGER.exception("Applying pool from options")
-                    return self.async_show_form(
-                        step_id="init",
-                        data_schema=self._options_schema(user_input),
-                        errors={"base": "pool_apply_failed"},
-                    )
-
-            return self.async_create_entry(title="", data=new_options)
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=self._options_schema(),
-        )
-
-    async def async_step_farm_options(
-        self, user_input: dict[str, Any] | None = None
-    ):
-        """Farm members, room sensors, and optional stratum apply to all members."""
         errors: dict[str, str] = {}
-
-        if user_input is not None:
-            tariff_mode = str(
-                user_input.get(CONF_FARM_ELEC_TARIFF_MODE) or FARM_ELEC_TARIFF_FLAT
-            ).strip()
-            if tariff_mode not in (
-                FARM_ELEC_TARIFF_FLAT,
-                FARM_ELEC_TARIFF_DUAL,
-                FARM_ELEC_TARIFF_TRIPLE,
-            ):
-                tariff_mode = FARM_ELEC_TARIFF_FLAT
-            zones_tou: list[Any] = []
-            tou_currency_save = ""
-
-            devices = user_input.get(CONF_FARM_DEVICE_IDS)
-            if isinstance(devices, str):
-                devices = [devices]
-            if not devices:
-                errors["base"] = "farm_no_devices"
+        host = str(user_input.get(CONF_IP, "")).strip()
+        if not host:
+            errors["base"] = "cannot_connect"
+        elif host != str(entry_data.get(CONF_IP, "")).strip():
+            if self._has_entry_with_host(host):
+                errors["base"] = "already_configured"
             else:
-                dev_reg = dr.async_get(self.hass)
-                for did in devices:
-                    dev = dev_reg.async_get(did)
-                    if dev is None:
-                        errors["base"] = "farm_invalid_device"
-                        break
-                    ce = async_get_miner_config_entry_for_device(self.hass, dev)
-                    if ce is None:
-                        errors["base"] = "farm_only_miner_devices"
-                        break
+                errors, _miner = await validate_ip_input(user_input)
+        else:
+            errors, _miner = await validate_ip_input(user_input)
 
-            ents = user_input.get(CONF_FARM_AMBIENT_TEMP_ENTITIES)
-            if ents is None:
-                ents = []
-            if isinstance(ents, str):
-                ents = [ents]
-            registry = er.async_get(self.hass)
-            for eid in ents:
-                try:
-                    ent_domain, _ = split_entity_id(eid)
-                except ValueError:
-                    errors["base"] = "invalid_temp_entity"
-                    break
-                if ent_domain != "sensor":
-                    errors["base"] = "invalid_temp_entity"
-                    break
-                if registry.async_get(eid) is None:
-                    errors["base"] = "invalid_temp_entity"
-                    break
-
-            opts = self.config_entry.options
-            prev_slots = farm_pool_preset_slots(opts)
-            new_slots = farm_pool_slots_from_user_input(user_input, prev_slots)
-
-            for i in range(FARM_POOL_SLOT_COUNT):
-                h = (user_input.get(f"pool_slot_{i}_host") or "").strip()
-                pr = user_input.get(f"pool_slot_{i}_port")
-                has_port = pr is not None and str(pr).strip() != ""
-                if h and not has_port:
-                    errors[f"pool_slot_{i}_port"] = "pool_fields_required"
-                elif has_port and not h:
-                    errors[f"pool_slot_{i}_host"] = "pool_fields_required"
-                elif h and has_port:
-                    try:
-                        pi = int(pr)
-                        if pi < 1 or pi > 65535:
-                            raise ValueError
-                    except (TypeError, ValueError):
-                        errors[f"pool_slot_{i}_port"] = "invalid_pool_port"
-
-            pool_action = str(user_input.get("pool_action", "none"))
-            if pool_action not in ("none", "replace_primary", "append_backup"):
-                pool_action = "none"
-
-            apply_slot_raw = str(user_input.get("pool_apply_slot", "1"))
-            try:
-                apply_slot_i = int(apply_slot_raw) - 1
-            except (TypeError, ValueError):
-                apply_slot_i = 0
-
-            preset_for_apply: dict[str, Any] | None = None
-            pool_port_int: int | None = None
-            if pool_action != "none":
-                if apply_slot_i < 0 or apply_slot_i >= FARM_POOL_SLOT_COUNT:
-                    errors["pool_apply_slot"] = "farm_pool_apply_slot_invalid"
-                else:
-                    cand = new_slots[apply_slot_i]
-                    if not cand.get("host"):
-                        errors["pool_apply_slot"] = "farm_pool_apply_slot_invalid"
-                    else:
-                        preset_for_apply = cand
-                        pool_port_int = int(cand["port"])
-
-            farm_coord = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
-
-            if (
-                pool_action != "none"
-                and not errors
-                and devices
-                and farm_coord is not None
-                and hasattr(farm_coord, "farm_stratum_allowed_for_device_ids")
-                and not farm_coord.farm_stratum_allowed_for_device_ids(devices)
-            ):
-                errors["base"] = "farm_pool_mixed_algorithms"
-
-            if not errors and tariff_mode in (
-                FARM_ELEC_TARIFF_DUAL,
-                FARM_ELEC_TARIFF_TRIPLE,
-            ):
-                tc = str(
-                    user_input.get(CONF_FARM_ELEC_TOU_CURRENCY) or ""
-                ).strip().upper()
-                if not tc:
-                    errors["base"] = "farm_tou_currency_required"
-                else:
-                    zones_tou = tou_zones_from_user_input(user_input, tariff_mode)
-                    ve = validate_tou_submission(tariff_mode, zones_tou)
-                    if ve:
-                        errors["base"] = ve
-                    else:
-                        tou_currency_save = tc
-
-            new_unique_id = self.config_entry.unique_id
-            if not errors and devices:
-                key = ",".join(sorted(devices))
-                uid_digest = hashlib.sha256(key.encode()).hexdigest()[:20]
-                new_unique_id = f"farm_{uid_digest}"
-                if new_unique_id != self.config_entry.unique_id:
-                    for ent in self.hass.config_entries.async_entries(DOMAIN):
-                        if ent.entry_id == self.config_entry.entry_id:
-                            continue
-                        if ent.unique_id == new_unique_id:
-                            errors["base"] = "farm_device_set_conflict"
-                            break
-
-            if not errors and (
-                pool_action != "none"
-                and preset_for_apply is not None
-                and pool_port_int is not None
-                and devices
-            ):
-                if farm_coord is None or not hasattr(
-                    farm_coord, "async_apply_stratum_to_members"
-                ):
-                    errors["base"] = "farm_not_loaded"
-                else:
-                    use_ssl = bool(preset_for_apply.get("use_ssl", False))
-                    uname_eff = str(preset_for_apply.get("username") or "")
-                    pwd_eff = str(preset_for_apply.get("password") or "")
-                    try:
-                        ok, err_key = await farm_coord.async_apply_stratum_to_members(
-                            device_ids=devices,
-                            replace_primary=pool_action == "replace_primary",
-                            host=str(preset_for_apply["host"]),
-                            port=pool_port_int,
-                            use_ssl=use_ssl,
-                            username=uname_eff,
-                            password=pwd_eff,
-                        )
-                        if not ok:
-                            errors["base"] = err_key or "farm_pool_apply_failed"
-                    except Exception:
-                        _LOGGER.exception("Farm stratum from options")
-                        errors["base"] = "farm_pool_apply_failed"
-
-            if not errors:
-                new_options = {**self.config_entry.options}
-                new_options[CONF_FARM_AMBIENT_TEMP_ENTITIES] = list(ents)
-                new_options[CONF_FARM_POOL_PRESETS] = new_slots
-                new_options[CONF_FARM_ELEC_TARIFF_MODE] = tariff_mode
-                if tariff_mode == FARM_ELEC_TARIFF_FLAT:
-                    new_options[CONF_FARM_ENERGY_RATES] = (
-                        farm_energy_rates_from_user_input(user_input)
-                    )
-                    new_options[CONF_FARM_ELEC_ZONES] = []
-                    tc_keep = str(
-                        user_input.get(CONF_FARM_ELEC_TOU_CURRENCY) or ""
-                    ).strip().upper()
-                    if tc_keep:
-                        new_options[CONF_FARM_ELEC_TOU_CURRENCY] = tc_keep
-                else:
-                    new_options[CONF_FARM_ENERGY_RATES] = []
-                    new_options[CONF_FARM_ELEC_TOU_CURRENCY] = tou_currency_save
-                    new_options[CONF_FARM_ELEC_ZONES] = zones_tou
-                strip_legacy_farm_pool_keys(new_options)
-
-                new_data = {**self.config_entry.data, CONF_FARM_DEVICE_IDS: devices}
-                update_kw: dict[str, Any] = {
-                    "data": new_data,
-                    "options": new_options,
-                }
-                if new_unique_id != self.config_entry.unique_id:
-                    update_kw["unique_id"] = new_unique_id
-                self.hass.config_entries.async_update_entry(
-                    self.config_entry, **update_kw
-                )
-                return self.async_create_entry(title="", data=new_options)
-
-        return self.async_show_form(
-            step_id="farm_options",
-            data_schema=self._farm_options_schema(user_input),
-            errors=errors,
-        )
-
-    def _farm_pool_slots_vol(
-        self, user_input: dict[str, Any] | None = None
-    ) -> dict[Any, Any]:
-        user_input = user_input or {}
-        slots = farm_pool_preset_slots(self.config_entry.options)
-        out: dict[Any, Any] = {}
-        for i in range(FARM_POOL_SLOT_COUNT):
-            s = slots[i] if i < len(slots) else {}
-            host_s = user_input.get(f"pool_slot_{i}_host", s.get("host", ""))
-            port_s = user_input.get(f"pool_slot_{i}_port", s.get("port"))
-            if f"pool_slot_{i}_use_ssl" in user_input:
-                ssl_def = bool(user_input.get(f"pool_slot_{i}_use_ssl"))
-            else:
-                ssl_def = bool(s.get("use_ssl", False))
-            user_s = user_input.get(f"pool_slot_{i}_username", s.get("username", ""))
-            pass_s = user_input.get(f"pool_slot_{i}_password", s.get("password", ""))
-            out[
-                vol.Optional(
-                    f"pool_slot_{i}_host",
-                    description={"suggested_value": host_s},
-                )
-            ] = str
-            port_opt: dict[str, Any] = {}
-            if port_s is not None:
-                port_opt["description"] = {"suggested_value": port_s}
-            out[
-                vol.Optional(
-                    f"pool_slot_{i}_port",
-                    **port_opt,
-                )
-            ] = NumberSelector(
-                NumberSelectorConfig(
-                    min=1,
-                    max=65535,
-                    mode="box",
-                ),
+        if errors:
+            return self.async_show_form(
+                step_id="reconfigure",
+                data_schema=self._reconfigure_schema({**entry_data, **user_input}),
+                errors=errors,
+                description_placeholders={"name": reconfigure_entry.title},
             )
-            out[
-                vol.Optional(
-                    f"pool_slot_{i}_use_ssl",
-                    default=ssl_def,
-                )
-            ] = BooleanSelector()
-            out[
-                vol.Optional(
-                    f"pool_slot_{i}_username",
-                    description={"suggested_value": user_s},
-                )
-            ] = str
-            out[
-                vol.Optional(
-                    f"pool_slot_{i}_password",
-                    description={"suggested_value": pass_s},
-                )
-            ] = TextSelector(
-                TextSelectorConfig(
-                    type=TextSelectorType.PASSWORD,
-                    autocomplete="new-password",
-                ),
-            )
-        apply_opts = [str(n) for n in range(1, FARM_POOL_SLOT_COUNT + 1)]
-        out[
-            vol.Optional(
-                "pool_action",
-                description={"suggested_value": user_input.get("pool_action", "none")},
-            )
-        ] = SelectSelector(
-            SelectSelectorConfig(
-                options=["none", "replace_primary", "append_backup"],
+
+        new_data = {
+            CONF_IP: host,
+            CONF_HOST: host,
+            CONF_MIN_POWER: int(
+                user_input.get(CONF_MIN_POWER, entry_data.get(CONF_MIN_POWER, DEFAULT_MIN_POWER))
             ),
-        )
-        out[
-            vol.Optional(
-                "pool_apply_slot",
-                description={
-                    "suggested_value": user_input.get("pool_apply_slot", "1"),
-                },
-            )
-        ] = SelectSelector(SelectSelectorConfig(options=apply_opts))
-        return out
-
-    def _farm_options_schema(
-        self, user_input: dict[str, Any] | None = None
-    ) -> vol.Schema:
-        user_input = user_input or {}
-        stored_devices = self.config_entry.data.get(CONF_FARM_DEVICE_IDS) or []
-        if isinstance(stored_devices, str):
-            stored_devices = [stored_devices]
-        suggested_devices = user_input.get(CONF_FARM_DEVICE_IDS, stored_devices)
-        stored = self.config_entry.options.get(CONF_FARM_AMBIENT_TEMP_ENTITIES) or []
-        if isinstance(stored, str):
-            stored = [stored]
-        suggested = user_input.get(CONF_FARM_AMBIENT_TEMP_ENTITIES, stored)
-        fields: dict[Any, Any] = {
-            vol.Required(
-                CONF_FARM_DEVICE_IDS,
-                description={"suggested_value": suggested_devices},
-            ): DeviceSelector(
-                DeviceSelectorConfig(integration=DOMAIN, multiple=True),
+            CONF_MAX_POWER: int(
+                user_input.get(CONF_MAX_POWER, entry_data.get(CONF_MAX_POWER, DEFAULT_MAX_POWER))
             ),
-            vol.Optional(
-                CONF_FARM_AMBIENT_TEMP_ENTITIES,
-                description={"suggested_value": suggested},
-            ): EntitySelector(EntitySelectorConfig(domain="sensor", multiple=True)),
+            CONF_RPC_PASSWORD: self._merge_secret(
+                user_input.get(CONF_RPC_PASSWORD),
+                str(entry_data.get(CONF_RPC_PASSWORD) or ""),
+            ),
+            CONF_WEB_USERNAME: str(
+                user_input.get(CONF_WEB_USERNAME, entry_data.get(CONF_WEB_USERNAME, ""))
+            ),
+            CONF_WEB_PASSWORD: self._merge_secret(
+                user_input.get(CONF_WEB_PASSWORD),
+                str(entry_data.get(CONF_WEB_PASSWORD) or ""),
+            ),
+            CONF_SSH_USERNAME: str(
+                user_input.get(CONF_SSH_USERNAME, entry_data.get(CONF_SSH_USERNAME, ""))
+            ),
+            CONF_SSH_PASSWORD: self._merge_secret(
+                user_input.get(CONF_SSH_PASSWORD),
+                str(entry_data.get(CONF_SSH_PASSWORD) or ""),
+            ),
         }
-        fields.update(self._farm_pool_slots_vol(user_input))
-        fields.update(
-            farm_tariff_schema_fields(self.config_entry.options, user_input)
-        )
-        fields.update(
-            farm_electricity_schema_fields(self.config_entry.options, user_input)
-        )
-        return vol.Schema(fields)
-
-    def _options_schema(
-        self, user_input: dict[str, Any] | None = None
-    ) -> vol.Schema:
-        """Build options schema (EntitySelector needs suggested_value, not default=None)."""
-        user_input = user_input or {}
-        stored = self.config_entry.options.get(CONF_POWER_SWITCH)
-        suggested = user_input.get(CONF_POWER_SWITCH, stored)
-        optional_kwargs: dict[str, Any] = {}
-        if suggested:
-            optional_kwargs["description"] = {"suggested_value": suggested}
-
-        pool_action_suggested = user_input.get("pool_action", "none")
-        pool_host_suggested = user_input.get("pool_host", "")
-        pool_port_suggested = user_input.get("pool_port")
-        pool_user_suggested = user_input.get("pool_username", "")
-        pool_pass_suggested = user_input.get("pool_password", "")
-
-        return vol.Schema(
-            {
-                vol.Optional(CONF_POWER_SWITCH, **optional_kwargs): EntitySelector(
-                    EntitySelectorConfig(domain="switch"),
-                ),
-                vol.Optional(
-                    "pool_action",
-                    description={"suggested_value": pool_action_suggested},
-                ): SelectSelector(
-                    SelectSelectorConfig(
-                        options=["none", "replace_primary", "append_backup"],
-                    ),
-                ),
-                vol.Optional(
-                    "pool_host",
-                    description={"suggested_value": pool_host_suggested},
-                ): str,
-                vol.Optional(
-                    "pool_port",
-                    description={"suggested_value": pool_port_suggested},
-                ): NumberSelector(
-                    NumberSelectorConfig(
-                        min=1,
-                        max=65535,
-                        mode="box",
-                    ),
-                ),
-                vol.Optional(
-                    "pool_use_ssl",
-                    default=bool(user_input.get("pool_use_ssl", False)),
-                ): BooleanSelector(),
-                vol.Optional(
-                    "pool_username",
-                    description={"suggested_value": pool_user_suggested},
-                ): str,
-                vol.Optional(
-                    "pool_password",
-                    description={"suggested_value": pool_pass_suggested},
-                ): TextSelector(
-                    TextSelectorConfig(
-                        type=TextSelectorType.PASSWORD,
-                        autocomplete="new-password",
-                    ),
-                ),
-            }
+        return self.async_update_reload_and_abort(
+            reconfigure_entry,
+            data_updates=new_data,
         )
