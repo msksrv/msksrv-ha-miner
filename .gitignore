@@ -1,5 +1,23 @@
-# Optional local clone of home-assistant/brands (legacy; custom integration icons ship in-package since HA 2026.3)
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+venv/
+.venv/
+
+# Build / release artifacts (not for git; CI builds miner.zip for GitHub Releases)
+custom_components/miner/miner.zip
+*.zip
+
+# Legacy local brands clone (icons ship in custom_components/miner/brand/)
 brands/
 
-__pycache__/
-*.pyc
+# IDE / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
