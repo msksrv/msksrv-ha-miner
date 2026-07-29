@@ -1,5 +1,28 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b7 (beta)
+
+Fixes critical baseline/anomaly bugs in v1.7.0b6.
+
+### Fixed
+
+- **Detector data format:** rules now receive full structured coordinator `data` (hashrate, power, boards, fans work).
+- **Binary sensor platform:** `anomaly_detected` registered from `binary_sensor.py`, not `sensor.py`.
+- **Mode warmup:** learning window resets on power/preset mode change (`max(mining_start, mode_start)`).
+- **Share counter:** accepted-shares decrease after reboot resets interval tracking.
+- **Learn order:** detect anomalies first; baseline updates only when clean (no anomaly, errors, fault, critical health).
+- **Learn rate:** one sample per 60 s (360 samples ≈ 6 h history at 10 s polls).
+- **Rule timers:** board/fan conditions always passed to timer logic (clears when normalized).
+- **`detected_at`:** preserved from first trigger until anomaly clears.
+- **Messages:** localized from `reason` + details (EN/RU by HA language).
+- **Accept baseline:** adds 30 seed samples + `manually_seeded` flag (confidence floor 50 %).
+
+### Note
+
+**v1.7.0b6 is broken** — use b7 or later for anomaly detection.
+
+---
+
 ## v1.7.0b6 (beta)
 
 Self-learning statistical baseline and explainable anomaly detection.

@@ -369,7 +369,7 @@
         "name": "Reset learned baseline"
       },
       "baseline_accept": {
-        "name": "Accept current as normal"
+        "name": "Add current to baseline"
       }
     },
     "switch": {

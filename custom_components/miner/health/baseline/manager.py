@@ -12,6 +12,7 @@ from homeassistant.helpers.storage import Store
 
 from ...const import DOMAIN
 from .detector import AnomalyState, detect_anomalies
+from .messages import format_anomaly_message
 from .mode import baseline_mode_key
 from .stats import RollingStats
 
@@ -23,8 +24,10 @@ WARMUP_SECONDS = 900
 PRELIMINARY_SECONDS = 3600
 RELIABLE_SECONDS = 43200
 SAVE_INTERVAL_SECONDS = 600
+LEARN_INTERVAL_SECONDS = 60
 REBOOT_WARMUP_SECONDS = 900
 RULE_REBOOT_WINDOW = 1800
+MANUAL_SEED_SAMPLES = 30
 
 
 class BaselineManager:
@@ -45,9 +48,12 @@ class BaselineManager:
         self._reboot_warmup_until: float | None = None
         self._last_share_at_monotonic: float | None = None
         self._last_accepted_shares: float | None = None
+        self._last_learn_monotonic = 0.0
         self._rule_timers: dict[str, float] = {}
         self._last_save_monotonic = 0.0
         self._dirty = False
+        self._anomaly_detected_at: str | None = None
+        self._anomaly_active_reason: str | None = None
         self._last_anomaly = AnomalyState(
             score=0,
             confidence=0,
@@ -88,16 +94,20 @@ class BaselineManager:
     def notify_reboot(self) -> None:
         self._reboot_warmup_until = time.monotonic() + REBOOT_WARMUP_SECONDS
         self._rule_timers.clear()
+        self._last_accepted_shares = None
+        self._last_share_at_monotonic = None
 
     def reset_all(self) -> None:
         self._profiles.clear()
         self._rule_timers.clear()
         self._mining_started_monotonic = None
         self._mode_started_monotonic = None
+        self._anomaly_detected_at = None
+        self._anomaly_active_reason = None
         self._dirty = True
 
     def accept_current(self, data: dict[str, Any]) -> None:
-        """Seed baseline with current readings (skip outlier filter)."""
+        """Seed baseline with current readings (multiple samples for stability)."""
         mode = baseline_mode_key(data)
         profile = self._ensure_profile(mode)
         now_iso = _utc_now()
@@ -105,14 +115,18 @@ class BaselineManager:
             if val is None:
                 continue
             stats = _get_metric_stats(profile, key)
-            stats.add(float(val), timestamp=now_iso)
+            for _ in range(MANUAL_SEED_SAMPLES):
+                stats.add(float(val), timestamp=now_iso)
             _save_metric_stats(profile, key, stats)
+        profile["manually_seeded"] = True
+        profile["seeded_at"] = now_iso
         self._dirty = True
 
     @callback
     def process_update(self, data: dict[str, Any]) -> AnomalyState:
         now = time.monotonic()
         now_iso = _utc_now()
+        lang = getattr(self.hass.config, "language", "en")
 
         uptime_i = _try_int(data.get("uptime"))
         if uptime_i is not None and self._last_uptime is not None and uptime_i + 60 < self._last_uptime:
@@ -122,6 +136,7 @@ class BaselineManager:
 
         if not data.get("is_mining"):
             self._mining_started_monotonic = None
+            self._clear_anomaly_tracking()
             self._last_anomaly = AnomalyState(
                 score=0,
                 confidence=self._last_anomaly.confidence,
@@ -146,18 +161,9 @@ class BaselineManager:
         learning = self._is_learning(now)
         confidence = self._confidence(now, profile)
 
-        if not learning and not self._in_reboot_warmup(now):
-            self._learn_sample(profile, data, now_iso, now)
-
-        snapshot = self._snapshot_values(data)
-        snapshot["accepted_shares"] = data.get("accepted_shares")
-        snapshot["rejected_shares"] = data.get("rejected_shares")
-        snapshot["reject_rate"] = data.get("reject_rate")
-        snapshot["seconds_since_share"] = data.get("seconds_since_share")
-        snapshot["timestamp"] = now_iso
-
-        self._last_anomaly = detect_anomalies(
-            snapshot=snapshot,
+        poll_data = {**data, "timestamp": now_iso}
+        raw_anomaly = detect_anomalies(
+            data=poll_data,
             baselines=self._baseline_values(profile),
             timers=self._rule_timers,
             now=now,
@@ -165,10 +171,49 @@ class BaselineManager:
             learning=learning or self._in_reboot_warmup(now),
             reboot_watch=(not self._in_reboot_warmup(now)) and self._reboot_recently(now),
         )
+        self._last_anomaly = self._finalize_anomaly(raw_anomaly, lang)
+
+        if (
+            not learning
+            and not self._in_reboot_warmup(now)
+            and self._can_learn(data, self._last_anomaly)
+            and now - self._last_learn_monotonic >= LEARN_INTERVAL_SECONDS
+        ):
+            self._learn_sample(profile, data, now_iso, now)
+            self._last_learn_monotonic = now
 
         if now - self._last_save_monotonic >= SAVE_INTERVAL_SECONDS:
             self.hass.async_create_task(self.async_save())
         return self._last_anomaly
+
+    def _finalize_anomaly(self, state: AnomalyState, language: str) -> AnomalyState:
+        if not state.detected:
+            self._clear_anomaly_tracking()
+            return state
+
+        reason = state.reason or ""
+        if reason != self._anomaly_active_reason:
+            self._anomaly_active_reason = reason
+            self._anomaly_detected_at = _utc_now()
+        elif self._anomaly_detected_at is None:
+            self._anomaly_detected_at = _utc_now()
+
+        message = format_anomaly_message(reason, state.details, language)
+        return AnomalyState(
+            score=state.score,
+            confidence=state.confidence,
+            detected=True,
+            severity=state.severity,
+            reason=reason,
+            message=message,
+            findings=state.findings,
+            details=state.details,
+            detected_at=self._anomaly_detected_at,
+        )
+
+    def _clear_anomaly_tracking(self) -> None:
+        self._anomaly_detected_at = None
+        self._anomaly_active_reason = None
 
     def _ensure_profile(self, mode: str) -> dict[str, Any]:
         if mode not in self._profiles:
@@ -176,10 +221,19 @@ class BaselineManager:
             self._dirty = True
         return self._profiles[mode]
 
-    def _is_learning(self, now: float) -> bool:
+    def _learning_started(self) -> float | None:
         if self._mining_started_monotonic is None:
+            return None
+        starts = [self._mining_started_monotonic]
+        if self._mode_started_monotonic is not None:
+            starts.append(self._mode_started_monotonic)
+        return max(starts)
+
+    def _is_learning(self, now: float) -> bool:
+        started = self._learning_started()
+        if started is None:
             return True
-        return (now - self._mining_started_monotonic) < WARMUP_SECONDS
+        return (now - started) < WARMUP_SECONDS
 
     def _in_reboot_warmup(self, now: float) -> bool:
         return self._reboot_warmup_until is not None and now < self._reboot_warmup_until
@@ -190,9 +244,10 @@ class BaselineManager:
         return now < self._reboot_warmup_until + RULE_REBOOT_WINDOW
 
     def _confidence(self, now: float, profile: dict[str, Any]) -> int:
-        if self._mining_started_monotonic is None:
+        started = self._learning_started()
+        if started is None:
             return 0
-        elapsed = now - self._mining_started_monotonic
+        elapsed = now - started
         if elapsed < WARMUP_SECONDS:
             return 0
         metrics = profile.get("metrics") or {}
@@ -207,7 +262,23 @@ class BaselineManager:
             time_factor = 0.7 + 0.25 * (elapsed - PRELIMINARY_SECONDS) / span
         else:
             time_factor = 1.0
-        return min(100, round(sample_factor * time_factor * 100))
+        conf = min(100, round(sample_factor * time_factor * 100))
+        if profile.get("manually_seeded") and samples >= 10:
+            conf = max(conf, 50)
+        return conf
+
+    @staticmethod
+    def _can_learn(data: dict[str, Any], anomaly: AnomalyState) -> bool:
+        if anomaly.detected:
+            return False
+        if data.get("fault_light"):
+            return False
+        if data.get("errors"):
+            return False
+        flags = (data.get("health") or {}).get("flags") or {}
+        if flags.get("temperature_high") or flags.get("maintenance_required"):
+            return False
+        return True
 
     def _learn_sample(
         self,
@@ -227,8 +298,18 @@ class BaselineManager:
             self._dirty = True
 
         accepted_f = _try_float(data.get("accepted_shares"))
-        if accepted_f is not None and self._last_accepted_shares is not None:
-            if accepted_f > self._last_accepted_shares and self._last_share_at_monotonic:
+        if accepted_f is not None:
+            if (
+                self._last_accepted_shares is not None
+                and accepted_f < self._last_accepted_shares
+            ):
+                self._last_accepted_shares = accepted_f
+                self._last_share_at_monotonic = now_m
+            elif (
+                self._last_accepted_shares is not None
+                and accepted_f > self._last_accepted_shares
+                and self._last_share_at_monotonic
+            ):
                 interval = now_m - self._last_share_at_monotonic
                 if 5 <= interval <= 600:
                     stats = _get_metric_stats(profile, "share_interval")
@@ -236,11 +317,12 @@ class BaselineManager:
                         stats.add(interval, timestamp=now_iso)
                         _save_metric_stats(profile, "share_interval", stats)
                         self._dirty = True
-        if accepted_f is not None and (
-            self._last_accepted_shares is None or accepted_f > self._last_accepted_shares
-        ):
-            self._last_share_at_monotonic = now_m
-        self._last_accepted_shares = accepted_f
+            if (
+                self._last_accepted_shares is None
+                or accepted_f > self._last_accepted_shares
+            ):
+                self._last_share_at_monotonic = now_m
+            self._last_accepted_shares = accepted_f
 
     def _baseline_values(self, profile: dict[str, Any]) -> dict[str, float]:
         out: dict[str, float] = {}

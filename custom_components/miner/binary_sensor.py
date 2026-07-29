@@ -44,6 +44,7 @@ async def async_setup_entry(
             MinerHealthBinarySensor(coordinator, key, device_class)
             for key, device_class in HEALTH_BINARY_KEYS
         ]
+        + [MinerAnomalyDetectedBinarySensor(coordinator)]
     )
 
 
@@ -81,6 +82,48 @@ class MinerHealthBinarySensor(CoordinatorEntity[MinerCoordinator], BinarySensorE
         health = self.coordinator.data.get("health") or {}
         flags = health.get("flags") or {}
         return bool(flags.get(self._flag_key))
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.available
+
+
+class MinerAnomalyDetectedBinarySensor(CoordinatorEntity[MinerCoordinator], BinarySensorEntity):
+    """ON when a baseline anomaly rule is active."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = BinarySensorDeviceClass.PROBLEM
+    _attr_translation_key = "anomaly_detected"
+
+    def __init__(self, coordinator: MinerCoordinator) -> None:
+        super().__init__(coordinator=coordinator)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}-anomaly_detected"
+
+    @property
+    def device_info(self) -> entity.DeviceInfo:
+        return get_miner_device_info(self.coordinator)
+
+    @property
+    def is_on(self) -> bool | None:
+        state = self.coordinator.baseline.anomaly
+        if state.confidence <= 0:
+            return None
+        return state.detected
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        state = self.coordinator.baseline.anomaly
+        if not state.detected:
+            return {"confidence": state.confidence}
+        return {
+            "severity": state.severity,
+            "reason": state.reason,
+            "message": state.message,
+            "confidence": state.confidence,
+            "detected_at": state.detected_at,
+            **state.details,
+        }
 
     @property
     def available(self) -> bool:

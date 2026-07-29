@@ -1,15 +1,7 @@
 """Anomaly detection sensors (self-learning baseline)."""
 from __future__ import annotations
 
-from homeassistant.components.binary_sensor import (
-    BinarySensorDeviceClass,
-    BinarySensorEntity,
-)
-from homeassistant.components.sensor import (
-    SensorEntity,
-    SensorEntityDescription,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, PERCENTAGE
 from homeassistant.core import HomeAssistant
@@ -20,15 +12,16 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_IS_FARM, DOMAIN
 from .coordinator import MinerCoordinator
 from .health.baseline import BaselineManager
+from .health.baseline.messages import format_anomaly_message
 from .miner_device_info import get_miner_device_info
 
 
-async def async_setup_anomaly_entities(
+async def async_setup_anomaly_sensors(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Register baseline anomaly entities for a miner."""
+    """Register baseline anomaly score sensors for a miner."""
     if config_entry.data.get(CONF_IS_FARM):
         return
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
@@ -36,7 +29,6 @@ async def async_setup_anomaly_entities(
         [
             MinerAnomalyScoreSensor(coordinator),
             MinerBaselineConfidenceSensor(coordinator),
-            MinerAnomalyDetectedBinarySensor(coordinator),
         ]
     )
 
@@ -82,6 +74,7 @@ class MinerAnomalyScoreSensor(_AnomalyEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         state = self.baseline.anomaly
+        lang = self.hass.config.language
         attrs: dict = {
             "confidence": state.confidence,
             "baseline_mode": self.baseline.current_mode,
@@ -89,13 +82,19 @@ class MinerAnomalyScoreSensor(_AnomalyEntity, SensorEntity):
         if state.detected:
             attrs["severity"] = state.severity
             attrs["reason"] = state.reason
-            attrs["message"] = state.message
+            if state.message:
+                attrs["message"] = state.message
             if state.detected_at:
                 attrs["detected_at"] = state.detected_at
             attrs.update(state.details)
         if len(state.findings) > 1:
             attrs["findings"] = [
-                {"reason": f.reason, "severity": f.severity, "message": f.message}
+                {
+                    "reason": f.reason,
+                    "severity": f.severity,
+                    "message": format_anomaly_message(f.reason, f.details, lang),
+                    **f.details,
+                }
                 for f in state.findings
             ]
         return attrs
@@ -120,34 +119,3 @@ class MinerBaselineConfidenceSensor(_AnomalyEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         return {"baseline_mode": self.baseline.current_mode}
-
-
-class MinerAnomalyDetectedBinarySensor(_AnomalyEntity, BinarySensorEntity):
-    """ON when a baseline anomaly rule is active."""
-
-    _attr_device_class = BinarySensorDeviceClass.PROBLEM
-
-    def __init__(self, coordinator: MinerCoordinator) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}-anomaly_detected"
-        self._attr_translation_key = "anomaly_detected"
-
-    @property
-    def is_on(self) -> bool | None:
-        state = self.baseline.anomaly
-        if state.confidence <= 0:
-            return None
-        return state.detected
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        state = self.baseline.anomaly
-        if not state.detected:
-            return {"confidence": state.confidence}
-        return {
-            "severity": state.severity,
-            "reason": state.reason,
-            "message": state.message,
-            "confidence": state.confidence,
-            **state.details,
-        }
