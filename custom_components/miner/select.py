@@ -114,10 +114,7 @@ class MinerPowerModeSelect(CoordinatorEntity[MinerCoordinator], SelectEntity):
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         super().__init__(coordinator=coordinator)
-        suffix = miner_entity_unique_suffix(
-            coordinator.config_entry, coordinator.data.get("mac")
-        )
-        self._attr_unique_id = f"{suffix}-power-mode"
+        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-power-mode"
 
     @property
     def device_info(self) -> entity.DeviceInfo:

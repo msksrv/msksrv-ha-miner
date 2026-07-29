@@ -76,6 +76,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     except UpdateFailed as err:
         raise ConfigEntryNotReady(str(err)) from err
 
+    from .entity_migration import async_migrate_mac_unique_id_duplicates
+
+    await async_migrate_mac_unique_id_duplicates(
+        hass, config_entry, coordinator.data.get("mac")
+    )
+
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True

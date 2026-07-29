@@ -18,7 +18,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import MinerCoordinator
-from .device_resolution import miner_entity_unique_suffix
 from .miner_device_info import get_miner_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,10 +65,7 @@ class MinerPowerLimitNumber(CoordinatorEntity[MinerCoordinator], NumberEntity):
         """Initialize the PowerLimit entity."""
         super().__init__(coordinator=coordinator)
         self._attr_native_value = self.coordinator.data["miner_sensors"]["power_limit"]
-        suffix = miner_entity_unique_suffix(
-            coordinator.config_entry, coordinator.data.get("mac")
-        )
-        self._attr_unique_id = f"{suffix}-power-limit"
+        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-power_limit"
         self.entity_description = entity_description
 
     @property
