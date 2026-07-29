@@ -1,34 +1,94 @@
-MSKSRV ASIC Miner — Non-Commercial License
+MSKSRV ASIC Miner — Licensing
 
-Copyright (c) 2021 Schnitzel (original hass-miner lineage)
-Copyright (c) 2024–2026 MSKSRV and contributors
+This repository is source-available. It is not open source software as defined
+by the Open Source Initiative, because Part B below restricts commercial use
+of the MSKSRV work and the combined integration.
+
+For commercial licensing, open a GitHub issue:
+https://github.com/msksrv/msksrv-ha-miner/issues
+
+================================================================================
+Part A — Original hass-miner code (MIT License)
+================================================================================
+
+Copyright (c) 2021 Schnitzel
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to use,
-copy, modify, merge, and publish copies of the Software, subject to the
-following conditions:
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-1. Non-commercial use only. You may use the Software for personal, hobby,
-   educational, or other non-commercial purposes.
-
-2. Commercial use is prohibited. Without prior written permission from the
-   copyright holders, you must not use, copy, modify, merge, publish,
-   distribute, sublicense, sell, rent, lease, or otherwise exploit the
-   Software or derivative works for commercial purposes. This includes,
-   without limitation: use inside a for-profit organization as part of its
-   operations; offering the Software or integrations built on it as part of
-   a paid product or service; or use intended to generate revenue.
-
-3. The above copyright notice and this permission notice shall be included in
-   all copies or substantial portions of the Software.
-
-4. This license does not grant permission to use the names, trademarks, or
-   branding of the copyright holders for promotion of derived products
-   without specific prior written consent.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Part A applies to portions of this project that remain under the MIT license
+from the upstream hass-miner lineage (https://github.com/Schnitzel/hass-miner).
+When distributing those portions, you must retain Schnitzel's copyright and this
+MIT text.
+
+================================================================================
+Part B — MSKSRV modifications and combined integration (2024–2026)
+================================================================================
+
+Copyright (c) 2024–2026 MSKSRV and contributors
+
+Permission is granted, free of charge, for non-commercial use, copying,
+modification, and distribution of the combined integration and MSKSRV-authored
+files, subject to the conditions below.
+
+1. Non-commercial use
+
+   You may use the Software for personal, hobby, educational, or other
+   non-commercial purposes. Examples of non-commercial use include:
+
+   - Home automation for your own mining hardware
+   - Operating your own farm without selling the integration or a derivative
+     product
+   - Evaluation and contribution in a private or community context
+
+2. Commercial use requires permission
+
+   Without prior written permission from MSKSRV, you must not use, copy,
+   modify, merge, publish, distribute, sublicense, sell, rent, lease, or
+   otherwise exploit the Software or derivative works for commercial purposes.
+
+   Commercial purposes include, without limitation:
+
+   - Offering the integration (or a service built on it) as a paid product
+   - Providing paid installation, support, or hosting where the integration is
+     a primary deliverable
+   - Redistributing a modified fork under a commercial license
+
+   Using the integration inside a for-profit company to monitor the company's
+   own miners is generally non-commercial, unless the use itself is offered
+   as a paid service to third parties.
+
+3. Notices
+
+   The copyright notices in Parts A and B, and this permission notice, shall
+   be included in all copies or substantial portions of the Software.
+
+4. Branding
+
+   This license does not grant permission to use the names, trademarks, or
+   branding of MSKSRV or Schnitzel to promote derived products without prior
+   written consent.
+
+5. Disclaimer
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   MSKSRV, SCHNITZEL, OR OTHER COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+   DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+   USE OR OTHER DEALINGS IN THE SOFTWARE.
