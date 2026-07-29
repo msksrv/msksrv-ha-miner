@@ -1,6 +1,7 @@
 {
   "title": "MSKSRV ASIC Miner",
   "config": {
+    "flow_title": "{name}",
     "step": {
       "user": {
         "menu_options": {
@@ -23,6 +24,7 @@
         }
       },
       "scan": {
+        "title": "Scan local network",
         "data": {
           "subnet": "Subnet (CIDR)",
           "min_power": "[%key:common::config_flow::data::min_power%]",
@@ -30,6 +32,7 @@
         }
       },
       "manual": {
+        "title": "Manual setup",
         "data": {
           "ip": "[%key:common::config_flow::data::ip%]",
           "min_power": "[%key:common::config_flow::data::min_power%]",
@@ -37,11 +40,13 @@
         }
       },
       "pick_miner": {
+        "title": "Select miner",
         "data": {
           "selected_miner": "Discovered miner"
         }
       },
       "login": {
+        "title": "Credentials",
         "data": {
           "ssh_username": "[%key:common::config_flow::data::ssh_username%]",
           "ssh_password": "[%key:common::config_flow::data::ssh_password%]",
@@ -51,6 +56,7 @@
         }
       },
       "title": {
+        "title": "Name",
         "data": {
           "title": "[%key:common::config_flow::data::title%]"
         }
@@ -68,7 +74,9 @@
       "farm_invalid_device": "A selected device no longer exists",
       "farm_only_miner_devices": "Only individual miner devices can be added (not another farm)",
       "farm_device_set_conflict": "Another farm already uses this exact set of miners",
-      "invalid_temp_entity": "Each entry must be an existing sensor entity"
+      "invalid_temp_entity": "Each entry must be an existing sensor entity",
+      "all_miners_configured": "All discovered miners are already configured",
+      "already_configured": "This miner is already configured in Home Assistant"
     },
     "abort": {
       "single_instance_allowed": "[%key:common::config_flow::abort::single_instance_allowed%]",
@@ -80,7 +88,7 @@
     "step": {
       "farm_options": {
         "title": "Farm settings",
-        "description": "Up to 5 stratum presets per farm (each farm has its own list in its integration entry). Leave a slot's host empty to remove it. After save, presets are stored with the farm. In the worker field you can use per-miner IP tokens as documented in the integration README. On the farm device card, pick a preset and use Apply buttons. Electricity: flat mode uses up to three currency + price/kWh pairs; two- or three-zone modes use one currency and local time windows (end of day as 24:00). Cost sensors integrate total farm power. After changing tariffs, reload this integration entry so entities match. Lifetime total is restored from the database after restart; hour/day/month reset on the calendar boundary.",
+        "description": "Link miners, optional stratum presets, electricity tariffs, and temperature sensors. Reload the integration entry after changing tariffs.",
         "data": {
           "farm_device_ids": "Miner devices",
           "farm_ambient_temp_entities": "Temperature sensors",
@@ -144,7 +152,8 @@
       "farm_not_loaded": "Farm is not loaded; try again later.",
       "farm_tou_currency_required": "Choose a currency for time-of-use tariffs.",
       "farm_tou_zones_dual": "Two-zone mode needs two zones with a positive price per kWh each.",
-      "farm_tou_zones_triple": "Three-zone mode needs three zones with a positive price per kWh each."
+      "farm_tou_zones_triple": "Three-zone mode needs three zones with a positive price per kWh each.",
+      "farm_tou_zones_coverage": "Time zones must cover the full day without gaps (use 24:00 for end of day)"
     }
   },
   "services": {
@@ -171,6 +180,9 @@
   },
   "entity": {
     "button": {
+      "reboot": {
+        "name": "Reboot"
+      },
       "power_off": {
         "name": "Power off"
       },
@@ -187,7 +199,98 @@
         "name": "Apply preset as backup pool"
       }
     },
+    "switch": {
+      "mining_active": {
+        "name": "Mining"
+      }
+    },
+    "number": {
+      "power_limit": {
+        "name": "Power limit"
+      }
+    },
     "sensor": {
+      "temperature": {
+        "name": "Temperature"
+      },
+      "board_temperature": {
+        "name": "Board {board} temperature"
+      },
+      "chip_temperature": {
+        "name": "Board {board} chip temperature"
+      },
+      "hashrate": {
+        "name": "Hashrate"
+      },
+      "ideal_hashrate": {
+        "name": "Ideal hashrate"
+      },
+      "active_preset_name": {
+        "name": "Mining profile"
+      },
+      "board_hashrate": {
+        "name": "Board {board} hashrate"
+      },
+      "board_chips": {
+        "name": "Board {board} chips"
+      },
+      "board_expected_chips": {
+        "name": "Board {board} expected chips"
+      },
+      "board_effective_chips": {
+        "name": "Board {board} effective chips"
+      },
+      "board_effective_chips_percent": {
+        "name": "Board {board} effective chips percent"
+      },
+      "power_limit": {
+        "name": "Power limit"
+      },
+      "miner_consumption": {
+        "name": "Power"
+      },
+      "efficiency": {
+        "name": "Efficiency"
+      },
+      "fan_speed": {
+        "name": "Fan {fan} speed"
+      },
+      "ip": {
+        "name": "IP address"
+      },
+      "mac": {
+        "name": "MAC address"
+      },
+      "model": {
+        "name": "Model"
+      },
+      "firmware": {
+        "name": "Firmware"
+      },
+      "uptime": {
+        "name": "Uptime"
+      },
+      "boards": {
+        "name": "Hashboards"
+      },
+      "pool_host": {
+        "name": "Pool host"
+      },
+      "pool_port": {
+        "name": "Pool port"
+      },
+      "pool_worker": {
+        "name": "Pool worker"
+      },
+      "accepted_shares": {
+        "name": "Accepted shares"
+      },
+      "rejected_shares": {
+        "name": "Rejected shares"
+      },
+      "reject_rate": {
+        "name": "Reject rate"
+      },
       "farm_total_hashrate": {
         "name": "Total hashrate"
       },
@@ -228,6 +331,9 @@
       },
       "pool_priority": {
         "name": "Pool priority"
+      },
+      "power_mode": {
+        "name": "Power mode"
       }
     }
   },
@@ -237,6 +343,13 @@
         "none": "Do not change pools",
         "replace_primary": "Set primary pool (host and port below)",
         "append_backup": "Add backup pool (host and port below)"
+      }
+    },
+    "farm_elec_tariff_mode": {
+      "options": {
+        "flat": "Flat (up to 3 currencies)",
+        "dual": "Two zones (by local time)",
+        "triple": "Three zones (by local time)"
       }
     }
   }

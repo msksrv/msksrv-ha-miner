@@ -18,6 +18,15 @@ from .miner_device_info import get_miner_device_info
 _LOGGER = logging.getLogger(__name__)
 
 
+def _mining_mode_from_data(config) -> object | None:
+    """Read mining_mode from pyasic config or offline placeholder dict."""
+    if config is None:
+        return None
+    if isinstance(config, dict):
+        return config.get("mining_mode")
+    return getattr(config, "mining_mode", None)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -25,14 +34,6 @@ async def async_setup_entry(
 ) -> None:
     """Add sensors for passed config_entry in HA."""
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    created = set()
-
-    @callback
-    def _create_entity(key: str):
-        """Create a sensor entity."""
-        created.add(key)
-
-    await coordinator.async_config_entry_first_refresh()
     miner = await coordinator.get_miner()
     if miner is not None and miner.supports_shutdown:
         async_add_entities(
@@ -47,6 +48,10 @@ async def async_setup_entry(
 class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
     """Defines a Miner Switch to pause and unpause the miner."""
 
+    _attr_has_entity_name = True
+    _attr_translation_key = "mining_active"
+    _attr_icon = "mdi:pickaxe"
+
     def __init__(
         self,
         coordinator: MinerCoordinator,
@@ -57,11 +62,6 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
         self._attr_is_on = self.coordinator.data["is_mining"]
         self.updating_switch = False
         self._last_mining_mode = None
-
-    @property
-    def name(self) -> str | None:
-        """Return name of the entity."""
-        return f"{self.coordinator.config_entry.title} Active"
 
     @property
     def device_info(self) -> entity.DeviceInfo:
@@ -90,7 +90,9 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
         if not miner.supports_shutdown:
             raise TypeError(f"{miner}: Shutdown not supported.")
         if miner.supports_power_modes:
-            self._last_mining_mode = self.coordinator.data["config"].mining_mode
+            self._last_mining_mode = _mining_mode_from_data(
+                self.coordinator.data.get("config")
+            )
         self._attr_is_on = False
         await miner.stop_mining()
         self.updating_switch = True

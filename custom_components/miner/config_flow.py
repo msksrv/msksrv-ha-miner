@@ -15,8 +15,6 @@ from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.core import callback
 from homeassistant.core import split_entity_id
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
-from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import BooleanSelector
 from homeassistant.helpers.selector import DeviceSelector, DeviceSelectorConfig
@@ -57,6 +55,7 @@ from .const import (
     SCAN_MAX_HOSTS,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
+from .device_resolution import is_miner_already_configured
 from .farm_pool_presets import FARM_POOL_SLOT_COUNT
 from .farm_pool_presets import farm_pool_preset_slots
 from .farm_pool_presets import farm_pool_slots_from_user_input
@@ -69,6 +68,7 @@ from .farm_pool_presets import strip_legacy_farm_pool_keys
 from .discovery import (
     DiscoveredMiner,
     async_scan_subnet,
+    filter_unconfigured_miners,
     get_stable_identifier,
     normalize_model_name,
 )
@@ -137,6 +137,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._miner = None
         self._scan_task: asyncio.Task[list[DiscoveredMiner]] | None = None
         self._scan_results: list[DiscoveredMiner] = []
+        self._scan_had_unfiltered: bool = False
         self._scan_input: dict[str, Any] = {}
 
     def _default_subnet(self) -> str:
@@ -199,11 +200,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def _has_entry_with_host(self, host: str) -> bool:
         """Check if host is already configured."""
-        host = str(host).strip()
-        for entry in self._async_current_entries():
-            if str(entry.data.get(CONF_IP, "")).strip() == host:
-                return True
-        return False
+        return is_miner_already_configured(self.hass, ip=str(host).strip())
 
     @staticmethod
     def _dhcp_mac_hex12(dhcp_mac: str) -> str:
@@ -211,31 +208,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def _mac_already_in_miner_integration(self, dhcp_mac: str) -> bool:
         """True if this MAC already belongs to a configured (non-farm) miner entry."""
-        raw = self._dhcp_mac_hex12(dhcp_mac)
-        if len(raw) != 12:
-            return False
-
-        dev_reg = dr.async_get(self.hass)
-        formatted = format_mac(raw)
-        if device := dev_reg.async_get_device(
-            connections={(CONNECTION_NETWORK_MAC, formatted)}
-        ):
-            for eid in device.config_entries:
-                entry = self.hass.config_entries.async_get_entry(eid)
-                if (
-                    entry
-                    and entry.domain == DOMAIN
-                    and not entry.data.get(CONF_IS_FARM)
-                ):
-                    return True
-
-        for entry in self._async_current_entries():
-            if entry.domain != DOMAIN or entry.data.get(CONF_IS_FARM):
-                continue
-            uid = (entry.unique_id or "").lower().replace(":", "").replace("-", "")
-            if uid == raw:
-                return True
-        return False
+        return is_miner_already_configured(self.hass, mac=dhcp_mac)
 
     async def _async_dhcp_probe_miner(self, host: str):
         """Try pyasic.get_miner a few times with backoff."""
@@ -432,6 +405,13 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         host = str(user_input[CONF_IP]).strip()
 
+        if self._has_entry_with_host(host):
+            return self.async_show_form(
+                step_id="manual",
+                data_schema=schema,
+                errors={"base": "already_configured"},
+            )
+
         try:
             await self._async_prepare_miner(miner, host, user_input)
         except AbortFlow as err:
@@ -440,12 +420,14 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return await self.async_step_login()
 
     async def _async_run_scan(self, subnet: str) -> list[DiscoveredMiner]:
-        """Background subnet scan."""
+        """Background subnet scan; omit miners already in Home Assistant."""
 
         def _progress(value: float) -> None:
             self.async_update_progress(value)
 
-        return await async_scan_subnet(subnet, progress_callback=_progress)
+        found = await async_scan_subnet(subnet, progress_callback=_progress)
+        self._scan_had_unfiltered = bool(found)
+        return filter_unconfigured_miners(self.hass, found)
 
     async def async_step_scan(self, user_input=None):
         """Scan local subnet for miners."""
@@ -510,10 +492,15 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_pick_miner(self, user_input=None):
         """Pick a discovered miner."""
         if not self._scan_results:
+            scan_error = (
+                "all_miners_configured"
+                if self._scan_had_unfiltered
+                else "no_devices_found"
+            )
             return self.async_show_form(
                 step_id="scan",
                 data_schema=self._scan_schema(self._scan_input),
-                errors={"base": "no_devices_found"},
+                errors={"base": scan_error},
             )
 
         options = {
@@ -541,6 +528,13 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_show_form(step_id="pick_miner", data_schema=schema)
 
         selected_ip = str(user_input[CONF_SELECTED_MINER]).strip()
+
+        if self._has_entry_with_host(selected_ip):
+            return self.async_show_form(
+                step_id="pick_miner",
+                data_schema=schema,
+                errors={"base": "already_configured"},
+            )
 
         import pyasic
 
