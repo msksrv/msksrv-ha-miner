@@ -367,13 +367,13 @@ https://pyasic.readthedocs.io/en/latest/miners/supported_types/
 
 ## Releases
 
-**Current release:** [**v1.6.13**](https://github.com/msksrv/msksrv-ha-miner/releases/tag/v1.6.13) — **Home Assistant 2026.7**-style config/options flow (farm menu, sections, reconfigure, native selectors, safe passwords, confirmations). Earlier baseline still listed: **v1.6.4**.
+**Current release:** [**v1.6.14**](https://github.com/msksrv/msksrv-ha-miner/releases/tag/v1.6.14) — **Home Assistant 2026.7**-style config/options flow (farm menu, sections, reconfigure, native selectors, safe passwords, confirmations). Earlier baseline still listed: **v1.6.4**.
 
 ### Automatic release (GitHub Actions)
 
 Push a version tag (`manifest.json` **must match** the tag without the `v` prefix):
 
-- **Stable:** `v1.6.13`, `v1.7.0`, … → **Release** with `miner.zip`
+- **Stable:** `v1.6.14`, `v1.7.0`, … → **Release** with `miner.zip`
 - **Beta / RC:** `v1.7.0b1`, `v1.7.0rc1` → **Pre-release**
 
 Workflow: [**Create release from tag**](.github/workflows/publish-tag-release.yml) — runs on push of a `v*` tag.
