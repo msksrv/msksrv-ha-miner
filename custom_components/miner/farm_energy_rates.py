@@ -79,17 +79,55 @@ def farm_energy_rates_from_user_input(user_input: dict[str, Any]) -> list[dict[s
     return stored
 
 
+def _flat_slot_active(
+    stored: list[dict[str, Any]], ui: dict[str, Any], index: int
+) -> bool:
+    """True when flat tariff slot *index* (1-based) has currency or price set."""
+    cur_key = f"farm_elec_currency_{index}"
+    price_key = f"farm_elec_price_kwh_{index}"
+    raw_cur = str(ui.get(cur_key) or "").strip()
+    if raw_cur and raw_cur.lower() not in (_FARM_CUR_OFF, "none"):
+        return True
+    pr = ui.get(price_key)
+    try:
+        if pr is not None and float(pr) > 0:
+            return True
+    except (TypeError, ValueError):
+        pass
+    if index - 1 < len(stored):
+        c = str(stored[index - 1].get("currency") or "").strip()
+        try:
+            p = float(stored[index - 1].get("price_kwh", 0))
+        except (TypeError, ValueError):
+            p = 0.0
+        if c and p > 0:
+            return True
+    return False
+
+
+def flat_tariff_visible_slot_count(
+    stored: list[dict[str, Any]], ui: dict[str, Any]
+) -> int:
+    """Show one slot by default; reveal the next only while the previous is in use."""
+    count = 1
+    for index in range(1, 3):
+        if _flat_slot_active(stored, ui, index):
+            count = min(index + 1, 3)
+    return count
+
+
 def farm_electricity_schema_fields(
     options: dict[str, Any], user_input: dict[str, Any] | None = None
 ) -> dict[Any, Any]:
-    """Vol schema fragment for three optional currency + price/kWh slots."""
+    """Vol schema fragment for optional currency + price/kWh slots (flat tariff)."""
     ui = user_input or {}
     stored_raw = options.get(CONF_FARM_ENERGY_RATES) or []
     stored: list[dict[str, Any]] = (
         [x for x in stored_raw if isinstance(x, dict)] if isinstance(stored_raw, list) else []
     )
+    slot_count = flat_tariff_visible_slot_count(stored, ui)
     fields: dict[Any, Any] = {}
-    for i in range(1, 4):
+    for i in range(1, slot_count + 1):
         cur_key = f"farm_elec_currency_{i}"
         price_key = f"farm_elec_price_kwh_{i}"
         if i - 1 < len(stored):

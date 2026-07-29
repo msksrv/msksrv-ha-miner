@@ -186,7 +186,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             )
             return self.async_create_entry(title="", data=new_options)
 
-        fields = farm_electricity_schema_fields(opts, ui.get("farm_tariff_flat"))
+        fields = farm_electricity_schema_fields(opts, ui.get("farm_tariff_flat") or {})
         schema = vol.Schema(
             {
                 vol.Required("farm_tariff_flat"): section(
@@ -233,36 +233,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     )
                     return self.async_create_entry(title="", data=new_options)
 
-        from .farm_elec_tou import TOU_CURRENCY_OPTIONS, farm_tou_currency
+        from .farm_elec_tou import farm_tou_zone_schema_fields
 
-        stored_z = farm_tou_zones_stored(opts)
-        stored_cur = farm_tou_currency(opts) or "EUR"
-        zone_count = 2 if mode == FARM_ELEC_TARIFF_DUAL else 3
-        inner: dict[Any, Any] = {
-            vol.Optional(
-                CONF_FARM_ELEC_TOU_CURRENCY,
-                description={
-                    "suggested_value": ui.get(CONF_FARM_ELEC_TOU_CURRENCY, stored_cur)
-                },
-            ): SelectSelector(SelectSelectorConfig(options=TOU_CURRENCY_OPTIONS)),
-        }
-        _def_start = {1: "00:00", 2: "12:00", 3: "16:00"}
-        _def_end = {1: "12:00", 2: "16:00", 3: "24:00"}
         tou_ui = ui.get("farm_tariff_tou") or ui
-        for i in range(1, zone_count + 1):
-            zi = stored_z[i - 1] if i - 1 < len(stored_z) else {}
-            sk, ek, pk = f"farm_elec_z{i}_start", f"farm_elec_z{i}_end", f"farm_elec_z{i}_price"
-            from homeassistant.helpers.selector import TimeSelector
-
-            inner[
-                vol.Optional(sk, description={"suggested_value": tou_ui.get(sk, zi.get("start", _def_start[i]))})
-            ] = TimeSelector()
-            inner[
-                vol.Optional(ek, description={"suggested_value": tou_ui.get(ek, zi.get("end", _def_end[i]))})
-            ] = TimeSelector()
-            inner[
-                vol.Optional(pk, description={"suggested_value": tou_ui.get(pk, zi.get("price_kwh", 0))})
-            ] = NumberSelector(NumberSelectorConfig(min=0, max=9999, step="any", mode="box"))
+        inner = farm_tou_zone_schema_fields(mode, opts, tou_ui)
 
         schema = vol.Schema(
             {

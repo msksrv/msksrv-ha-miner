@@ -238,6 +238,43 @@ def tou_zones_from_user_input(
     return zones
 
 
+def farm_tou_zone_schema_fields(
+    mode: str,
+    options: dict[str, Any],
+    user_input: dict[str, Any] | None = None,
+) -> dict[Any, Any]:
+    """Vol schema for TOU currency + zone fields (2 zones for dual, 3 for triple)."""
+    ui = user_input or {}
+    if mode not in (FARM_ELEC_TARIFF_DUAL, FARM_ELEC_TARIFF_TRIPLE):
+        return {}
+
+    stored_z = farm_tou_zones_stored(options)
+    stored_cur = farm_tou_currency(options) or "EUR"
+    zone_count = 2 if mode == FARM_ELEC_TARIFF_DUAL else 3
+
+    fields: dict[Any, Any] = {
+        vol.Optional(
+            CONF_FARM_ELEC_TOU_CURRENCY,
+            description={"suggested_value": ui.get(CONF_FARM_ELEC_TOU_CURRENCY, stored_cur)},
+        ): SelectSelector(SelectSelectorConfig(options=TOU_CURRENCY_OPTIONS)),
+    }
+    _def_start = {1: "00:00", 2: "12:00", 3: "16:00"}
+    _def_end = {1: "12:00", 2: "16:00", 3: "24:00"}
+    for i in range(1, zone_count + 1):
+        zi = stored_z[i - 1] if i - 1 < len(stored_z) else {}
+        sk, ek, pk = f"farm_elec_z{i}_start", f"farm_elec_z{i}_end", f"farm_elec_z{i}_price"
+        fields[
+            vol.Optional(sk, description={"suggested_value": ui.get(sk, zi.get("start", _def_start[i]))})
+        ] = TimeSelector()
+        fields[
+            vol.Optional(ek, description={"suggested_value": ui.get(ek, zi.get("end", _def_end[i]))})
+        ] = TimeSelector()
+        fields[
+            vol.Optional(pk, description={"suggested_value": ui.get(pk, zi.get("price_kwh", 0))})
+        ] = NumberSelector(NumberSelectorConfig(min=0, max=9999, step="any", mode="box"))
+    return fields
+
+
 def farm_tariff_schema_fields(
     options: dict[str, Any], user_input: dict[str, Any] | None = None
 ) -> dict[Any, Any]:

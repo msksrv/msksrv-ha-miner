@@ -212,20 +212,19 @@
       },
       "farm_tariff_flat": {
         "title": "Flat electricity tariff",
-        "description": "Set one or more fixed prices per kWh.",
+        "description": "One fixed price per kWh; add more currencies only if you need them.",
         "sections": {
           "farm_tariff_flat": {
-            "name": "Flat tariffs"
+            "name": "Flat tariff",
+            "data": {
+              "farm_elec_currency_1": "Currency",
+              "farm_elec_price_kwh_1": "Price per kWh",
+              "farm_elec_currency_2": "Extra currency (optional)",
+              "farm_elec_price_kwh_2": "Price per kWh",
+              "farm_elec_currency_3": "Extra currency (optional)",
+              "farm_elec_price_kwh_3": "Price per kWh"
+            }
           }
-        },
-        "data": {
-          "farm_elec_tou_currency": "Currency",
-          "farm_elec_currency_1": "Tariff 1 currency (empty = off)",
-          "farm_elec_price_kwh_1": "Tariff 1 price per kWh",
-          "farm_elec_currency_2": "Tariff 2 currency (empty = off)",
-          "farm_elec_price_kwh_2": "Tariff 2 price per kWh",
-          "farm_elec_currency_3": "Tariff 3 currency (empty = off)",
-          "farm_elec_price_kwh_3": "Tariff 3 price per kWh"
         }
       },
       "farm_tariff_tou": {
@@ -233,20 +232,20 @@
         "description": "Configure day/night or three-zone pricing.",
         "sections": {
           "farm_tariff_tou": {
-            "name": "Time zones"
+            "name": "Time zones",
+            "data": {
+              "farm_elec_tou_currency": "Currency",
+              "farm_elec_z1_start": "Zone 1 — start (local time)",
+              "farm_elec_z1_end": "Zone 1 — end (local time)",
+              "farm_elec_z1_price": "Zone 1 — price per kWh",
+              "farm_elec_z2_start": "Zone 2 — start (local time)",
+              "farm_elec_z2_end": "Zone 2 — end (local time)",
+              "farm_elec_z2_price": "Zone 2 — price per kWh",
+              "farm_elec_z3_start": "Zone 3 — start (local time)",
+              "farm_elec_z3_end": "Zone 3 — end (local time)",
+              "farm_elec_z3_price": "Zone 3 — price per kWh"
+            }
           }
-        },
-        "data": {
-          "farm_elec_tou_currency": "Currency",
-          "farm_elec_z1_start": "Zone 1 — start (local time)",
-          "farm_elec_z1_end": "Zone 1 — end (local time)",
-          "farm_elec_z1_price": "Zone 1 — price per kWh",
-          "farm_elec_z2_start": "Zone 2 — start (local time)",
-          "farm_elec_z2_end": "Zone 2 — end (local time)",
-          "farm_elec_z2_price": "Zone 2 — price per kWh",
-          "farm_elec_z3_start": "Zone 3 — start (local time)",
-          "farm_elec_z3_end": "Zone 3 — end (local time)",
-          "farm_elec_z3_price": "Zone 3 — price per kWh"
         }
       },
       "farm_actions": {

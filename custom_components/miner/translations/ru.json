@@ -212,20 +212,19 @@
       },
       "farm_tariff_flat": {
         "title": "Плоский тариф",
-        "description": "Задайте одну или несколько фиксированных цен за kВt·ч.",
+        "description": "Одна фиксированная цена за kВt·ч; при необходимости можно добавить ещё валюты.",
         "sections": {
           "farm_tariff_flat": {
-            "name": "Плоские тарифы"
+            "name": "Плоский тариф",
+            "data": {
+              "farm_elec_currency_1": "Валюта",
+              "farm_elec_price_kwh_1": "Цена за kВt·ч",
+              "farm_elec_currency_2": "Доп. валюта (необяз.)",
+              "farm_elec_price_kwh_2": "Цена за kВt·ч",
+              "farm_elec_currency_3": "Доп. валюта (необяз.)",
+              "farm_elec_price_kwh_3": "Цена за kВt·ч"
+            }
           }
-        },
-        "data": {
-          "farm_elec_tou_currency": "Валюта",
-          "farm_elec_currency_1": "Тариф 1 — валюта (пусто = выкл.)",
-          "farm_elec_price_kwh_1": "Тариф 1 — цена за kВt·ч",
-          "farm_elec_currency_2": "Тариф 2 — валюта (пусто = выкл.)",
-          "farm_elec_price_kwh_2": "Тариф 2 — цена за kВt·ч",
-          "farm_elec_currency_3": "Тариф 3 — валюта (пусто = выкл.)",
-          "farm_elec_price_kwh_3": "Тариф 3 — цена за kВt·ч"
         }
       },
       "farm_tariff_tou": {
@@ -233,20 +232,20 @@
         "description": "Настройка тарифа день/ночь или трёх зон.",
         "sections": {
           "farm_tariff_tou": {
-            "name": "Временные зоны"
+            "name": "Временные зоны",
+            "data": {
+              "farm_elec_tou_currency": "Валюта",
+              "farm_elec_z1_start": "Зона 1 — начало (местное время)",
+              "farm_elec_z1_end": "Зона 1 — конец (местное время)",
+              "farm_elec_z1_price": "Зона 1 — цена за kВt·ч",
+              "farm_elec_z2_start": "Зона 2 — начало (местное время)",
+              "farm_elec_z2_end": "Зона 2 — конец (местное время)",
+              "farm_elec_z2_price": "Зона 2 — цена за kВt·ч",
+              "farm_elec_z3_start": "Зона 3 — начало (местное время)",
+              "farm_elec_z3_end": "Зона 3 — конец (местное время)",
+              "farm_elec_z3_price": "Зона 3 — цена за kВt·ч"
+            }
           }
-        },
-        "data": {
-          "farm_elec_tou_currency": "Валюта",
-          "farm_elec_z1_start": "Зона 1 — начало (местное время)",
-          "farm_elec_z1_end": "Зона 1 — конец (местное время)",
-          "farm_elec_z1_price": "Зона 1 — цена за kВt·ч",
-          "farm_elec_z2_start": "Зона 2 — начало (местное время)",
-          "farm_elec_z2_end": "Зона 2 — конец (местное время)",
-          "farm_elec_z2_price": "Зона 2 — цена за kВt·ч",
-          "farm_elec_z3_start": "Зона 3 — начало (местное время)",
-          "farm_elec_z3_end": "Зона 3 — конец (местное время)",
-          "farm_elec_z3_price": "Зона 3 — цена за kВt·ч"
         }
       },
       "farm_actions": {
