@@ -64,7 +64,7 @@ Poll interval is **10 seconds** (`local_polling`). Typical data includes:
 - **Device** — model, firmware, uptime (formatted), board count, IP, MAC
 - **Farm (optional)** — when tariffs are set under **⚙️ Configure** on the farm entry: **electricity cost** sensors (this hour, today, this month, lifetime, and **cost at current draw**) in the chosen currency; in zone mode the active **price follows HA local time**.
 
-When the miner is temporarily unreachable, the integration keeps entities alive with **degraded / zeroed** data on the first failure, then marks the device unavailable on repeated failures.
+When the miner is temporarily unreachable, polling fails and entities are marked **unavailable** until connectivity returns (no fake zeroed readings).
 
 ### Control (platforms)
 
@@ -127,14 +127,32 @@ These match what you see in the HA sidebar and on integration cards:
 3. Enter optional **RPC / Web / SSH** credentials if prompted.
 4. Set the **device name** (area / dashboard friendly).
 
+### Reconfigure connection
+
+On a **single-miner** entry (not a farm) under **🧩 Integrations**, use **Reconfigure** (often under the row **⋯** menu): **IP**, **RPC / web / SSH**, **power range**. Leave **password fields empty** to keep current values. The entry reloads automatically after save.
+
 ### Integration options (power + stratum)
 
 **⚙️ Settings → 🔌 Devices & services → 🧩 Integrations** (this is **not** the “Devices” tab). Find **MSKSRV ASIC Miner**, select the **entry for this miner** (one row per IP), then **⚙️ Configure**.
 
-- **Power switch** — picker limited to **`switch`**. **Power off** / **Power on** stay unavailable until you save a valid switch (or if that entity is removed). Clear the field and submit to unlink.
-- **Stratum pool** — choose **do nothing**, **set primary pool**, or **add backup pool**, then fill **host**, **port**, optional **SSL** and **worker** credentials. The miner must be **reachable** when you submit; up to **3** pools in the primary group (append fails if full).
+- **Power switch** — picker limited to **`switch`** (dedicated section). **Power off** / **Power on** stay unavailable until you save a valid switch (or if that entity is removed). Clear the field and submit to unlink.
+- **Stratum pool** — collapsible section: **do nothing**, **set primary pool**, or **add backup pool**, then **host**, **port**, optional **SSL** and **worker**. **Host/port are validated before** the confirm step when applying a pool. The miner must be **reachable**; up to **3** pools in the primary group (append fails if full).
 
 Pool fields are applied **only when you submit** this form; they are not stored as long-lived options (only the power switch entity id is saved).
+
+### Farm options (menu)
+
+**⚙️ Configure** on the **farm** tile opens a **menu** (one step per item):
+
+| Item | Purpose |
+|------|---------|
+| **Farm members** | Miner device list |
+| **Room temperature sensors** | Only `sensor` with **`device_class: temperature`** |
+| **Pools and workers** | Up to five stratum presets (collapsible section) |
+| **Electricity tariff** | Choose tariff type, then a dedicated flat or zone form |
+| **Mass actions** | Apply a saved preset to all members (**with confirmation**) |
+
+Preset pool passwords are **not echoed** back to the browser; an **empty password field** keeps the stored value.
 
 ### Sidebar & dashboards
 
@@ -147,15 +165,15 @@ Add **Farm** from the same integration menu, enter a **name**, and multi-select 
 
 To **add or remove miners** on an existing farm, open **⚙️ Configure** on the **farm** integration tile (under **🧩 Integrations**), update **Miner devices** (multi-select), and save. Finish setting up any **new** miner as its own integration entry first so it appears in the picker.
 
-**⚙️ Configure** on the **farm** tile also links **room temperature** sensors: pick one or more **`sensor`** entities (e.g. ZigBee probes). Each appears on the farm device as a temperature sensor whose **name matches the source entity’s friendly name** (and unit follows the source). Saving reloads the entry.
+**⚙️ Configure** on the **farm** tile (menu item **Room temperature sensors**) links **room temperature** probes: one or more **`sensor`** entities with **`device_class: temperature`** (e.g. ZigBee). Each appears on the farm device; the **name matches the source entity’s friendly name** (unit follows the source).
 
-**Stratum (all members)** — up to **five** preset slots per **farm integration entry** (each farm has its **own** list in that entry’s options — independent of other farms). Each slot has host, port, SSL, worker, password. **Clear a slot’s host** (and port) and save to **remove** that preset. Bulk apply from **⚙️ Configure** on the **farm** tile uses the **“which slot (1–5)”** selector plus **replace primary** / **append backup**; behaviour matches **`miner.set_pool`**. **Every** linked miner must accept the change or the form errors. Bulk apply is **blocked** if members report **more than one algorithm** (last successful poll).
+**Stratum (all members)** — up to **five** presets under menu item **Pools and workers**. **Clear a slot’s host** (and port) to remove it. **Mass actions** — pick slot (1–5) and **replace primary** / **append backup**; **confirmation** is required before apply. Matches **`miner.set_pool`**. Blocked when members report **more than one algorithm**.
 
-- **Worker** — per slot, same rules as before: shared string or **`{ip}`** / **`{ip_last}`** templates (farm-only). Many **Bitcoin-style** pools use `subaccount.workername`; follow your pool’s docs for other coins.
-- **Dashboard** — on the **farm** **device page** (“Devices” tab): **Preset to apply** (select) and **Apply preset as primary pool** / **… as backup pool** (buttons) — **without** **⚙️ Configure** under Integrations. Buttons log an error if apply fails (e.g. mixed algorithms, offline miner).
+- **Worker** — per slot: shared string or **`{ip}`** / **`{ip_last}`** templates (farm only). Many **Bitcoin-style** pools use `subaccount.workername`; follow your pool’s docs for other coins.
+- **Dashboard** — on the **farm** **device page** (“Devices” tab): **Preset to apply** (select) and apply buttons — without opening integration **⚙️ Configure**.
 - **Secrets** — presets live in HA **config storage** with the farm entry; include them in your **backup** threat model.
 
-**Electricity (cost)** — under **⚙️ Configure** on the **farm** tile, the electricity section: **flat** mode (up to three currency + price/kWh pairs) or **two / three zones** in **Home Assistant local time** (one currency; each zone has start, end, and price/kWh). Use **24:00** for end-of-day when you need the last minute of the day inside a zone. Cost sensors are created only when the selected mode is filled in validly. After **changing tariff mode or zones**, **reload the farm integration entry** (**🧩 Integrations** → farm row → **⋯** → Reload) so entities match the new settings.
+**Electricity (cost)** — menu item **Electricity tariff**: choose **flat** or **two/three zones**, then a dedicated form. Cost sensors appear only with valid configuration. **Reload the farm entry** after changing tariff mode or zones.
 
 Farm sensors include **total hashrate / power**, **miner count / online**, **algorithm summary** (from pyasic per miner; if miners differ, shown as e.g. `SHA256d (3), Scrypt (1)`; if none report an algorithm, **SHA256d** is assumed as label only), **effective chips %** (sum of working chips vs expected chips across **online** members’ hashboards), any linked **ambient temperature** sensors, and when tariffs are configured — **electricity cost** sensors (see above).
 
@@ -349,20 +367,20 @@ https://pyasic.readthedocs.io/en/latest/miners/supported_types/
 
 ## Releases
 
-**Current stable line: 1.6.x** — **farm electricity cost**: **flat** mode (up to three currencies) and **two / three time-of-use zones** in **local time**; power integrated across zone boundaries; updated option-form strings (English and Russian). Earlier **1.4.x–1.5.x** brought farm stratum work, **pool worker** sensor, config-flow/DHCP fixes.
+**Current release:** [**v1.6.12**](https://github.com/msksrv/msksrv-ha-miner/releases/tag/v1.6.12) — **Home Assistant 2026.7**-style config/options flow (farm menu, sections, reconfigure, native selectors, safe passwords, confirmations). Earlier baseline still listed: **v1.6.4**.
 
 ### Automatic release (GitHub Actions)
 
-Push a version tag:
+Push a version tag (`manifest.json` **must match** the tag without the `v` prefix):
 
-- **Stable:** `v1.6.0` (or the next semver tag) → full **Release**, `miner.zip` attached, `manifest.json` version updated in the workflow to match the tag (without leading `v`).
-- **Beta / RC:** `v1.7.0b1`, `v1.7.0rc1`, etc. → **Pre-release** (same ZIP workflow).
+- **Stable:** `v1.6.12`, `v1.7.0`, … → **Release** with `miner.zip`
+- **Beta / RC:** `v1.7.0b1`, `v1.7.0rc1` → **Pre-release**
 
-Workflows: **Create release from tag** (drafts the GitHub release) and **Release** (on publish: patch manifest version in the artifact, zip `custom_components/miner`, upload **`miner.zip`**).
+Workflow: [**Create release from tag**](.github/workflows/publish-tag-release.yml) — runs on push of a `v*` tag.
 
 ### Manual
 
-You can create a release in the GitHub UI: choose the tag, optionally **Set as a pre-release** for betas, then **Publish** — the ZIP workflow runs the same way.
+Create a release in the GitHub UI: pick the tag, optionally **Pre-release**, then **Publish**. HACS uses the tagged source tree; `miner.zip` is for manual installs.
 
 ---
 
