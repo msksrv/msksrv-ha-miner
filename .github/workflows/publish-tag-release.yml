@@ -67,7 +67,7 @@ jobs:
           echo "miner.zip size: $(wc -c < miner.zip) bytes, files: $(zipinfo -1 miner.zip | wc -l)"
 
       - name: Create GitHub Release with miner.zip
-        uses: softprops/action-gh-release@v3.0.0
+        uses: softprops/action-gh-release@v3.0.2
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
