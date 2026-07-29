@@ -3,26 +3,29 @@
 from __future__ import annotations
 
 import logging
-from datetime import date
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from datetime import time as dt_time
-from datetime import timedelta
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.helpers.selector import NumberSelector, NumberSelectorConfig
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
-from homeassistant.helpers.selector import TimeSelector
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    SelectSelector,
+    SelectSelectorConfig,
+    TimeSelector,
+)
 from homeassistant.util import dt as dt_util
 
-from .const import CONF_FARM_ELEC_TARIFF_MODE
-from .const import CONF_FARM_ELEC_TOU_CURRENCY
-from .const import CONF_FARM_ELEC_ZONES
-from .const import FARM_ELEC_TARIFF_DUAL
-from .const import FARM_ELEC_TARIFF_FLAT
-from .const import FARM_ELEC_TARIFF_TRIPLE
-from .farm_energy_rates import FARM_ELECTRICITY_CURRENCY_OPTIONS
-from .farm_energy_rates import _FARM_CUR_OFF
+from .const import (
+    CONF_FARM_ELEC_TARIFF_MODE,
+    CONF_FARM_ELEC_TOU_CURRENCY,
+    CONF_FARM_ELEC_ZONES,
+    FARM_ELEC_TARIFF_DUAL,
+    FARM_ELEC_TARIFF_FLAT,
+    FARM_ELEC_TARIFF_TRIPLE,
+)
+from .farm_energy_rates import _FARM_CUR_OFF, FARM_ELECTRICITY_CURRENCY_OPTIONS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -303,9 +306,8 @@ def validate_tou_submission(mode: str, zones: list[dict[str, Any]]) -> str | Non
     if mode == FARM_ELEC_TARIFF_DUAL:
         if len(zones) != 2:
             return "farm_tou_zones_dual"
-    elif mode == FARM_ELEC_TARIFF_TRIPLE:
-        if len(zones) != 3:
-            return "farm_tou_zones_triple"
+    elif mode == FARM_ELEC_TARIFF_TRIPLE and len(zones) != 3:
+        return "farm_tou_zones_triple"
     if mode in (FARM_ELEC_TARIFF_DUAL, FARM_ELEC_TARIFF_TRIPLE):
         return validate_tou_zone_coverage(zones)
     return None

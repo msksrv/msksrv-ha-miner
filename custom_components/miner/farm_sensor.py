@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import hashlib
 
-from homeassistant.components.sensor import SensorDeviceClass
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.components.sensor import SensorEntityDescription
-from homeassistant.components.sensor import SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -14,11 +16,9 @@ from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES
-from .const import DOMAIN
-from .const import TERA_HASH_PER_SECOND
-from .farm_cost_sensors import setup_farm_cost_sensors
+from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES, DOMAIN, TERA_HASH_PER_SECOND
 from .farm_coordinator import MinerFarmCoordinator
+from .farm_cost_sensors import setup_farm_cost_sensors
 
 
 def _farm_ambient_entity_ids(entry: ConfigEntry) -> list[str]:

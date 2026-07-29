@@ -14,11 +14,10 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from pyasic.config.mining import MiningModeHPM, MiningModeLPM, MiningModeNormal
 from pyasic.config.pools import PoolGroup
 
-from .const import CONF_IS_FARM
-from .const import DOMAIN
+from .const import CONF_IS_FARM, DOMAIN
+from .coordinator import MinerCoordinator
 from .device_resolution import miner_entity_unique_suffix
 from .miner_device_info import get_miner_device_info
-from .coordinator import MinerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 

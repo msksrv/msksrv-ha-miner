@@ -4,11 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from homeassistant.helpers import device_registry
-from homeassistant.helpers import entity
+from homeassistant.helpers import device_registry, entity
 
-from .const import CONF_IP
-from .const import DOMAIN
+from .const import CONF_IP, DOMAIN
 
 if TYPE_CHECKING:
     from .coordinator import MinerCoordinator

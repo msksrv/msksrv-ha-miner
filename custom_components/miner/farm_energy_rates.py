@@ -5,8 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.helpers.selector import NumberSelector, NumberSelectorConfig
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    SelectSelector,
+    SelectSelectorConfig,
+)
 
 from .const import CONF_FARM_ENERGY_RATES
 

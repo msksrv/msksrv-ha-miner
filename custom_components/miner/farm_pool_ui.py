@@ -7,8 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
 from .farm_coordinator import MinerFarmCoordinator
-from .farm_pool_presets import farm_pool_preset_slots
-from .farm_pool_presets import farm_pool_select_option_labels
+from .farm_pool_presets import farm_pool_preset_slots, farm_pool_select_option_labels
 
 _LOGGER = logging.getLogger(__name__)
 

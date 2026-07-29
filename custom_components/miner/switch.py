@@ -5,8 +5,7 @@ import logging
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import callback
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -102,9 +101,8 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
     def _handle_coordinator_update(self) -> None:
         is_mining = self.coordinator.data["is_mining"]
         if is_mining is not None:
-            if self.updating_switch:
-                if is_mining == self._attr_is_on:
-                    self.updating_switch = False
+            if self.updating_switch and is_mining == self._attr_is_on:
+                self.updating_switch = False
             if not self.updating_switch:
                 self._attr_is_on = is_mining
 

@@ -4,17 +4,17 @@ from __future__ import annotations
 import logging
 
 import pyasic
-
-from homeassistant.components.number import NumberEntityDescription, NumberDeviceClass
-from homeassistant.components.number import NumberEntity
+from homeassistant.components.number import (
+    NumberDeviceClass,
+    NumberEntity,
+    NumberEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import callback
-from homeassistant.core import HomeAssistant
+from homeassistant.const import EntityCategory, UnitOfPower
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.const import EntityCategory
-from homeassistant.const import UnitOfPower
 
 from .const import DOMAIN
 from .coordinator import MinerCoordinator
