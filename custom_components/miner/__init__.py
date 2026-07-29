@@ -7,8 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 
-from .const import CONF_IP, CONF_IS_FARM, DOMAIN
-from .farm_coordinator import MinerFarmCoordinator
+from .const import CONF_IS_FARM, DOMAIN
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
@@ -45,6 +44,8 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Set up Miner from a config entry."""
     if config_entry.data.get(CONF_IS_FARM):
+        from .farm_coordinator import MinerFarmCoordinator
+
         coordinator = MinerFarmCoordinator(hass, config_entry)
         hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
         await coordinator.async_config_entry_first_refresh()
@@ -63,20 +64,18 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         )
         return True
 
-    import pyasic
+    from homeassistant.helpers.update_coordinator import UpdateFailed
 
     from .coordinator import MinerCoordinator
-
-    miner_ip = config_entry.data[CONF_IP]
-    miner = await pyasic.get_miner(miner_ip)
-
-    if miner is None:
-        raise ConfigEntryNotReady("Miner could not be found.")
 
     coordinator = MinerCoordinator(hass, config_entry)
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
 
-    await coordinator.async_config_entry_first_refresh()
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except UpdateFailed as err:
+        raise ConfigEntryNotReady(str(err)) from err
+
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
 
     return True

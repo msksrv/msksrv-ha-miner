@@ -12,6 +12,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import MinerCoordinator
+from .device_resolution import miner_entity_unique_suffix
 from .miner_device_info import get_miner_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,10 +58,15 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-active"
+        suffix = miner_entity_unique_suffix(
+            coordinator.config_entry, coordinator.data.get("mac")
+        )
+        self._attr_unique_id = f"{suffix}-active"
         self._attr_is_on = self.coordinator.data["is_mining"]
         self.updating_switch = False
-        self._last_mining_mode = None
+        self._last_mining_mode = _mining_mode_from_data(
+            coordinator.data.get("config")
+        )
 
     @property
     def device_info(self) -> entity.DeviceInfo:
@@ -75,7 +81,7 @@ class MinerActiveSwitch(CoordinatorEntity[MinerCoordinator], SwitchEntity):
             raise TypeError(f"{miner}: Shutdown not supported.")
         self._attr_is_on = True
         await miner.resume_mining()
-        if miner.supports_power_modes:
+        if miner.supports_power_modes and self._last_mining_mode is not None:
             config = await miner.get_config()
             config.mining_mode = self._last_mining_mode
             await miner.send_config(config)

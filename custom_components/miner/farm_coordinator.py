@@ -167,9 +167,9 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         chips_effective = 0
         algo_counts: Counter[str] = Counter()
 
-        for coord in self._iter_miner_coordinators():
+        for _entry, coord in self._iter_miner_member_pairs(self.device_ids):
             miner_count += 1
-            if not coord.last_update_success:
+            if coord is None or not coord.last_update_success:
                 continue
             miners_online += 1
             ms = coord.data.get("miner_sensors") or {}
@@ -263,15 +263,36 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
 
     async def async_emergency_power_off(self) -> None:
         """Turn off every linked smart switch (miner power strips)."""
-        for eid in self.linked_power_switches():
-            if self.hass.states.get(eid) is None:
-                continue
-            await self.hass.services.async_call(
-                "switch",
-                "turn_off",
-                {"entity_id": eid},
-                blocking=False,
+        switches = [
+            eid
+            for eid in self.linked_power_switches()
+            if self.hass.states.get(eid) is not None
+        ]
+        if not switches:
+            _LOGGER.warning("Emergency stop: no linked switches available")
+            return
+
+        failures = 0
+        for eid in switches:
+            try:
+                await self.hass.services.async_call(
+                    "switch",
+                    "turn_off",
+                    {"entity_id": eid},
+                    blocking=True,
+                )
+            except Exception:
+                failures += 1
+                _LOGGER.exception("Emergency stop failed for %s", eid)
+
+        if failures:
+            _LOGGER.error(
+                "Emergency stop: %s of %s switch(es) failed",
+                failures,
+                len(switches),
             )
+        else:
+            _LOGGER.info("Emergency stop: turned off %s switch(es)", len(switches))
 
     def _reported_algorithms_for_device_ids(self, device_ids: list[str]) -> set[str]:
         """Non-empty algorithm strings from members (last successful poll) for these devices."""

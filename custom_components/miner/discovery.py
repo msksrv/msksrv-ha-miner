@@ -75,6 +75,7 @@ def normalize_model_name(miner) -> str:
 
         return raw_model or raw_make or raw_type or "Miner"
     except Exception:
+        _LOGGER.debug("Failed to normalize model name", exc_info=True)
         return "Miner"
 
 
@@ -88,7 +89,7 @@ def get_stable_identifier(miner) -> str | None:
                 if normalized:
                     return normalized
     except Exception:
-        pass
+        _LOGGER.debug("Failed to read stable miner identifier", exc_info=True)
 
     return None
 
@@ -142,6 +143,7 @@ async def async_detect_miner(ip: str) -> DiscoveredMiner | None:
         if hostname:
             hostname = str(hostname).strip()
     except Exception:
+        _LOGGER.debug("Failed to read hostname for %s", ip, exc_info=True)
         hostname = None
 
     stable_id = get_stable_identifier(miner)
@@ -189,7 +191,7 @@ async def async_scan_subnet(
                 try:
                     progress_callback(processed / total)
                 except Exception:
-                    pass
+                    _LOGGER.debug("Scan progress callback failed", exc_info=True)
 
     await asyncio.gather(*(_scan_host(ip) for ip in hosts))
     return sorted(found.values(), key=lambda item: tuple(int(x) for x in item.ip.split(".")))
