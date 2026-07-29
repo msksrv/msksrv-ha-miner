@@ -20,6 +20,17 @@ _MAC_SUFFIX_KEEP = (
     "-pool-priority",
 )
 
+# 1.6.7 used hyphen; 1.6.5 / 1.6.9 use underscore for power limit number entity.
+_LEGACY_TAIL_ALIASES = {
+    "power-limit": "power_limit",
+}
+
+
+def _legacy_unique_id(entry_id: str, mac_tail: str) -> str:
+    """Map MAC-suffixed tail back to the pre-1.6.7 entry_id unique_id form."""
+    legacy_tail = _LEGACY_TAIL_ALIASES.get(mac_tail, mac_tail)
+    return f"{entry_id}-{legacy_tail}"
+
 
 async def async_migrate_mac_unique_id_duplicates(
     hass: HomeAssistant,
@@ -48,7 +59,7 @@ async def async_migrate_mac_unique_id_duplicates(
         if any(uid.endswith(suffix) for suffix in _MAC_SUFFIX_KEEP):
             continue
 
-        legacy_uid = f"{entry_id}-{uid[len(prefix):]}"
+        legacy_uid = _legacy_unique_id(entry_id, uid[len(prefix):])
         legacy_eid = registry.async_get_entity_id(DOMAIN, entity.domain, legacy_uid)
         if legacy_eid is not None:
             _LOGGER.info(
