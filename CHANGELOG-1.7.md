@@ -1,5 +1,13 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b10 (beta)
+
+### Fixed
+
+- **Share interval floor:** learn intervals from **0.5 s** (was 5 s) so fast miners / low-difficulty pools can build a share baseline.
+
+---
+
 ## v1.7.0b9 (beta)
 
 Polish after b8 validation.

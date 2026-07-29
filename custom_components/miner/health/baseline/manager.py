@@ -328,7 +328,7 @@ class BaselineManager:
             interval = now_m - self._last_share_at_monotonic
             if share_delta > 0 and interval > 0:
                 interval_per_share = interval / share_delta
-                if 5 <= interval_per_share <= 600:
+                if 0.5 <= interval_per_share <= 600:
                     stats = _get_metric_stats(profile, "share_interval")
                     if not stats.is_outlier(interval_per_share):
                         stats.add(interval_per_share, timestamp=now_iso)
