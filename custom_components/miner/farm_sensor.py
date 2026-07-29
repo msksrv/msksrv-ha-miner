@@ -10,13 +10,13 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, PERCENTAGE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES, DOMAIN, TERA_HASH_PER_SECOND
+from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES, DOMAIN, JOULES_PER_TERA_HASH, TERA_HASH_PER_SECOND
 from .farm_coordinator import MinerFarmCoordinator
 from .farm_cost_sensors import setup_farm_cost_sensors
 
@@ -40,6 +40,13 @@ async def async_setup_farm_sensors(
         FarmTotalPowerKwSensor(coordinator),
         FarmMinerCountSensor(coordinator),
         FarmMinersOnlineSensor(coordinator),
+        FarmMinersHealthySensor(coordinator),
+        FarmMinersWithIssuesSensor(coordinator),
+        FarmExpectedHashrateSensor(coordinator),
+        FarmLostHashrateSensor(coordinator),
+        FarmAverageEfficiencySensor(coordinator),
+        FarmHottestMinerSensor(coordinator),
+        FarmWorstRejectRateSensor(coordinator),
         FarmAlgorithmSensor(coordinator),
         FarmEffectiveChipsPercentSensor(coordinator),
         FarmHealthScoreSensor(coordinator),
@@ -148,6 +155,219 @@ class FarmMinersOnlineSensor(_FarmSensor):
         self._attr_translation_key = "farm_miners_online"
 
 
+class FarmMinersHealthySensor(_FarmSensor):
+    """Online miners without active health flags or anomalies."""
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            SensorEntityDescription(
+                key="miners_healthy",
+                state_class=SensorStateClass.MEASUREMENT,
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
+            "miners_healthy",
+        )
+        self._attr_translation_key = "farm_miners_healthy"
+
+
+class FarmMinersWithIssuesSensor(_FarmSensor):
+    """Online miners with warning or problem status."""
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            SensorEntityDescription(
+                key="miners_with_issues",
+                state_class=SensorStateClass.MEASUREMENT,
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
+            "miners_with_issues",
+        )
+        self._attr_translation_key = "farm_miners_with_issues"
+
+
+class _FarmHashrateMetricSensor(_FarmSensor):
+    """Base for farm hashrate metrics that disable on mixed algorithms."""
+
+    @property
+    def available(self) -> bool:
+        if self.coordinator.data.get("hashrate_metrics_mixed_algorithms"):
+            return False
+        return super().available
+
+
+class FarmExpectedHashrateSensor(_FarmHashrateMetricSensor):
+    """Sum of expected hashrate per member (baseline or ideal)."""
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            SensorEntityDescription(
+                key="expected_hashrate",
+                native_unit_of_measurement=TERA_HASH_PER_SECOND,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=2,
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
+            "expected_hashrate_th",
+        )
+        self._attr_translation_key = "farm_expected_hashrate"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        attrs = {
+            "expected_miners": data.get("expected_miners", 0),
+            "expected_miners_unknown": data.get("expected_miners_unknown", 0),
+            "reference": data.get("expected_hashrate_reference"),
+        }
+        if data.get("hashrate_metrics_mixed_algorithms"):
+            attrs["reason"] = "mixed_algorithms"
+            attrs["algorithms"] = data.get("hashrate_metrics_algorithms") or []
+        return attrs
+
+
+class FarmLostHashrateSensor(_FarmHashrateMetricSensor):
+    """Expected minus actual farm hashrate."""
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            SensorEntityDescription(
+                key="lost_hashrate",
+                native_unit_of_measurement=TERA_HASH_PER_SECOND,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=2,
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
+            "lost_hashrate_th",
+        )
+        self._attr_translation_key = "farm_lost_hashrate"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        attrs = {
+            "expected_miners": data.get("expected_miners", 0),
+            "expected_miners_unknown": data.get("expected_miners_unknown", 0),
+            "lost_percent": data.get("lost_hashrate_percent"),
+            "reference": data.get("expected_hashrate_reference"),
+        }
+        if data.get("hashrate_metrics_mixed_algorithms"):
+            attrs["reason"] = "mixed_algorithms"
+            attrs["algorithms"] = data.get("hashrate_metrics_algorithms") or []
+        return attrs
+
+
+class FarmAverageEfficiencySensor(_FarmSensor):
+    """Weighted farm efficiency: total power / total hashrate."""
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            SensorEntityDescription(
+                key="average_efficiency",
+                native_unit_of_measurement=JOULES_PER_TERA_HASH,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=1,
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
+            "average_efficiency_jth",
+        )
+        self._attr_translation_key = "farm_average_efficiency"
+
+    @property
+    def available(self) -> bool:
+        if self.coordinator.data.get("hashrate_metrics_mixed_algorithms"):
+            return False
+        return super().available
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data = self.coordinator.data
+        if not data.get("hashrate_metrics_mixed_algorithms"):
+            return {}
+        return {
+            "reason": "mixed_algorithms",
+            "algorithms": data.get("hashrate_metrics_algorithms") or [],
+        }
+
+
+class FarmHottestMinerSensor(_FarmSensor):
+    """Highest chip/board temperature among online miners."""
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            SensorEntityDescription(
+                key="hottest_miner",
+                device_class=SensorDeviceClass.TEMPERATURE,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=0,
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
+            "hottest_miner",
+        )
+        self._attr_translation_key = "farm_hottest_miner"
+
+    @property
+    def native_value(self):
+        block = self.coordinator.data.get("hottest_miner") or {}
+        return block.get("temperature")
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        return "°C"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        block = self.coordinator.data.get("hottest_miner") or {}
+        attrs: dict = {}
+        if block.get("miner"):
+            attrs["miner"] = block["miner"]
+        if block.get("ip"):
+            attrs["ip"] = block["ip"]
+        if block.get("temperature_source"):
+            attrs["temperature_source"] = block["temperature_source"]
+        return attrs
+
+
+class FarmWorstRejectRateSensor(_FarmSensor):
+    """Highest reject rate among miners with enough share statistics."""
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            SensorEntityDescription(
+                key="worst_reject_rate",
+                native_unit_of_measurement=PERCENTAGE,
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=1,
+                entity_category=EntityCategory.DIAGNOSTIC,
+            ),
+            "worst_reject_rate",
+        )
+        self._attr_translation_key = "farm_worst_reject_rate"
+
+    @property
+    def native_value(self):
+        block = self.coordinator.data.get("worst_reject_rate") or {}
+        return block.get("reject_rate")
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        block = self.coordinator.data.get("worst_reject_rate") or {}
+        attrs: dict = {}
+        if block.get("miner"):
+            attrs["miner"] = block["miner"]
+        if block.get("accepted_shares") is not None:
+            attrs["accepted_shares"] = block["accepted_shares"]
+        if block.get("rejected_shares") is not None:
+            attrs["rejected_shares"] = block["rejected_shares"]
+        return attrs
+
+
 class FarmAlgorithmSensor(_FarmSensor):
     """Mining algorithm(s) reported by online members."""
 
@@ -201,15 +421,25 @@ class FarmHealthScoreSensor(_FarmSensor):
 
     @property
     def extra_state_attributes(self) -> dict:
-        return {
-            "miners_evaluated": self.coordinator.data.get(
-                "health_miners_evaluated", 0
-            ),
-            "miners_offline": self.coordinator.data.get(
-                "health_miners_offline", 0
-            ),
-            "issues": self.coordinator.data.get("health_issues") or {},
+        data = self.coordinator.data
+        status = data.get("health_status_counts") or {}
+        attrs = {
+            "healthy": status.get("healthy", 0),
+            "warning": status.get("warning", 0),
+            "problem": status.get("problem", 0),
+            "offline": status.get("offline", 0),
+            "unknown": status.get("unknown", 0),
+            "miners_evaluated": data.get("health_miners_evaluated", 0),
+            "miners_offline": data.get("health_miners_offline", 0),
+            "issues": data.get("health_issues") or {},
         }
+        problem_devices = data.get("health_problem_devices") or []
+        if problem_devices:
+            attrs["problem_devices"] = problem_devices
+        truncated = data.get("health_problem_devices_truncated") or 0
+        if truncated:
+            attrs["problem_devices_truncated"] = truncated
+        return attrs
 
 
 class FarmAmbientTemperatureSensor(

@@ -19,6 +19,7 @@ from .const import (
     DOMAIN,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
+from .farm_health import compute_farm_health_metrics
 from .health.repairs.farm_manager import FarmRepairManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -161,37 +162,19 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         return out
 
     async def _async_update_data(self) -> dict:
+        member_pairs = list(self._iter_miner_member_pairs(self.device_ids))
         total_hash = 0.0
         total_w = 0.0
-        miner_count = 0
+        miner_count = len(member_pairs)
         miners_online = 0
         chips_expected = 0
         chips_effective = 0
         algo_counts: Counter[str] = Counter()
-        health_scores: list[int] = []
-        health_issue_counts: Counter[str] = Counter()
-        health_offline = 0
 
-        for _entry, coord in self._iter_miner_member_pairs(self.device_ids):
-            miner_count += 1
+        for _entry, coord in member_pairs:
             if coord is None or not coord.last_update_success:
-                health_offline += 1
                 continue
             miners_online += 1
-            health = coord.data.get("health") or {}
-            member_score = health.get("score")
-            if member_score is not None:
-                try:
-                    health_scores.append(int(member_score))
-                except (TypeError, ValueError):
-                    pass
-            for issue, active in (health.get("flags") or {}).items():
-                if active and issue not in (
-                    "share_stale",
-                    "temperature_warning",
-                    "maintenance_required",
-                ):
-                    health_issue_counts[str(issue)] += 1
             ms = coord.data.get("miner_sensors") or {}
             h = ms.get("hashrate")
             if h is not None:
@@ -226,6 +209,11 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                 chips_expected += exp_i
                 chips_effective += min(act_i, exp_i)
 
+        farm_metrics = compute_farm_health_metrics(member_pairs)
+        health_scores = farm_metrics["health_scores"]
+        health_issue_counts = farm_metrics["health_issue_counts"]
+        health_offline = farm_metrics["health_status_counts"]["offline"]
+
         if algo_counts:
             if len(algo_counts) == 1:
                 algorithm_summary = next(iter(algo_counts.keys()))
@@ -250,7 +238,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             farm_health_score = round(sum(health_scores) / health_denominator)
 
         offline_names: list[str] = []
-        for entry, coord in self._iter_miner_member_pairs(self.device_ids):
+        for entry, coord in member_pairs:
             if coord is None or not coord.last_update_success:
                 offline_names.append(
                     entry.title or str(entry.data.get(CONF_IP) or "Miner")
@@ -276,6 +264,38 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             "health_miners_evaluated": len(health_scores),
             "health_miners_offline": health_offline,
             "health_issues": dict(sorted(health_issue_counts.items())),
+            "miners_healthy": farm_metrics["miners_healthy"],
+            "miners_with_issues": farm_metrics["miners_with_issues"],
+            "expected_hashrate_th": (
+                None
+                if farm_metrics["hashrate_metrics_mixed_algorithms"]
+                else farm_metrics["expected_hashrate_th"]
+            ),
+            "expected_miners": farm_metrics["expected_miners"],
+            "expected_miners_unknown": farm_metrics["expected_miners_unknown"],
+            "expected_hashrate_reference": farm_metrics["expected_hashrate_reference"],
+            "lost_hashrate_th": (
+                None
+                if farm_metrics["hashrate_metrics_mixed_algorithms"]
+                else farm_metrics["lost_hashrate_th"]
+            ),
+            "lost_hashrate_percent": (
+                None
+                if farm_metrics["hashrate_metrics_mixed_algorithms"]
+                else farm_metrics["lost_hashrate_percent"]
+            ),
+            "average_efficiency_jth": farm_metrics["average_efficiency_jth"],
+            "hashrate_metrics_mixed_algorithms": farm_metrics[
+                "hashrate_metrics_mixed_algorithms"
+            ],
+            "hashrate_metrics_algorithms": farm_metrics["hashrate_metrics_algorithms"],
+            "hottest_miner": farm_metrics["hottest_miner"],
+            "worst_reject_rate": farm_metrics["worst_reject_rate"],
+            "health_status_counts": farm_metrics["health_status_counts"],
+            "health_problem_devices": farm_metrics["health_problem_devices"],
+            "health_problem_devices_truncated": farm_metrics[
+                "health_problem_devices_truncated"
+            ],
             "ambient_temperatures": self._ambient_temperature_map(),
             "emergency_stop_available": self.emergency_stop_available,
         }
@@ -338,15 +358,9 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             _LOGGER.info("Emergency stop: turned off %s switch(es)", len(switches))
 
     def _reported_algorithms_for_device_ids(self, device_ids: list[str]) -> set[str]:
-        """Non-empty algorithm strings from members (last successful poll) for these devices."""
-        distinct: set[str] = set()
-        for coord in self._iter_miner_coordinators_for_ids(device_ids):
-            if not coord.last_update_success:
-                continue
-            algo = coord.data.get("algorithm")
-            if algo and str(algo).strip():
-                distinct.add(str(algo).strip())
-        return distinct
+        from .farm_validation import reported_algorithms_for_device_ids
+
+        return reported_algorithms_for_device_ids(self.hass, device_ids)
 
     def farm_stratum_allowed_for_device_ids(self, device_ids: list[str]) -> bool:
         """False when members report two or more different algorithms."""

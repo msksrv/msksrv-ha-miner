@@ -487,6 +487,12 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                         errors["base"] = "farm_only_miner_devices"
                         break
             if not errors:
+                from .farm_validation import validate_farm_device_algorithms
+
+                algo_error = validate_farm_device_algorithms(self.hass, devices)
+                if algo_error:
+                    errors["base"] = algo_error
+            if not errors:
                 key = ",".join(sorted(devices))
                 uid_digest = hashlib.sha256(key.encode()).hexdigest()[:20]
                 new_unique_id = f"farm_{uid_digest}"

@@ -1,5 +1,26 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b16 (beta)
+
+### Added (Farm — point 5)
+
+- **Miner classification:** healthy / warning / problem / offline / unknown (mutually exclusive).
+- **New farm sensors:** `farm_miners_healthy`, `farm_miners_with_issues`, `farm_expected_hashrate`, `farm_lost_hashrate`, `farm_average_efficiency`, `farm_hottest_miner`, `farm_worst_reject_rate`.
+- **Expected hashrate:** per-miner baseline (when ready) or ideal hashrate; offline miners count expected but actual = 0.
+- **Lost hashrate:** `max(expected − actual, 0)` with `lost_percent` attribute.
+- **Weighted efficiency:** `total_power_w / total_hashrate_th` (J/TH).
+- **Mixed algorithms:** expected/lost/efficiency sensors unavailable with `reason: mixed_algorithms`.
+- **Farm health score attrs:** status counts, `problem_devices` (max 20), truncation counter.
+
+### Fixed (point 5 review)
+
+- **Mixed algorithms:** blocked when creating a farm and when saving farm members (existing farms still guarded in coordinator).
+- **Algorithm validation:** uses last known algorithm from coordinator data (incl. offline); unknown algorithm blocks save.
+- **Lost hashrate:** compares expected only against actual from miners with known expected.
+- **`problem_devices`:** includes warning, problem, and offline miners; anomaly reason preserved; `status` field added.
+
+---
+
 ## v1.7.0b15 (beta)
 
 ### Added (Health & Repairs — point 4)
