@@ -42,6 +42,7 @@ async def async_setup_farm_sensors(
         FarmMinersOnlineSensor(coordinator),
         FarmAlgorithmSensor(coordinator),
         FarmEffectiveChipsPercentSensor(coordinator),
+        FarmHealthScoreSensor(coordinator),
     ]
     for eid in _farm_ambient_entity_ids(config_entry):
         eid = str(eid).strip()
@@ -178,6 +179,37 @@ class FarmEffectiveChipsPercentSensor(_FarmSensor):
             "chips_effective_percent",
         )
         self._attr_translation_key = "farm_effective_chips_percent"
+
+
+class FarmHealthScoreSensor(_FarmSensor):
+    """Aggregate health score of farm members."""
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            SensorEntityDescription(
+                key="health_score",
+                native_unit_of_measurement="%",
+                state_class=SensorStateClass.MEASUREMENT,
+                suggested_display_precision=0,
+                entity_category=EntityCategory.DIAGNOSTIC,
+                icon="mdi:heart-pulse",
+            ),
+            "health_score",
+        )
+        self._attr_translation_key = "farm_health_score"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return {
+            "miners_evaluated": self.coordinator.data.get(
+                "health_miners_evaluated", 0
+            ),
+            "miners_offline": self.coordinator.data.get(
+                "health_miners_offline", 0
+            ),
+            "issues": self.coordinator.data.get("health_issues") or {},
+        }
 
 
 class FarmAmbientTemperatureSensor(

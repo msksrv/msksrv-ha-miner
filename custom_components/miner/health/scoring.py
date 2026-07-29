@@ -20,6 +20,8 @@ HASHRATE_LOW_RATIO = 0.85
 CHIP_LOW_PERCENT = 90.0
 TEMP_CHIP_HIGH_C = 85.0
 TEMP_BOARD_HIGH_C = 75.0
+TEMP_CHIP_WARN_C = 75.0
+TEMP_BOARD_WARN_C = 65.0
 REJECT_RATE_HIGH_PCT = 2.0
 FAN_MIN_RPM = 1000
 SHARE_STALE_SECONDS = 600
@@ -37,6 +39,7 @@ class HealthResult:
     components: dict[str, float | None]
     flags: dict[str, bool]
     seconds_since_share: float | None
+    data_coverage: int
 
 
 def _f(value: Any) -> float | None:
@@ -49,6 +52,8 @@ def _f(value: Any) -> float | None:
 
 
 def _score_hashrate(data: dict[str, Any]) -> tuple[float | None, bool]:
+    if not data.get("is_mining"):
+        return None, False
     ms = data.get("miner_sensors") or {}
     hr = _f(ms.get("hashrate"))
     ideal = _f(ms.get("ideal_hashrate"))
@@ -111,18 +116,27 @@ def _score_temperature(data: dict[str, Any]) -> tuple[float | None, bool]:
     max_chip, max_board = _max_temps(data)
     if max_chip is None and max_board is None:
         return None, False
-    ref = max(v for v in (max_chip, max_board) if v is not None)
     high = (max_chip is not None and max_chip >= TEMP_CHIP_HIGH_C) or (
         max_board is not None and max_board >= TEMP_BOARD_HIGH_C
     )
-    if ref <= TEMP_BOARD_HIGH_C:
-        comp = 100.0
-    elif ref >= TEMP_CHIP_HIGH_C:
-        comp = 0.0
-    else:
-        span = TEMP_CHIP_HIGH_C - TEMP_BOARD_HIGH_C
-        comp = max(0.0, 100.0 - ((ref - TEMP_BOARD_HIGH_C) / span) * 100.0)
-    return comp, high
+
+    def _temperature_score(value: float, warn: float, critical: float) -> float:
+        if value <= warn:
+            return 100.0
+        if value >= critical:
+            return 0.0
+        return 100.0 - ((value - warn) / (critical - warn)) * 100.0
+
+    scores: list[float] = []
+    if max_chip is not None:
+        scores.append(
+            _temperature_score(max_chip, TEMP_CHIP_WARN_C, TEMP_CHIP_HIGH_C)
+        )
+    if max_board is not None:
+        scores.append(
+            _temperature_score(max_board, TEMP_BOARD_WARN_C, TEMP_BOARD_HIGH_C)
+        )
+    return min(scores), high
 
 
 def _score_fans(data: dict[str, Any]) -> tuple[float | None, bool]:
@@ -136,7 +150,7 @@ def _score_fans(data: dict[str, Any]) -> tuple[float | None, bool]:
     mining = bool(data.get("is_mining"))
     problem = mining and any(s <= 0 or s < FAN_MIN_RPM for s in speeds)
     if not mining:
-        return 100.0, problem
+        return None, False
     min_speed = min(speeds)
     if min_speed >= FAN_MIN_RPM:
         return 100.0, False
@@ -164,6 +178,8 @@ def _score_power(data: dict[str, Any]) -> tuple[float | None, bool]:
     mining = bool(data.get("is_mining"))
     if watts is None:
         return None, False
+    if not mining:
+        return None, False
     anomaly = False
     if limit and limit > 0 and watts > limit * POWER_OVER_LIMIT_RATIO:
         anomaly = True
@@ -173,9 +189,11 @@ def _score_power(data: dict[str, Any]) -> tuple[float | None, bool]:
         ratio = watts / limit
         if ratio > POWER_OVER_LIMIT_RATIO:
             return 0.0, True
-        if mining and ratio < 0.05:
+        if ratio < 0.05:
             return 30.0, True
-        return max(0.0, min(100.0, ratio * 100.0)), anomaly
+        # A configured power limit is an upper bound, not the miner's expected
+        # draw. Running below it is healthy and must not reduce the score.
+        return 100.0, anomaly
     return 100.0 if not anomaly else 50.0, anomaly
 
 
@@ -205,7 +223,7 @@ def _score_shares(data: dict[str, Any]) -> tuple[float | None, bool]:
     secs = _f(data.get("seconds_since_share"))
     mining = bool(data.get("is_mining"))
     if not mining:
-        return 100.0, False
+        return None, False
     if secs is None:
         return None, False
     if secs <= SHARE_STALE_SECONDS / 3:
@@ -222,6 +240,7 @@ def compute_health(data: dict[str, Any]) -> HealthResult:
     parts: list[tuple[str, float, float]] = []
     flags: dict[str, bool] = {}
 
+    components: dict[str, float | None] = {}
     for key, weight, fn in (
         ("hashrate", WEIGHT_HASHRATE, _score_hashrate),
         ("boards", WEIGHT_BOARDS, _score_boards),
@@ -244,25 +263,24 @@ def compute_health(data: dict[str, Any]) -> HealthResult:
             "shares": "share_stale",
         }[key]
         flags[flag_key] = flag
+        components[key] = comp_score
         if comp_score is not None:
             parts.append((key, comp_score, weight))
 
-    components = {
-        "hashrate": _score_hashrate(data)[0],
-        "boards": _score_boards(data)[0],
-        "temperature": _score_temperature(data)[0],
-        "fans": _score_fans(data)[0],
-        "reject": _score_reject(data)[0],
-        "power": _score_power(data)[0],
-        "pool": _score_pool(data)[0],
-        "shares": _score_shares(data)[0],
-    }
-
     if not parts:
         score = None
+        data_coverage = 0
     else:
         total_w = sum(w for _, _, w in parts)
         score = round(sum(s * w for _, s, w in parts) / total_w)
+        data_coverage = round(total_w)
+
+        # Explicit firmware/hardware errors must be visible in the aggregate
+        # score even when all numeric telemetry still looks normal.
+        if data.get("fault_light"):
+            score = min(score, 50)
+        elif data.get("errors"):
+            score = min(score, 65)
 
     problem_count = sum(
         1 for k, v in flags.items() if v and k != "share_stale"
@@ -286,4 +304,5 @@ def compute_health(data: dict[str, Any]) -> HealthResult:
         components=components,
         flags=flags,
         seconds_since_share=secs,
+        data_coverage=data_coverage,
     )

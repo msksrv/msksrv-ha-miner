@@ -453,6 +453,9 @@
       "farm_effective_chips_percent": {
         "name": "Effective chips"
       },
+      "farm_health_score": {
+        "name": "Farm health score"
+      },
       "farm_cost_now": {
         "name": "Power cost at current draw ({currency})"
       },

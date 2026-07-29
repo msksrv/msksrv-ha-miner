@@ -54,6 +54,10 @@ class MinerHealthScoreSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
         flags = health.get("flags")
         if flags:
             attrs["issues"] = [k for k, v in flags.items() if v and k != "share_stale"]
+        attrs["data_coverage"] = health.get("data_coverage", 0)
+        attrs["operating_state"] = (
+            "mining" if self.coordinator.data.get("is_mining") else "stopped"
+        )
         secs = self.coordinator.data.get("seconds_since_share")
         if secs is not None:
             attrs["seconds_since_share"] = round(float(secs), 0)

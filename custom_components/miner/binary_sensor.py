@@ -23,7 +23,8 @@ HEALTH_BINARY_KEYS: tuple[tuple[str, BinarySensorDeviceClass | None], ...] = (
     ("fan_problem", BinarySensorDeviceClass.PROBLEM),
     ("board_problem", BinarySensorDeviceClass.PROBLEM),
     ("reject_rate_high", BinarySensorDeviceClass.PROBLEM),
-    ("pool_problem", BinarySensorDeviceClass.CONNECTIVITY),
+    # ON when a problem exists; CONNECTIVITY would invert the meaning.
+    ("pool_problem", BinarySensorDeviceClass.PROBLEM),
     ("power_anomaly", BinarySensorDeviceClass.PROBLEM),
     ("maintenance_required", BinarySensorDeviceClass.PROBLEM),
 )

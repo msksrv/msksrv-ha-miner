@@ -478,5 +478,6 @@ class MinerCoordinator(DataUpdateCoordinator):
             "score": health.score,
             "components": health.components,
             "flags": health.flags,
+            "data_coverage": health.data_coverage,
         }
         return data

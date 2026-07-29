@@ -166,12 +166,26 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         chips_expected = 0
         chips_effective = 0
         algo_counts: Counter[str] = Counter()
+        health_scores: list[int] = []
+        health_issue_counts: Counter[str] = Counter()
+        health_offline = 0
 
         for _entry, coord in self._iter_miner_member_pairs(self.device_ids):
             miner_count += 1
             if coord is None or not coord.last_update_success:
+                health_offline += 1
                 continue
             miners_online += 1
+            health = coord.data.get("health") or {}
+            member_score = health.get("score")
+            if member_score is not None:
+                try:
+                    health_scores.append(int(member_score))
+                except (TypeError, ValueError):
+                    pass
+            for issue, active in (health.get("flags") or {}).items():
+                if active and issue != "share_stale":
+                    health_issue_counts[str(issue)] += 1
             ms = coord.data.get("miner_sensors") or {}
             h = ms.get("hashrate")
             if h is not None:
@@ -222,6 +236,12 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             if chips_expected > 0
             else None
         )
+        farm_health_score = None
+        health_denominator = len(health_scores) + health_offline
+        if health_denominator:
+            # Offline members contribute zero. Online miners with unsupported
+            # health data remain unknown instead of being treated as broken.
+            farm_health_score = round(sum(health_scores) / health_denominator)
 
         return {
             "total_hashrate_th": round(total_hash, 2),
@@ -233,6 +253,10 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             "chips_effective_percent": chips_percent,
             "chips_effective": chips_effective if chips_expected else None,
             "chips_expected": chips_expected if chips_expected else None,
+            "health_score": farm_health_score,
+            "health_miners_evaluated": len(health_scores),
+            "health_miners_offline": health_offline,
+            "health_issues": dict(sorted(health_issue_counts.items())),
             "ambient_temperatures": self._ambient_temperature_map(),
             "emergency_stop_available": self.emergency_stop_available,
         }

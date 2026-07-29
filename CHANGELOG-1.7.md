@@ -1,5 +1,24 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b2 (beta)
+
+Improvements from field testing and scoring refinements.
+
+### Changed
+
+- **Scoring:** hashrate, fans, power, and shares are skipped (not penalized) when the miner is **not mining**.
+- **Temperature:** separate warn/critical thresholds for chip and board; score uses the worst of the two.
+- **Power:** draw below the configured limit no longer reduces the score (limit is an upper bound).
+- **Errors / fault light:** aggregate score capped at 65 (errors) or 50 (fault light).
+- **`sensor.*_health_score`:** new attributes `data_coverage` (% of weighted components available) and `operating_state` (`mining` / `stopped`).
+- **`binary_sensor.*_pool_problem`:** device class `PROBLEM` instead of `CONNECTIVITY` (ON = problem exists).
+
+### Added
+
+- **`sensor.farm_*_health_score`** — farm aggregate health with attributes `miners_evaluated`, `miners_offline`, `issues`.
+
+---
+
 ## v1.7.0b1 (beta)
 
 **Miner health** — first 1.7 feature set (single beta; later betas will cover other features).
@@ -35,7 +54,6 @@ Missing data for a component is excluded from the weighted average (not penalize
 
 ### Not in this beta
 
-- Farm-level health aggregate
 - Configurable thresholds (options flow)
 - Per-model threshold profiles
 

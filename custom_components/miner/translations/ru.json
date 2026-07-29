@@ -453,6 +453,9 @@
       "farm_effective_chips_percent": {
         "name": "Рабочие чипы"
       },
+      "farm_health_score": {
+        "name": "Состояние фермы"
+      },
       "farm_cost_now": {
         "name": "Стоимость мощности сейчас ({currency})"
       },
