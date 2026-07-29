@@ -4,21 +4,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-DOMAIN_ISSUE_PREFIX = "miner"
+MINER_ISSUE_PREFIX = "miner"
+FARM_ISSUE_PREFIX = "farm"
 
 # Seconds the condition must hold before creating a repair.
 CONFIRM_SECONDS: dict[str, float] = {
     "hashboard": 300,
-    "hashrate": 0,  # anomaly detector already enforces rule duration
+    "hashrate": 0,
     "temperature": 180,
     "fan": 180,
+    "offline": 600,
+    "pool": 300,
+    "recovery": 0,
+    "reject": 300,
 }
 
-# Zero-RPM fan faults confirm faster than imbalance (from baseline rules).
 CONFIRM_FAN_IMBALANCE_SECONDS = 300
-
-# Stable normalization before clearing an issue.
 RECOVERY_SECONDS = 240
+FARM_OFFLINE_MAX_NAMES = 3
 
 HASHRATE_ANOMALY_REASONS = frozenset(
     {"hashrate_power_mismatch", "hashrate_efficiency_drop"}
@@ -27,6 +30,9 @@ BOARD_ANOMALY_REASONS = frozenset(
     {"board_hashrate_outlier", "board_temp_outlier"}
 )
 FAN_ANOMALY_REASONS = frozenset({"fan_imbalance"})
+RECOVERY_ANOMALY_REASONS = frozenset({"post_reboot_slow_recovery"})
+REJECT_ANOMALY_REASONS = frozenset({"reject_rate_high"})
+POOL_ANOMALY_REASONS = frozenset({"share_stale"})
 
 LEARN_MORE_URL = (
     "https://github.com/msksrv/msksrv-ha-miner/blob/beta/README.md"
@@ -34,12 +40,18 @@ LEARN_MORE_URL = (
 
 
 class RepairType:
-    """Stable repair type suffixes for issue ids."""
-
     HASHBOARD = "hashboard"
     HASHRATE = "hashrate"
     TEMPERATURE = "temperature"
     FAN = "fan"
+    OFFLINE = "offline"
+    POOL = "pool"
+    RECOVERY = "recovery"
+    REJECT = "reject"
+
+
+class FarmRepairType:
+    OFFLINE = "offline"
 
 
 @dataclass(frozen=True)
@@ -62,30 +74,69 @@ REPAIR_DEFINITIONS: dict[str, RepairDefinition] = {
     RepairType.FAN: RepairDefinition(
         RepairType.FAN, "miner_fan", CONFIRM_SECONDS["fan"]
     ),
+    RepairType.OFFLINE: RepairDefinition(
+        RepairType.OFFLINE, "miner_offline", CONFIRM_SECONDS["offline"]
+    ),
+    RepairType.POOL: RepairDefinition(
+        RepairType.POOL, "miner_pool", CONFIRM_SECONDS["pool"]
+    ),
+    RepairType.RECOVERY: RepairDefinition(
+        RepairType.RECOVERY, "miner_recovery", CONFIRM_SECONDS["recovery"]
+    ),
+    RepairType.REJECT: RepairDefinition(
+        RepairType.REJECT, "miner_reject", CONFIRM_SECONDS["reject"]
+    ),
 }
 
+FARM_REPAIR_DEFINITIONS: dict[str, RepairDefinition] = {
+    FarmRepairType.OFFLINE: RepairDefinition(
+        FarmRepairType.OFFLINE, "farm_offline", CONFIRM_SECONDS["offline"]
+    ),
+}
 
-PHASE1_REPAIR_TYPES: tuple[str, ...] = (
+MINER_REPAIR_TYPES: tuple[str, ...] = (
     RepairType.HASHBOARD,
     RepairType.HASHRATE,
     RepairType.TEMPERATURE,
     RepairType.FAN,
+    RepairType.OFFLINE,
+    RepairType.POOL,
+    RepairType.RECOVERY,
+    RepairType.REJECT,
 )
 
-
-def issue_id(entry_id: str, repair_type: str) -> str:
-    """Stable issue id: miner_<entry_id>_<type>."""
-    return f"{DOMAIN_ISSUE_PREFIX}_{entry_id}_{repair_type}"
+FARM_REPAIR_TYPES: tuple[str, ...] = (FarmRepairType.OFFLINE,)
 
 
-def parse_issue_id(issue_id_str: str) -> tuple[str, str] | None:
-    """Return (entry_id, repair_type) or None."""
-    if not issue_id_str.startswith(f"{DOMAIN_ISSUE_PREFIX}_"):
+def miner_issue_id(entry_id: str, repair_type: str) -> str:
+    return f"{MINER_ISSUE_PREFIX}_{entry_id}_{repair_type}"
+
+
+def farm_issue_id(entry_id: str, repair_type: str) -> str:
+    return f"{FARM_ISSUE_PREFIX}_{entry_id}_{repair_type}"
+
+
+def parse_issue_id(issue_id_str: str) -> tuple[str, str, str] | None:
+    """Return (scope, entry_id, repair_type) where scope is miner|farm."""
+    if issue_id_str.startswith(f"{MINER_ISSUE_PREFIX}_"):
+        scope = "miner"
+        types = MINER_REPAIR_TYPES
+        prefix_len = len(MINER_ISSUE_PREFIX) + 1
+    elif issue_id_str.startswith(f"{FARM_ISSUE_PREFIX}_"):
+        scope = "farm"
+        types = FARM_REPAIR_TYPES
+        prefix_len = len(FARM_ISSUE_PREFIX) + 1
+    else:
         return None
-    for rtype in PHASE1_REPAIR_TYPES:
+    for rtype in types:
         suffix = f"_{rtype}"
         if issue_id_str.endswith(suffix):
-            entry_id = issue_id_str[len(DOMAIN_ISSUE_PREFIX) + 1 : -len(suffix)]
+            entry_id = issue_id_str[prefix_len : -len(suffix)]
             if entry_id:
-                return entry_id, rtype
+                return scope, entry_id, rtype
     return None
+
+
+# Backward-compatible alias used by phase-1 code paths.
+def issue_id(entry_id: str, repair_type: str) -> str:
+    return miner_issue_id(entry_id, repair_type)

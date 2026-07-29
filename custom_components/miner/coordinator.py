@@ -236,6 +236,16 @@ class MinerCoordinator(DataUpdateCoordinator):
         """Return if device is available or not."""
         return self.last_update_success
 
+    async def async_refresh(self, *args, **kwargs) -> None:
+        """Refresh data and evaluate offline repairs when polling fails."""
+        await super().async_refresh(*args, **kwargs)
+        if not self.last_update_success:
+            self.repairs.process_update(
+                self.data,
+                self.baseline.anomaly,
+                available=False,
+            )
+
     async def get_miner(self):
         """Get a valid Miner instance."""
         miner_ip = self.config_entry.data[CONF_IP]

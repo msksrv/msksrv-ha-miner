@@ -106,11 +106,27 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
 
 async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
     """Remove repair issues only when the config entry is deleted."""
-    if config_entry.data.get(CONF_IS_FARM):
-        return
     from homeassistant.helpers import issue_registry as ir
 
-    from .health.repairs.definitions import PHASE1_REPAIR_TYPES, issue_id
+    from .health.repairs.definitions import (
+        FARM_REPAIR_TYPES,
+        MINER_REPAIR_TYPES,
+        farm_issue_id,
+        miner_issue_id,
+    )
 
-    for rtype in PHASE1_REPAIR_TYPES:
-        ir.async_delete_issue(hass, DOMAIN, issue_id(config_entry.entry_id, rtype))
+    if config_entry.data.get(CONF_IS_FARM):
+        for rtype in FARM_REPAIR_TYPES:
+            ir.async_delete_issue(
+                hass, DOMAIN, farm_issue_id(config_entry.entry_id, rtype)
+            )
+        return
+
+    for rtype in MINER_REPAIR_TYPES:
+        ir.async_delete_issue(
+            hass, DOMAIN, miner_issue_id(config_entry.entry_id, rtype)
+        )
+
+    from .health.baseline.manager import BaselineManager
+
+    await BaselineManager(hass, config_entry.entry_id).async_remove()

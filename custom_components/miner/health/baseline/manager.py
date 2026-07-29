@@ -91,6 +91,10 @@ class BaselineManager:
         self._dirty = False
         self._last_save_monotonic = time.monotonic()
 
+    async def async_remove(self) -> None:
+        """Delete persisted baseline when the miner config entry is removed."""
+        await self._store.async_remove()
+
     def notify_reboot(self) -> None:
         self._reboot_warmup_until = time.monotonic() + REBOOT_WARMUP_SECONDS
         self._rule_timers.clear()

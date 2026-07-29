@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
-from ...const import DOMAIN
+from ...const import CONF_IP, DOMAIN
 from ..baseline.detector import AnomalyFinding, AnomalyState
 from .definitions import (
     BOARD_ANOMALY_REASONS,
@@ -17,12 +17,17 @@ from .definitions import (
     FAN_ANOMALY_REASONS,
     HASHRATE_ANOMALY_REASONS,
     LEARN_MORE_URL,
-    PHASE1_REPAIR_TYPES,
+    MINER_REPAIR_TYPES,
+    POOL_ANOMALY_REASONS,
+    RECOVERY_ANOMALY_REASONS,
+    REJECT_ANOMALY_REASONS,
     REPAIR_DEFINITIONS,
     RepairType,
-    issue_id,
+    miner_issue_id,
 )
 from .lifecycle import RepairLifecycle, monotonic_now
+from .membership import miner_belongs_to_farm
+from .registry_sync import sync_open_from_registry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,6 +41,14 @@ class RepairManager:
         self.entry_id = entry.entry_id
         self._lifecycle = RepairLifecycle()
         self._open: set[str] = set()
+        sync_open_from_registry(
+            hass,
+            entry.entry_id,
+            MINER_REPAIR_TYPES,
+            miner_issue_id,
+            self._lifecycle,
+            self._open,
+        )
 
     @callback
     def process_update(
@@ -45,33 +58,47 @@ class RepairManager:
         *,
         available: bool,
     ) -> None:
-        """Evaluate phase-1 repairs after each coordinator poll."""
-        if not available or not data:
-            return
-
+        """Evaluate miner repairs after each coordinator poll."""
         now = monotonic_now()
-        name = self._device_name(data)
-        raw_active = {
-            RepairType.HASHBOARD: self._hashboard_raw(data, anomaly),
-            RepairType.HASHRATE: self._hashrate_raw(data, anomaly),
-            RepairType.TEMPERATURE: self._temperature_raw(data),
-            RepairType.FAN: self._fan_raw(data, anomaly),
-        }
-        self._sync_open(raw_active, now, data, anomaly, name)
+        name = self._device_name(data) if data else (self.entry.title or "Miner")
+        raw_active: dict[str, bool] = {}
+
+        if not miner_belongs_to_farm(self.hass, self.entry_id):
+            raw_active[RepairType.OFFLINE] = not available
+
+        if available and data:
+            raw_active.update(
+                {
+                    RepairType.HASHBOARD: self._hashboard_raw(data, anomaly),
+                    RepairType.HASHRATE: self._hashrate_raw(data, anomaly),
+                    RepairType.TEMPERATURE: self._temperature_raw(data),
+                    RepairType.FAN: self._fan_raw(data, anomaly),
+                    RepairType.POOL: self._pool_raw(data, anomaly),
+                    RepairType.RECOVERY: self._recovery_raw(anomaly),
+                    RepairType.REJECT: self._reject_raw(data, anomaly),
+                }
+            )
+        else:
+            for rtype in MINER_REPAIR_TYPES:
+                raw_active.setdefault(rtype, False)
+
+        self._sync_open(raw_active, now, data or {}, anomaly, name)
 
     @callback
     def async_clear_all(self) -> None:
         """Remove all issues for this miner (config entry removal only)."""
-        for rtype in PHASE1_REPAIR_TYPES:
-            ir.async_delete_issue(self.hass, DOMAIN, issue_id(self.entry_id, rtype))
+        for rtype in MINER_REPAIR_TYPES:
+            ir.async_delete_issue(
+                self.hass, DOMAIN, miner_issue_id(self.entry_id, rtype)
+            )
         self._open.clear()
         self._lifecycle.reset_all()
 
     def dismiss_repair(self, repair_type: str) -> None:
         """User acknowledged via repair flow — reset timers and clear issue."""
-        if repair_type not in PHASE1_REPAIR_TYPES:
+        if repair_type not in MINER_REPAIR_TYPES:
             return
-        key = issue_id(self.entry_id, repair_type)
+        key = miner_issue_id(self.entry_id, repair_type)
         self._lifecycle.reset_key(key)
         ir.async_delete_issue(self.hass, DOMAIN, key)
         self._open.discard(repair_type)
@@ -84,8 +111,8 @@ class RepairManager:
         anomaly: AnomalyState,
         name: str,
     ) -> None:
-        for rtype in PHASE1_REPAIR_TYPES:
-            key = issue_id(self.entry_id, rtype)
+        for rtype in MINER_REPAIR_TYPES:
+            key = miner_issue_id(self.entry_id, rtype)
             raw = raw_active.get(rtype, False)
             confirm = self._confirm_seconds(rtype, data, anomaly)
 
@@ -114,6 +141,10 @@ class RepairManager:
     ) -> float:
         if rtype == RepairType.FAN and self._fan_imbalance(anomaly):
             return CONFIRM_FAN_IMBALANCE_SECONDS
+        if rtype == RepairType.REJECT and self._reject_anomaly_active(anomaly):
+            return 0
+        if rtype == RepairType.RECOVERY:
+            return REPAIR_DEFINITIONS[rtype].confirm_seconds
         return REPAIR_DEFINITIONS[rtype].confirm_seconds
 
     def _create_or_update(
@@ -122,10 +153,11 @@ class RepairManager:
         translation_key: str,
         placeholders: dict[str, str],
     ) -> None:
+        key = miner_issue_id(self.entry_id, rtype)
         ir.async_create_issue(
             self.hass,
             DOMAIN,
-            issue_id(self.entry_id, rtype),
+            key,
             is_fixable=True,
             is_persistent=False,
             severity=ir.IssueSeverity.ERROR,
@@ -134,6 +166,7 @@ class RepairManager:
             learn_more_url=LEARN_MORE_URL,
             data={
                 "entry_id": self.entry_id,
+                "scope": "miner",
                 "repair_type": rtype,
             },
         )
@@ -174,6 +207,48 @@ class RepairManager:
         return self._fan_zero_rpm(data) or self._fan_imbalance(anomaly)
 
     @staticmethod
+    def _pool_raw(data: dict[str, Any], anomaly: AnomalyState) -> bool:
+        if not data.get("is_mining"):
+            return False
+        flags = (data.get("health") or {}).get("flags") or {}
+        if flags.get("pool_problem") or flags.get("share_stale"):
+            return True
+        if not anomaly.detected or anomaly.confidence < 20:
+            return False
+        if anomaly.reason in POOL_ANOMALY_REASONS:
+            return True
+        return any(f.reason in POOL_ANOMALY_REASONS for f in anomaly.findings)
+
+    @staticmethod
+    def _recovery_raw(anomaly: AnomalyState) -> bool:
+        if not anomaly.detected or anomaly.confidence < 20:
+            return False
+        if anomaly.reason in RECOVERY_ANOMALY_REASONS:
+            return True
+        return any(f.reason in RECOVERY_ANOMALY_REASONS for f in anomaly.findings)
+
+    @staticmethod
+    def _reject_raw(data: dict[str, Any], anomaly: AnomalyState) -> bool:
+        if not data.get("is_mining"):
+            return False
+        if RepairManager._reject_anomaly_active(anomaly):
+            return True
+        flags = (data.get("health") or {}).get("flags") or {}
+        if not flags.get("reject_rate_high"):
+            return False
+        accepted = _f(data.get("accepted_shares")) or 0
+        rejected = _f(data.get("rejected_shares")) or 0
+        return (accepted + rejected) >= 100
+
+    @staticmethod
+    def _reject_anomaly_active(anomaly: AnomalyState) -> bool:
+        if not anomaly.detected or anomaly.confidence < 20:
+            return False
+        if anomaly.reason in REJECT_ANOMALY_REASONS:
+            return True
+        return any(f.reason in REJECT_ANOMALY_REASONS for f in anomaly.findings)
+
+    @staticmethod
     def _fan_zero_rpm(data: dict[str, Any]) -> bool:
         flags = (data.get("health") or {}).get("flags") or {}
         return bool(flags.get("fan_problem"))
@@ -186,13 +261,15 @@ class RepairManager:
             return True
         return any(f.reason in FAN_ANOMALY_REASONS for f in anomaly.findings)
 
-    def _device_name(self, data: dict[str, Any]) -> str:
-        return (
-            self.entry.title
-            or data.get("hostname")
-            or data.get("model")
-            or "Miner"
-        )
+    def _device_name(self, data: dict[str, Any] | None) -> str:
+        if data:
+            return (
+                self.entry.title
+                or data.get("hostname")
+                or data.get("model")
+                or "Miner"
+            )
+        return self.entry.title or "Miner"
 
     def _translation_key(
         self, rtype: str, data: dict[str, Any], anomaly: AnomalyState
@@ -220,7 +297,73 @@ class RepairManager:
             return self._hashrate_placeholders(data, anomaly, name, lifecycle_key, now)
         if rtype == RepairType.TEMPERATURE:
             return self._temperature_placeholders(data, name)
+        if rtype == RepairType.OFFLINE:
+            return self._offline_placeholders(data, name)
+        if rtype == RepairType.POOL:
+            return self._pool_placeholders(data, anomaly, name)
+        if rtype == RepairType.RECOVERY:
+            return self._recovery_placeholders(anomaly, name)
+        if rtype == RepairType.REJECT:
+            return self._reject_placeholders(data, anomaly, name)
         return self._fan_placeholders(data, anomaly, name)
+
+    def _offline_placeholders(self, data: dict[str, Any], name: str) -> dict[str, str]:
+        ip = "—"
+        if data.get("ip"):
+            ip = str(data["ip"])
+        elif self.entry.data.get(CONF_IP):
+            ip = str(self.entry.data[CONF_IP])
+        return {"name": name, "ip": ip}
+
+    def _pool_placeholders(
+        self, data: dict[str, Any], anomaly: AnomalyState, name: str
+    ) -> dict[str, str]:
+        finding = _find_finding(anomaly, POOL_ANOMALY_REASONS)
+        secs = _fmt(data.get("seconds_since_share"), "—", decimals=0)
+        if finding:
+            d = finding.details
+            return {
+                "name": name,
+                "pool_host": str(data.get("pool_host") or "—"),
+                "seconds_since_share": _fmt(
+                    d.get("seconds_since_share"), secs, decimals=0
+                ),
+                "baseline_share_interval": _fmt(
+                    d.get("baseline_share_interval"), "—", decimals=0
+                ),
+            }
+        return {
+            "name": name,
+            "pool_host": str(data.get("pool_host") or "—"),
+            "seconds_since_share": secs,
+            "baseline_share_interval": "—",
+        }
+
+    def _recovery_placeholders(
+        self, anomaly: AnomalyState, name: str
+    ) -> dict[str, str]:
+        finding = _find_finding(anomaly, RECOVERY_ANOMALY_REASONS)
+        d = finding.details if finding else (anomaly.details or {})
+        return {
+            "name": name,
+            "current_hashrate": _fmt(d.get("current_hashrate"), "—"),
+            "baseline_hashrate": _fmt(d.get("baseline_hashrate"), "—"),
+            "recovery_pct": _fmt(d.get("recovery_pct"), "—", decimals=0),
+        }
+
+    def _reject_placeholders(
+        self, data: dict[str, Any], anomaly: AnomalyState, name: str
+    ) -> dict[str, str]:
+        finding = _find_finding(anomaly, REJECT_ANOMALY_REASONS)
+        if finding:
+            d = finding.details
+            return {
+                "name": name,
+                "current_reject_rate": _fmt(d.get("current_reject_rate"), "—"),
+                "baseline_reject_rate": _fmt(d.get("baseline_reject_rate"), "—"),
+            }
+        reject = _fmt(data.get("reject_rate"), "—")
+        return {"name": name, "current_reject_rate": reject, "baseline_reject_rate": "—"}
 
     def _hashboard_placeholders(
         self, data: dict[str, Any], anomaly: AnomalyState, name: str
@@ -275,13 +418,11 @@ class RepairManager:
             current = _fmt(details.get("current_hashrate"), current)
         if details.get("current_power") is not None:
             power = _fmt(details.get("current_power"), power, decimals=0)
-        duration = self._lifecycle.active_duration_minutes(lifecycle_key, now) or "—"
         return {
             "name": name,
             "current_hashrate": current,
             "baseline_hashrate": baseline,
             "power": power,
-            "duration": duration,
         }
 
     def _temperature_placeholders(
@@ -311,11 +452,7 @@ class RepairManager:
                 "pct_below": _fmt(d.get("pct_below"), "—", decimals=0),
             }
         fan_idx, fan_speed = _slowest_fan(data)
-        return {
-            "name": name,
-            "fan": fan_idx,
-            "fan_speed": fan_speed,
-        }
+        return {"name": name, "fan": fan_idx, "fan_speed": fan_speed}
 
 
 def _find_finding(

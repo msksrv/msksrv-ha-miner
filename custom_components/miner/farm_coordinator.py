@@ -19,6 +19,7 @@ from .const import (
     DOMAIN,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
+from .health.repairs.farm_manager import FarmRepairManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,6 +75,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=15),
             config_entry=entry,
         )
+        self.repairs = FarmRepairManager(hass, entry)
 
     def _iter_miner_member_pairs(
         self,
@@ -246,6 +248,19 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             # Offline members contribute zero. Online miners with unsupported
             # health data remain unknown instead of being treated as broken.
             farm_health_score = round(sum(health_scores) / health_denominator)
+
+        offline_names: list[str] = []
+        for entry, coord in self._iter_miner_member_pairs(self.device_ids):
+            if coord is None or not coord.last_update_success:
+                offline_names.append(
+                    entry.title or str(entry.data.get(CONF_IP) or "Miner")
+                )
+
+        self.repairs.process_update(
+            offline_count=health_offline,
+            miner_count=miner_count,
+            offline_names=offline_names,
+        )
 
         return {
             "total_hashrate_th": round(total_hash, 2),

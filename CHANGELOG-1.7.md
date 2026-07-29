@@ -1,5 +1,38 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b14 (beta)
+
+### Fixed (Repairs blockers)
+
+- **`_open` after reload:** both managers seed open issues from Issue Registry; recovery runs on first poll when the fault cleared; ignored issues are recreated when the fault returns.
+- **Retry poll:** dismiss only when `last_update_success` (miner) or all farm members are online after refresh.
+- **Thresholds:** native numeric form inside the repair flow; saves to `config_entry.options`; repair stays open.
+- **Farm offline dedup:** suppress miner-offline only when the miner belongs to a **loaded** farm entry.
+- **Ignore:** removed `recreate_issue_if_ignored()` — ignored issues stay ignored until the fault clears (4 min recovery) or a new separate fault creates a fresh issue.
+- **Threshold form:** human-readable field labels and `repairs.error` translations for validation.
+
+### Other
+
+- Remove misleading hashrate **duration** placeholder after reload.
+- Delete baseline storage on config entry removal.
+- RU copy cleanup (pool, temperature, switch, backend, etc.).
+
+---
+
+## v1.7.0b13 (beta)
+
+### Added (Repairs phase 2)
+
+- **Miner offline** (>10 min unreachable) — suppressed when miner is a farm member.
+- **Farm offline** — aggregate repair with truncated miner list (3 + “and N more”).
+- **Pool / shares** — `pool_problem`, `share_stale`, anomaly `share_stale`.
+- **Slow recovery** — anomaly `post_reboot_slow_recovery`.
+- **High reject rate** — health flag (≥100 shares) or anomaly `reject_rate_high`.
+- **Fix flow:** retry poll, restart backend, power on, open threshold options; farm retry for offline members.
+- **Bugfix:** repair flow parsed issue id `(scope, entry_id, type)` correctly.
+
+---
+
 ## v1.7.0b12 (beta)
 
 ### Fixed (Repairs)

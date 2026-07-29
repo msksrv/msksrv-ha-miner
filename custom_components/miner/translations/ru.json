@@ -589,15 +589,35 @@
     },
     "miner_hashrate": {
       "title": "{name}: хешрейт ниже нормы",
-      "description": "Хешрейт {current_hashrate} TH/s (обычно {baseline_hashrate} TH/s), потребление {power} W, длительность {duration} мин."
+      "description": "Хешрейт {current_hashrate} TH/s (обычно {baseline_hashrate} TH/s), потребление {power} W."
     },
     "miner_temperature": {
-      "title": "{name}: критическая температура",
+      "title": "{name}: опасно высокая температура",
       "description": "Максимум по чипам {chip_temperature} °C, по платам {board_temperature} °C."
     },
     "miner_fan": {
       "title": "{name}: проблема с вентилятором",
       "description": "Вентилятор №{fan}: {fan_speed} RPM — нулевые обороты или устойчивый дисбаланс."
+    },
+    "miner_offline": {
+      "title": "{name}: майнер недоступен",
+      "description": "Не удаётся связаться с майнером по {ip} более 10 минут."
+    },
+    "miner_pool": {
+      "title": "{name}: проблема с пулом или шарами",
+      "description": "Пул {pool_host}: новые шары не принимаются {seconds_since_share} с (обычный интервал {baseline_share_interval} с)."
+    },
+    "miner_recovery": {
+      "title": "{name}: медленное восстановление после перезагрузки",
+      "description": "Хешрейт {current_hashrate} TH/s ({recovery_pct}% от обычных {baseline_hashrate} TH/s)."
+    },
+    "miner_reject": {
+      "title": "{name}: высокий процент отклонённых шар",
+      "description": "Отклонено {current_reject_rate}% (обычно {baseline_reject_rate}%)."
+    },
+    "farm_offline": {
+      "title": "{name}: майнеры недоступны",
+      "description": "Недоступно {offline} из {total} майнеров: {miners}{miners_more}."
     }
   },
   "repairs": {
@@ -606,14 +626,41 @@
         "title": "Устранение: {name}",
         "description": "Выберите действие для этого майнера."
       },
+      "farm_init": {
+        "title": "Устранение: {name}",
+        "description": "Выберите действие для этой фермы."
+      },
       "confirm_reboot": {
         "title": "Перезагрузить {name}?",
         "description": "Майнинг будет прерван на несколько минут."
       },
+      "confirm_restart_backend": {
+        "title": "Перезапустить службу управления на {name}?",
+        "description": "Служба управления майнером перезапустится. Майнинг может ненадолго прерваться."
+      },
       "confirm_power": {
         "title": "Отключить питание {name}?",
         "description": "Привязанный выключатель будет выключен. Подтверждайте только если нужно обесточить майнер."
+      },
+      "confirm_power_on": {
+        "title": "Включить питание {name}?",
+        "description": "Привязанный выключатель будет включён."
+      },
+      "open_thresholds": {
+        "title": "Настроить пороги для {name}",
+        "description": "Измените значения ниже и отправьте форму. Проблема останется открытой, пока условие не исчезнет или вы не подтвердите проверку оборудования.",
+        "data": {
+          "temp_chip_warn_c": "Предупреждение по температуре чипов (°C)",
+          "temp_chip_high_c": "Опасная температура чипов (°C)",
+          "temp_board_warn_c": "Предупреждение по температуре платы (°C)",
+          "temp_board_high_c": "Опасная температура платы (°C)",
+          "reject_rate_high_pct": "Допустимый процент отклонённых шар (%)"
+        }
       }
+    },
+    "error": {
+      "temp_warn_must_be_below_critical": "Порог предупреждения должен быть ниже опасного",
+      "invalid_threshold": "Введите корректное число"
     },
     "miner_not_loaded": {
       "title": "Майнер не загружен",
@@ -629,15 +676,31 @@
     },
     "no_power_switch": {
       "title": "Нет выключателя питания",
-      "description": "Привяжите switch в параметрах интеграции для отключения питания из этого repair."
+      "description": "Привяжите выключатель питания в параметрах интеграции, чтобы управлять питанием из этой проблемы."
     },
     "power_off_failed": {
       "title": "Не удалось отключить питание",
-      "description": "Не удалось выключить привязанный switch. Проверьте сущность и повторите."
+      "description": "Не удалось выключить привязанный выключатель. Проверьте сущность и повторите."
+    },
+    "power_on_failed": {
+      "title": "Не удалось включить питание",
+      "description": "Не удалось включить привязанный выключатель. Проверьте сущность и повторите."
+    },
+    "restart_backend_failed": {
+      "title": "Ошибка перезапуска службы управления",
+      "description": "Майнер отклонил команду перезапуска или соединение прервано."
+    },
+    "refresh_failed": {
+      "title": "Опрос не удался",
+      "description": "Майнер по-прежнему недоступен или опрос не прошёл. Повторите позже."
+    },
+    "farm_not_loaded": {
+      "title": "Ферма не загружена",
+      "description": "Интеграция фермы недоступна. Повторите после перезагрузки Home Assistant."
     },
     "issue_unsupported": {
       "title": "Неподдерживаемая проблема",
-      "description": "Эта repair-задача не распознана текущей версией интеграции."
+      "description": "Эта проблема не распознана текущей версией интеграции."
     }
   }
 }

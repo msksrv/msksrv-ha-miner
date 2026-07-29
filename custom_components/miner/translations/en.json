@@ -589,15 +589,35 @@
     },
     "miner_hashrate": {
       "title": "{name}: hashrate below normal",
-      "description": "Hashrate is {current_hashrate} TH/s (baseline {baseline_hashrate} TH/s) at {power} W for {duration} min."
+      "description": "Hashrate is {current_hashrate} TH/s (baseline {baseline_hashrate} TH/s) at {power} W."
     },
     "miner_temperature": {
-      "title": "{name}: critical temperature",
+      "title": "{name}: dangerously high temperature",
       "description": "Peak chip temperature {chip_temperature} °C, peak board temperature {board_temperature} °C."
     },
     "miner_fan": {
       "title": "{name}: fan problem",
       "description": "Fan {fan} speed is {fan_speed} RPM — zero RPM or sustained imbalance."
+    },
+    "miner_offline": {
+      "title": "{name}: miner unreachable",
+      "description": "Cannot reach the miner at {ip} for more than 10 minutes."
+    },
+    "miner_pool": {
+      "title": "{name}: pool or shares problem",
+      "description": "Pool {pool_host}: no new shares accepted for {seconds_since_share} s (baseline interval {baseline_share_interval} s)."
+    },
+    "miner_recovery": {
+      "title": "{name}: slow recovery after reboot",
+      "description": "Hashrate {current_hashrate} TH/s ({recovery_pct}% of baseline {baseline_hashrate} TH/s)."
+    },
+    "miner_reject": {
+      "title": "{name}: high reject rate",
+      "description": "Reject rate {current_reject_rate}% (baseline {baseline_reject_rate}%)."
+    },
+    "farm_offline": {
+      "title": "{name}: miners offline",
+      "description": "{offline} of {total} miners unreachable: {miners}{miners_more}."
     }
   },
   "repairs": {
@@ -606,14 +626,41 @@
         "title": "Repair {name}",
         "description": "Choose an action for this miner."
       },
+      "farm_init": {
+        "title": "Repair {name}",
+        "description": "Choose an action for this farm."
+      },
       "confirm_reboot": {
         "title": "Reboot {name}?",
         "description": "Mining will pause for several minutes while the miner reboots."
       },
+      "confirm_restart_backend": {
+        "title": "Restart backend on {name}?",
+        "description": "The miner control service will restart. Mining may pause briefly."
+      },
       "confirm_power": {
         "title": "Turn off power to {name}?",
         "description": "The linked power switch will be turned off. Confirm only if you intend to cut power."
+      },
+      "confirm_power_on": {
+        "title": "Turn on power to {name}?",
+        "description": "The linked power switch will be turned on."
+      },
+      "open_thresholds": {
+        "title": "Adjust thresholds for {name}",
+        "description": "Change the values below and submit. The repair stays open until the condition clears or you confirm you checked the equipment.",
+        "data": {
+          "temp_chip_warn_c": "Chip temperature warning (°C)",
+          "temp_chip_high_c": "Chip temperature high (°C)",
+          "temp_board_warn_c": "Board temperature warning (°C)",
+          "temp_board_high_c": "Board temperature high (°C)",
+          "reject_rate_high_pct": "Maximum reject rate (%)"
+        }
       }
+    },
+    "error": {
+      "temp_warn_must_be_below_critical": "Warning threshold must be lower than high threshold",
+      "invalid_threshold": "Enter a valid number"
     },
     "miner_not_loaded": {
       "title": "Miner not loaded",
@@ -629,11 +676,27 @@
     },
     "no_power_switch": {
       "title": "No power switch",
-      "description": "Link a switch entity in integration options to use power off from this repair."
+      "description": "Link a power switch entity in integration options to use power control from this repair."
     },
     "power_off_failed": {
       "title": "Power off failed",
       "description": "Could not turn off the linked switch. Check the entity and try again."
+    },
+    "power_on_failed": {
+      "title": "Power on failed",
+      "description": "Could not turn on the linked switch. Check the entity and try again."
+    },
+    "restart_backend_failed": {
+      "title": "Backend restart failed",
+      "description": "The miner rejected the restart command or the connection was lost."
+    },
+    "refresh_failed": {
+      "title": "Refresh failed",
+      "description": "The miner is still unreachable or the poll did not succeed. Try again later."
+    },
+    "farm_not_loaded": {
+      "title": "Farm not loaded",
+      "description": "The farm integration is not available. Try again after Home Assistant finishes reloading."
     },
     "issue_unsupported": {
       "title": "Unsupported repair",
