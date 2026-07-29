@@ -23,6 +23,7 @@ from .const import (
 )
 from .health.baseline import BaselineManager
 from .health.profiles import format_profile_name, resolve_health_thresholds
+from .health.repairs import RepairManager
 from .health.scoring import compute_health
 
 _LOGGER = logging.getLogger(__name__)
@@ -215,6 +216,7 @@ class MinerCoordinator(DataUpdateCoordinator):
         self._last_accepted_shares: float | None = None
         self._last_share_at = None
         self.baseline = BaselineManager(hass, entry.entry_id)
+        self.repairs = RepairManager(hass, entry)
         super().__init__(
             hass=hass,
             logger=_LOGGER,
@@ -499,6 +501,9 @@ class MinerCoordinator(DataUpdateCoordinator):
             ),
         }
         anomaly = self.baseline.process_update(data)
+        self.repairs.process_update(
+            data, anomaly, available=self.last_update_success
+        )
         data["anomaly"] = {
             "score": anomaly.score,
             "confidence": anomaly.confidence,

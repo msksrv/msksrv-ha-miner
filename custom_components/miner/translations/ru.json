@@ -573,5 +573,39 @@
         "custom": "Свои пороги"
       }
     }
+  },
+  "issues": {
+    "miner_hashboard": {
+      "title": "{name}: проблема хэш-платы",
+      "description": "Плата №{board} сообщает {chips} из {expected_chips} рабочих чипов."
+    },
+    "miner_hashrate": {
+      "title": "{name}: хешрейт ниже нормы",
+      "description": "Хешрейт {current_hashrate} TH/s (обычно {baseline_hashrate} TH/s), потребление {power} W, длительность {duration} мин."
+    },
+    "miner_temperature": {
+      "title": "{name}: критическая температура",
+      "description": "Температура достигла {temperature} °C — выше критического порога профиля."
+    },
+    "miner_fan": {
+      "title": "{name}: проблема с вентилятором",
+      "description": "Вентилятор №{fan}: {fan_speed} RPM — нулевые обороты или устойчивый дисбаланс."
+    }
+  },
+  "repairs": {
+    "fix_flow": {
+      "init": {
+        "title": "Устранение: {name}",
+        "description": "Выберите действие для этого майнера."
+      },
+      "confirm_reboot": {
+        "title": "Перезагрузить {name}?",
+        "description": "Майнинг будет прерван на несколько минут."
+      },
+      "confirm_power": {
+        "title": "Отключить питание {name}?",
+        "description": "Привязанный выключатель будет выключен. Подтверждайте только если нужно обесточить майнер."
+      }
+    }
   }
 }

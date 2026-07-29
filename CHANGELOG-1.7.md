@@ -1,5 +1,13 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b11 (beta)
+
+### Added
+
+- **Repairs (phase 1):** hashboard, hashrate, critical temperature, fan — stable issue ids, confirm/recovery timers, EN/RU text, fix flow (reboot / power off / checked).
+
+---
+
 ## v1.7.0b10 (beta)
 
 ### Fixed

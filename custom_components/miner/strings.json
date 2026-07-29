@@ -573,5 +573,39 @@
         "custom": "Custom thresholds"
       }
     }
+  },
+  "issues": {
+    "miner_hashboard": {
+      "title": "{name}: hashboard problem",
+      "description": "Board {board} reports {chips} of {expected_chips} working chips."
+    },
+    "miner_hashrate": {
+      "title": "{name}: hashrate below normal",
+      "description": "Hashrate is {current_hashrate} TH/s (baseline {baseline_hashrate} TH/s) at {power} W for {duration} min."
+    },
+    "miner_temperature": {
+      "title": "{name}: critical temperature",
+      "description": "Temperature reached {temperature} °C above the critical profile limit."
+    },
+    "miner_fan": {
+      "title": "{name}: fan problem",
+      "description": "Fan {fan} speed is {fan_speed} RPM — zero RPM or sustained imbalance."
+    }
+  },
+  "repairs": {
+    "fix_flow": {
+      "init": {
+        "title": "Repair {name}",
+        "description": "Choose an action for this miner."
+      },
+      "confirm_reboot": {
+        "title": "Reboot {name}?",
+        "description": "Mining will pause for several minutes while the miner reboots."
+      },
+      "confirm_power": {
+        "title": "Turn off power to {name}?",
+        "description": "The linked power switch will be turned off. Confirm only if you intend to cut power."
+      }
+    }
   }
 }
