@@ -1,6 +1,6 @@
-# Opens a GitHub Release when you push a version tag (e.g. v1.4.0b6).
-# Betas are marked Pre-release; stable tags (v1.4.0) are full releases.
-# miner.zip is attached at publish time (required for immutable releases).
+# Opens a GitHub Release when you push a version tag (e.g. v1.6.8).
+# HACS uses the tagged source tree (custom_components/miner/); GitHub Releases
+# must exist (not tags alone). miner.zip is optional for manual installs.
 
 name: Create release from tag
 
@@ -36,24 +36,19 @@ jobs:
           echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Patch manifest version
+      - name: Verify manifest version matches tag
         shell: bash
         env:
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          export VERSION="${TAG_NAME#v}"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
+          VERSION="${TAG_NAME#v}"
+          MANIFEST_VERSION="$(python3 -c "import json; print(json.load(open('custom_components/miner/manifest.json'))['version'])")"
+          if [[ "$MANIFEST_VERSION" != "$VERSION" ]]; then
+            echo "::error::manifest.json version ($MANIFEST_VERSION) must match tag ($VERSION) for HACS"
+            exit 1
+          fi
 
-          path = Path("custom_components/miner/manifest.json")
-          data = json.loads(path.read_text(encoding="utf-8"))
-          data["version"] = os.environ["VERSION"]
-          path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-          PY
-
-      - name: ZIP the integration directory
+      - name: ZIP the integration directory (manual install asset)
         shell: bash
         run: |
           cd "${{ github.workspace }}/custom_components/miner"
