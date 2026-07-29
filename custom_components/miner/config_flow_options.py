@@ -39,6 +39,7 @@ from .const import (
     CONF_FARM_AMBIENT_TEMP_ENTITIES,
     CONF_FARM_DEVICE_IDS,
     CONF_FARM_ENERGY_PHYSICAL_SENSOR,
+    CONF_FARM_LEGACY_COST_SENSORS,
     CONF_FARM_ELEC_TARIFF_MODE,
     CONF_FARM_ELEC_TOU_CURRENCY,
     CONF_FARM_ELEC_ZONES,
@@ -614,6 +615,11 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     new_options[CONF_FARM_ENERGY_PHYSICAL_SENSOR] = str(entity_id).strip()
                 else:
                     new_options.pop(CONF_FARM_ENERGY_PHYSICAL_SENSOR, None)
+                if CONF_FARM_LEGACY_COST_SENSORS in user_input:
+                    if user_input.get(CONF_FARM_LEGACY_COST_SENSORS):
+                        new_options[CONF_FARM_LEGACY_COST_SENSORS] = True
+                    else:
+                        new_options.pop(CONF_FARM_LEGACY_COST_SENSORS, None)
                 self.hass.config_entries.async_update_entry(
                     self.config_entry, options=new_options
                 )
@@ -631,6 +637,15 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                             device_class="energy",
                         )
                     ),
+                    vol.Optional(
+                        CONF_FARM_LEGACY_COST_SENSORS,
+                        description={
+                            "suggested_value": opts.get(
+                                CONF_FARM_LEGACY_COST_SENSORS, False
+                            )
+                        },
+                        default=False,
+                    ): BooleanSelector(),
                 }
             ),
             errors=errors,

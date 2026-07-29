@@ -356,7 +356,8 @@
         "title": "Счётчик энергии фермы",
         "description": "Необязательный физический счётчик всей фермы (например PDU). Если задан, энергия фермы берётся с него, а не суммируется с майнеров.",
         "data": {
-          "farm_energy_physical_sensor": "Сенсор энергии всей фермы"
+          "farm_energy_physical_sensor": "Сенсор энергии всей фермы",
+          "farm_legacy_cost_sensors_enabled": "Устаревшие сенсоры стоимости по мощности"
         }
       },
       "farm_tariff_flat": {
@@ -695,6 +696,21 @@
       "farm_energy_idle_saved_today": {
         "name": "Сэкономленная энергия в простое сегодня"
       },
+      "farm_energy_cost_today": {
+        "name": "Стоимость электроэнергии сегодня"
+      },
+      "farm_energy_cost_month": {
+        "name": "Стоимость электроэнергии за месяц"
+      },
+      "farm_energy_cost_total": {
+        "name": "Стоимость электроэнергии всего"
+      },
+      "farm_energy_cost_prev_month": {
+        "name": "Стоимость электроэнергии за прошлый месяц"
+      },
+      "farm_energy_cost_at_power": {
+        "name": "Стоимость при текущей мощности"
+      },
       "farm_miner_count": {
         "name": "Число майнеров"
       },
@@ -732,19 +748,19 @@
         "name": "Состояние фермы"
       },
       "farm_cost_now": {
-        "name": "Стоимость мощности сейчас ({currency})"
+        "name": "Стоимость мощности сейчас ({currency}) (устар.)"
       },
       "farm_cost_hour": {
-        "name": "Электроэнергия за этот час ({currency})"
+        "name": "Электроэнергия за этот час ({currency}) (устар.)"
       },
       "farm_cost_day": {
-        "name": "Электроэнергия за сутки ({currency})"
+        "name": "Электроэнергия за сутки ({currency}) (устар.)"
       },
       "farm_cost_month": {
-        "name": "Электроэнергия за месяц ({currency})"
+        "name": "Электроэнергия за месяц ({currency}) (устар.)"
       },
       "farm_cost_total": {
-        "name": "Электроэнергия всего ({currency})"
+        "name": "Электроэнергия всего ({currency}) (устар.)"
       }
     },
     "binary_sensor": {

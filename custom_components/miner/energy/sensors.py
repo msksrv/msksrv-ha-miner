@@ -60,20 +60,48 @@ def setup_farm_energy_sensors(
     from ..farm_coordinator import MinerFarmCoordinator
 
     coordinator: MinerFarmCoordinator = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities(
-        [
-            FarmEnergyTotalSensor(coordinator),
-            FarmEnergyTodaySensor(coordinator),
-            FarmEnergyMonthSensor(coordinator),
-            FarmEnergyPrevMonthSensor(coordinator),
-            FarmEnergyEfficiencyTodaySensor(coordinator),
-            FarmEnergyEfficiencyMonthSensor(coordinator),
-            FarmEnergyCostPerThHourTodaySensor(coordinator),
-            FarmEnergyCostPerPhDaySensor(coordinator),
-            FarmEnergyLostHashTodaySensor(coordinator),
-            FarmEnergyIdleSavedTodaySensor(coordinator),
-        ]
+    entities: list[SensorEntity] = [
+        FarmEnergyTotalSensor(coordinator),
+        FarmEnergyTodaySensor(coordinator),
+        FarmEnergyMonthSensor(coordinator),
+        FarmEnergyPrevMonthSensor(coordinator),
+        FarmEnergyEfficiencyTodaySensor(coordinator),
+        FarmEnergyEfficiencyMonthSensor(coordinator),
+        FarmEnergyCostPerThHourTodaySensor(coordinator),
+        FarmEnergyCostPerPhDaySensor(coordinator),
+        FarmEnergyLostHashTodaySensor(coordinator),
+        FarmEnergyIdleSavedTodaySensor(coordinator),
+    ]
+    if _farm_tariff_configured(config_entry):
+        entities.extend(
+            [
+                FarmEnergyCostTodaySensor(coordinator),
+                FarmEnergyCostMonthSensor(coordinator),
+                FarmEnergyCostTotalSensor(coordinator),
+                FarmEnergyCostPrevMonthSensor(coordinator),
+                FarmEnergyCostAtPowerSensor(coordinator),
+            ]
+        )
+    async_add_entities(entities)
+
+
+def _farm_tariff_configured(config_entry: ConfigEntry) -> bool:
+    from ..const import FARM_ELEC_TARIFF_DUAL, FARM_ELEC_TARIFF_FLAT
+    from ..farm_elec_tou import (
+        farm_tariff_mode,
+        farm_tou_currency,
+        farm_tou_zones_stored,
     )
+    from ..farm_energy_rates import farm_energy_rates_list
+
+    opts = config_entry.options
+    mode = farm_tariff_mode(opts)
+    if mode == FARM_ELEC_TARIFF_FLAT:
+        return bool(farm_energy_rates_list(opts))
+    cur = farm_tou_currency(opts)
+    zones = farm_tou_zones_stored(opts)
+    need = 2 if mode == FARM_ELEC_TARIFF_DUAL else 3
+    return bool(cur and len(zones) == need)
 
 
 class _MinerEnergySensorBase(CoordinatorEntity["MinerCoordinator"], SensorEntity):
@@ -594,3 +622,129 @@ class FarmEnergyIdleSavedTodaySensor(_FarmEnergySensorBase):
     @property
     def native_value(self) -> float | None:
         return self.coordinator.energy.period.day_idle_saved_kwh
+
+
+class _FarmEnergyMonetarySensorBase(_FarmEnergySensorBase):
+    _attr_device_class = SensorDeviceClass.MONETARY
+    _attr_suggested_display_precision = 2
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        cur = self.coordinator.energy.record.cost_currency
+        if cur:
+            return cur
+        return self.coordinator.energy.period.currency
+
+
+class FarmEnergyCostTodaySensor(_FarmEnergyMonetarySensorBase):
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            suffix="cost-today",
+            translation_key="farm_energy_cost_today",
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        return round(self.coordinator.energy.period.day_cost, 2)
+
+
+class FarmEnergyCostMonthSensor(_FarmEnergyMonetarySensorBase):
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            suffix="cost-month",
+            translation_key="farm_energy_cost_month",
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        return round(self.coordinator.energy.period.month_cost, 2)
+
+
+class FarmEnergyCostTotalSensor(_FarmEnergyMonetarySensorBase):
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            suffix="cost-total",
+            translation_key="farm_energy_cost_total",
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        return round(self.coordinator.energy.record.total_cost, 2)
+
+
+class FarmEnergyCostPrevMonthSensor(_FarmEnergyMonetarySensorBase):
+    _attr_state_class = SensorStateClass.TOTAL
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            suffix="cost-prev-month",
+            translation_key="farm_energy_cost_prev_month",
+        )
+
+    @property
+    def native_value(self) -> float | None:
+        return round(self.coordinator.energy.record.prev_month_cost, 2)
+
+
+class FarmEnergyCostAtPowerSensor(_FarmEnergySensorBase):
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:cash-clock"
+
+    def __init__(self, coordinator: MinerFarmCoordinator) -> None:
+        super().__init__(
+            coordinator,
+            suffix="cost-at-power",
+            translation_key="farm_energy_cost_at_power",
+        )
+
+    @property
+    def native_unit_of_measurement(self) -> str | None:
+        cur = self.coordinator.energy.record.cost_currency
+        if not cur:
+            cur = self.coordinator.energy.period.currency
+        if not cur:
+            return None
+        return f"{cur}/h"
+
+    @property
+    def native_value(self) -> float | None:
+        from homeassistant.util import dt as dt_util
+
+        from ..const import FARM_ELEC_TARIFF_FLAT
+        from ..farm_elec_tou import (
+            farm_tariff_mode,
+            farm_tou_zones_stored,
+            price_at_local_dt,
+        )
+        from ..farm_energy_rates import farm_energy_rates_list
+
+        data = self.coordinator.data
+        if not data:
+            return None
+        try:
+            kw = float(data.get("total_power_kw") or 0.0)
+        except (TypeError, ValueError):
+            return None
+        opts = self.coordinator.config_entry.options
+        if farm_tariff_mode(opts) == FARM_ELEC_TARIFF_FLAT:
+            rates = farm_energy_rates_list(opts)
+            if not rates:
+                return None
+            price = float(rates[0][1])
+        else:
+            zones = farm_tou_zones_stored(opts)
+            if not zones:
+                return None
+            price = price_at_local_dt(dt_util.as_local(dt_util.utcnow()), zones)
+        return round(kw * price, 2)

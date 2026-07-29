@@ -356,7 +356,8 @@
         "title": "Farm energy meter",
         "description": "Optional physical meter for the whole farm (e.g. PDU). When set, farm energy uses this meter instead of summing miners.",
         "data": {
-          "farm_energy_physical_sensor": "Whole-farm energy sensor"
+          "farm_energy_physical_sensor": "Whole-farm energy sensor",
+          "farm_legacy_cost_sensors_enabled": "Legacy power-based cost sensors (deprecated)"
         }
       },
       "farm_tariff_flat": {
@@ -695,6 +696,21 @@
       "farm_energy_idle_saved_today": {
         "name": "Energy saved while idle today"
       },
+      "farm_energy_cost_today": {
+        "name": "Electricity cost today"
+      },
+      "farm_energy_cost_month": {
+        "name": "Electricity cost this month"
+      },
+      "farm_energy_cost_total": {
+        "name": "Electricity cost total"
+      },
+      "farm_energy_cost_prev_month": {
+        "name": "Electricity cost previous month"
+      },
+      "farm_energy_cost_at_power": {
+        "name": "Cost at current power draw"
+      },
       "farm_miner_count": {
         "name": "Miner count"
       },
@@ -732,19 +748,19 @@
         "name": "Farm health score"
       },
       "farm_cost_now": {
-        "name": "Power cost at current draw ({currency})"
+        "name": "Power cost at current draw ({currency}) (legacy)"
       },
       "farm_cost_hour": {
-        "name": "Electricity cost this hour ({currency})"
+        "name": "Electricity cost this hour ({currency}) (legacy)"
       },
       "farm_cost_day": {
-        "name": "Electricity cost today ({currency})"
+        "name": "Electricity cost today ({currency}) (legacy)"
       },
       "farm_cost_month": {
-        "name": "Electricity cost this month ({currency})"
+        "name": "Electricity cost this month ({currency}) (legacy)"
       },
       "farm_cost_total": {
-        "name": "Electricity cost total ({currency})"
+        "name": "Electricity cost total ({currency}) (legacy)"
       }
     },
     "binary_sensor": {

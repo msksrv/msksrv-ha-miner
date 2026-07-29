@@ -43,6 +43,7 @@ def reset_periods_if_needed(record: EnergyRecord, now: datetime) -> None:
         if record.month_key:
             record.prev_month_key = record.month_key
             record.prev_month_kwh = record.month_kwh
+            record.prev_month_cost = record.month_cost
         record.month_key = mk
         record.month_kwh = 0.0
         record.month_hash_th = 0.0
@@ -128,6 +129,7 @@ def integrate_period_sample(
     if delta_cost > 0:
         record.day_cost += delta_cost
         record.month_cost += delta_cost
+        record.total_cost += delta_cost
 
     curr_h = hashrate_th_s if available else 0.0
 

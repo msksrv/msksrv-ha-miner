@@ -221,6 +221,33 @@ def test_nominal_power_updates_only_near_reference() -> None:
     assert record.last_nominal_power_w == 3200.0
 
 
+def test_total_cost_accumulates_with_energy_deltas() -> None:
+    record = EnergyRecord(cost_currency="RUB")
+    integrate_period_sample(
+        record,
+        now=NOW,
+        delta_kwh=0.5,
+        delta_cost=4.0,
+        hashrate_th_s=100.0,
+        reference_hashrate_th_s=100.0,
+        available=True,
+        dt_s=10.0,
+    )
+    assert record.day_cost == pytest.approx(4.0)
+    assert record.total_cost == pytest.approx(4.0)
+
+
+def test_prev_month_cost_rolls_over() -> None:
+    record = EnergyRecord(
+        month_key="2026-02",
+        month_cost=500.0,
+        total_cost=500.0,
+    )
+    reset_periods_if_needed(record, NOW)
+    assert record.prev_month_cost == pytest.approx(500.0)
+    assert record.month_cost == 0.0
+
+
 def test_calendar_reset_clears_day_quality_without_sample() -> None:
     record = EnergyRecord(
         day_key="2026-03-14",

@@ -69,6 +69,8 @@ class EnergyRecord:
     month_idle_saved_kwh: float = 0.0
     day_cost: float = 0.0
     month_cost: float = 0.0
+    total_cost: float = 0.0
+    prev_month_cost: float = 0.0
     cost_currency: str | None = None
     last_hashrate_th_s: float | None = None
     last_reference_hashrate_th_s: float | None = None
@@ -108,6 +110,8 @@ class EnergyRecord:
             "month_idle_saved_kwh": self.month_idle_saved_kwh,
             "day_cost": self.day_cost,
             "month_cost": self.month_cost,
+            "total_cost": self.total_cost,
+            "prev_month_cost": self.prev_month_cost,
             "cost_currency": self.cost_currency,
             "last_hashrate_th_s": self.last_hashrate_th_s,
             "last_reference_hashrate_th_s": self.last_reference_hashrate_th_s,
@@ -151,6 +155,8 @@ class EnergyRecord:
             month_idle_saved_kwh=float(raw.get("month_idle_saved_kwh") or 0.0),
             day_cost=float(raw.get("day_cost") or 0.0),
             month_cost=float(raw.get("month_cost") or 0.0),
+            total_cost=float(raw.get("total_cost") or 0.0),
+            prev_month_cost=float(raw.get("prev_month_cost") or 0.0),
             cost_currency=raw.get("cost_currency"),
             last_hashrate_th_s=_optional_float(raw.get("last_hashrate_th_s")),
             last_reference_hashrate_th_s=_optional_float(

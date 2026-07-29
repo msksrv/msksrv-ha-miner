@@ -52,6 +52,7 @@ class FarmCostSensorBase(
 
     _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
@@ -202,6 +203,7 @@ class FarmCostAtCurrentPowerSensor(CoordinatorEntity[MinerFarmCoordinator], Sens
 
     _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
@@ -221,8 +223,7 @@ class FarmCostAtCurrentPowerSensor(CoordinatorEntity[MinerFarmCoordinator], Sens
         self.entity_description = SensorEntityDescription(
             key=f"farm_cost_now_{cur_safe}",
             translation_key="farm_cost_now",
-            device_class=SensorDeviceClass.MONETARY,
-            native_unit_of_measurement=currency,
+            native_unit_of_measurement=f"{currency}/h",
             state_class=SensorStateClass.MEASUREMENT,
             suggested_display_precision=2,
             entity_category=EntityCategory.DIAGNOSTIC,
@@ -266,7 +267,11 @@ def setup_farm_cost_sensors(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Add cost sensors when at least one tariff is configured."""
+    """Add legacy cost sensors when explicitly enabled (deprecated)."""
+    from .const import CONF_FARM_LEGACY_COST_SENSORS
+
+    if not config_entry.options.get(CONF_FARM_LEGACY_COST_SENSORS):
+        return
     coordinator: MinerFarmCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     opts = config_entry.options
     mode = farm_tariff_mode(opts)

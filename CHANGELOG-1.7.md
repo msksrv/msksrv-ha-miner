@@ -1,5 +1,19 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b20 (beta)
+
+### Added (Energy cost — farm UI alignment)
+
+- **Farm cost sensors from energy record:** today, month, total (`total_cost` in Store), previous month.
+- **Cost at current power:** `{currency}/h` rate sensor (not MONETARY — monetary speed, not balance).
+
+### Changed
+
+- **Legacy `farm_cost_*` sensors:** disabled by default; optional re-enable in farm energy settings.
+- **Legacy sensor labels:** marked «(legacy)» / «(устар.)» to distinguish from energy-based cost sensors.
+
+---
+
 ## v1.7.0b19 (beta)
 
 ### Added (Energy — point 8, phase 1)
