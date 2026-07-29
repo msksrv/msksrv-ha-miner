@@ -57,6 +57,9 @@ async def async_setup_farm_sensors(
             entities.append(FarmAmbientTemperatureSensor(coordinator, eid))
     async_add_entities(entities)
     setup_farm_cost_sensors(hass, config_entry, async_add_entities)
+    from .energy.sensors import setup_farm_energy_sensors
+
+    setup_farm_energy_sensors(hass, config_entry, async_add_entities)
 
 
 class _FarmSensor(CoordinatorEntity[MinerFarmCoordinator], SensorEntity):

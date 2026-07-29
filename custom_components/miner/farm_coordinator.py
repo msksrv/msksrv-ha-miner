@@ -21,6 +21,7 @@ from .const import (
 from .device_resolution import async_get_miner_config_entry_for_device
 from .farm_health import compute_farm_health_metrics
 from .events import FarmEventManager
+from .energy import FarmEnergyManager
 from .health.repairs.farm_manager import FarmRepairManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         )
         self.events = FarmEventManager(hass, entry)
         self.repairs = FarmRepairManager(hass, entry)
+        self.energy = FarmEnergyManager(hass, entry)
         self._recovery_active_miner: str | None = None
         self._emergency_stop_active = False
         self._emergency_clear_armed_until: float | None = None
@@ -266,7 +268,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             offline_names=offline_names,
         )
 
-        return {
+        data = {
             "total_hashrate_th": round(total_hash, 2),
             "total_power_w": round(total_w, 0),
             "total_power_kw": round(total_w / 1000.0, 3) if total_w else 0.0,
@@ -316,6 +318,8 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             "emergency_stop_available": self.emergency_stop_available,
             "emergency_stop_active": self._emergency_stop_active,
         }
+        await self.energy.async_tick(self)
+        return data
 
     def linked_power_switches(self) -> list[str]:
         """Entity IDs of power switches configured on member miners."""

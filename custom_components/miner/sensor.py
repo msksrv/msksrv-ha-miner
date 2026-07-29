@@ -336,6 +336,9 @@ async def async_setup_entry(
 
     async_add_entities(sensors)
     await async_setup_anomaly_sensors(hass, config_entry, async_add_entities)
+    from .energy.sensors import setup_miner_energy_sensors
+
+    setup_miner_energy_sensors(hass, config_entry, async_add_entities)
 
 
 class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):

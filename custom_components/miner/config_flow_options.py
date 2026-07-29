@@ -38,6 +38,7 @@ from .const import (
     CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS,
     CONF_FARM_AMBIENT_TEMP_ENTITIES,
     CONF_FARM_DEVICE_IDS,
+    CONF_FARM_ENERGY_PHYSICAL_SENSOR,
     CONF_FARM_ELEC_TARIFF_MODE,
     CONF_FARM_ELEC_TOU_CURRENCY,
     CONF_FARM_ELEC_ZONES,
@@ -50,7 +51,14 @@ from .const import (
     CONF_REPAIR_RECOVERY,
     CONF_IS_FARM,
     CONF_POWER_SWITCH,
+    CONF_ENERGY_PHYSICAL_SENSOR,
+    CONF_ENERGY_POWER_SENSOR,
+    CONF_ENERGY_SOURCE_MODE,
     DOMAIN,
+    ENERGY_SOURCE_AUTO,
+    ENERGY_SOURCE_MINER_POWER,
+    ENERGY_SOURCE_PHYSICAL,
+    ENERGY_SOURCE_SWITCH_POWER,
     FARM_ELEC_TARIFF_DUAL,
     FARM_ELEC_TARIFF_FLAT,
     FARM_ELEC_TARIFF_TRIPLE,
@@ -87,6 +95,7 @@ _FARM_MENU = (
     "farm_ambient",
     "farm_pools",
     "farm_tariff",
+    "farm_energy",
     "farm_actions",
 )
 
@@ -176,6 +185,11 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
         return await self._async_farm_save_pools(user_input, apply_now=False)
+
+    async def async_step_farm_energy(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        return await self._async_farm_save_energy(user_input)
 
     async def async_step_farm_tariff(
         self, user_input: dict[str, Any] | None = None
@@ -572,6 +586,56 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             errors=errors,
         )
 
+    async def _async_farm_save_energy(
+        self, user_input: dict[str, Any] | None
+    ) -> config_entries.FlowResult:
+        errors: dict[str, str] = {}
+        opts = self.config_entry.options
+        stored = opts.get(CONF_FARM_ENERGY_PHYSICAL_SENSOR)
+        if user_input is not None:
+            entity_id = user_input.get(CONF_FARM_ENERGY_PHYSICAL_SENSOR)
+            if entity_id:
+                err = self._validate_energy_entity(entity_id)
+                if err:
+                    errors["base"] = err
+                else:
+                    from .energy.registry import physical_sensor_in_use
+
+                    owner = physical_sensor_in_use(
+                        self.hass,
+                        str(entity_id).strip(),
+                        exclude_entry_id=f"farm_{self.config_entry.entry_id}",
+                    )
+                    if owner:
+                        errors["base"] = "energy_physical_in_use"
+            if not errors:
+                new_options = {**opts}
+                if entity_id:
+                    new_options[CONF_FARM_ENERGY_PHYSICAL_SENSOR] = str(entity_id).strip()
+                else:
+                    new_options.pop(CONF_FARM_ENERGY_PHYSICAL_SENSOR, None)
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry, options=new_options
+                )
+                return self.async_create_entry(title="", data=new_options)
+        return self.async_show_form(
+            step_id="farm_energy",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        CONF_FARM_ENERGY_PHYSICAL_SENSOR,
+                        description={"suggested_value": stored},
+                    ): EntitySelector(
+                        EntitySelectorConfig(
+                            domain="sensor",
+                            device_class="energy",
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+        )
+
     async def _async_farm_save_pools(
         self, user_input: dict[str, Any] | None, *, apply_now: bool
     ) -> config_entries.FlowResult:
@@ -688,6 +752,62 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 flat[key] = val
         return flat
 
+    def _validate_energy_entity(self, entity_id: str) -> str | None:
+        from homeassistant.components.sensor import SensorDeviceClass
+
+        try:
+            ent_domain, _ = split_entity_id(entity_id)
+        except ValueError:
+            return "invalid_energy_entity"
+        if ent_domain != "sensor" or er.async_get(self.hass).async_get(entity_id) is None:
+            return "invalid_energy_entity"
+        entry = er.async_get(self.hass).async_get(entity_id)
+        if entry and entry.original_device_class != SensorDeviceClass.ENERGY:
+            return "invalid_energy_entity"
+        return None
+
+    def _validate_power_entity(self, entity_id: str) -> str | None:
+        from homeassistant.components.sensor import SensorDeviceClass
+
+        try:
+            ent_domain, _ = split_entity_id(entity_id)
+        except ValueError:
+            return "invalid_power_entity"
+        if ent_domain != "sensor" or er.async_get(self.hass).async_get(entity_id) is None:
+            return "invalid_power_entity"
+        entry = er.async_get(self.hass).async_get(entity_id)
+        if entry and entry.original_device_class != SensorDeviceClass.POWER:
+            return "invalid_power_entity"
+        return None
+
+    def _validate_miner_energy_options(self, flat: dict[str, Any]) -> dict[str, str]:
+        from .energy.registry import physical_sensor_in_use
+
+        errors: dict[str, str] = {}
+        mode = str(flat.get(CONF_ENERGY_SOURCE_MODE) or ENERGY_SOURCE_AUTO)
+        physical = (flat.get(CONF_ENERGY_PHYSICAL_SENSOR) or "").strip()
+        power = (flat.get(CONF_ENERGY_POWER_SENSOR) or "").strip()
+
+        if mode == ENERGY_SOURCE_PHYSICAL and not physical:
+            errors[CONF_ENERGY_PHYSICAL_SENSOR] = "energy_physical_required"
+        if physical:
+            if err := self._validate_energy_entity(physical):
+                errors[CONF_ENERGY_PHYSICAL_SENSOR] = err
+            else:
+                owner = physical_sensor_in_use(
+                    self.hass,
+                    physical,
+                    exclude_entry_id=self.config_entry.entry_id,
+                )
+                if owner:
+                    errors[CONF_ENERGY_PHYSICAL_SENSOR] = "energy_physical_in_use"
+        if power:
+            if err := self._validate_power_entity(power):
+                errors[CONF_ENERGY_POWER_SENSOR] = err
+        if mode == ENERGY_SOURCE_SWITCH_POWER and not power:
+            errors[CONF_ENERGY_POWER_SENSOR] = "energy_power_required"
+        return errors
+
     def _miner_identity(self) -> tuple[str | None, str | None]:
         coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
         if coordinator is None:
@@ -750,6 +870,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 if er.async_get(self.hass).async_get(entity_id) is None or ent_domain != "switch":
                     errors["base"] = "invalid_switch"
 
+            energy_errors = self._validate_miner_energy_options(user_input)
+            if energy_errors:
+                errors.update(_nest_section_errors("energy", energy_errors))
+
             pool_action = str(user_input.get("pool_action", "none"))
             host = (user_input.get("pool_host") or "").strip()
             port_raw = user_input.get("pool_port")
@@ -802,6 +926,19 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 new_options[CONF_POWER_SWITCH] = entity_id
             else:
                 new_options.pop(CONF_POWER_SWITCH, None)
+
+            mode = str(user_input.get(CONF_ENERGY_SOURCE_MODE) or ENERGY_SOURCE_AUTO)
+            new_options[CONF_ENERGY_SOURCE_MODE] = mode
+            physical = (user_input.get(CONF_ENERGY_PHYSICAL_SENSOR) or "").strip()
+            power_ent = (user_input.get(CONF_ENERGY_POWER_SENSOR) or "").strip()
+            if physical:
+                new_options[CONF_ENERGY_PHYSICAL_SENSOR] = physical
+            else:
+                new_options.pop(CONF_ENERGY_PHYSICAL_SENSOR, None)
+            if power_ent:
+                new_options[CONF_ENERGY_POWER_SENSOR] = power_ent
+            else:
+                new_options.pop(CONF_ENERGY_POWER_SENSOR, None)
 
             new_options[CONF_HEALTH_PROFILE] = profile
             if profile == HEALTH_PROFILE_CUSTOM:
@@ -1103,6 +1240,62 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                         }
                     ),
                     SectionConfig(collapsed=False),
+                ),
+                vol.Required("energy"): section(
+                    vol.Schema(
+                        {
+                            vol.Optional(
+                                CONF_ENERGY_SOURCE_MODE,
+                                description={
+                                    "suggested_value": ui.get(
+                                        CONF_ENERGY_SOURCE_MODE,
+                                        opts.get(
+                                            CONF_ENERGY_SOURCE_MODE, ENERGY_SOURCE_AUTO
+                                        ),
+                                    )
+                                },
+                            ): SelectSelector(
+                                SelectSelectorConfig(
+                                    options=[
+                                        ENERGY_SOURCE_AUTO,
+                                        ENERGY_SOURCE_PHYSICAL,
+                                        ENERGY_SOURCE_SWITCH_POWER,
+                                        ENERGY_SOURCE_MINER_POWER,
+                                    ],
+                                    translation_key=CONF_ENERGY_SOURCE_MODE,
+                                )
+                            ),
+                            vol.Optional(
+                                CONF_ENERGY_PHYSICAL_SENSOR,
+                                description={
+                                    "suggested_value": ui.get(
+                                        CONF_ENERGY_PHYSICAL_SENSOR,
+                                        opts.get(CONF_ENERGY_PHYSICAL_SENSOR),
+                                    )
+                                },
+                            ): EntitySelector(
+                                EntitySelectorConfig(
+                                    domain="sensor",
+                                    device_class="energy",
+                                )
+                            ),
+                            vol.Optional(
+                                CONF_ENERGY_POWER_SENSOR,
+                                description={
+                                    "suggested_value": ui.get(
+                                        CONF_ENERGY_POWER_SENSOR,
+                                        opts.get(CONF_ENERGY_POWER_SENSOR),
+                                    )
+                                },
+                            ): EntitySelector(
+                                EntitySelectorConfig(
+                                    domain="sensor",
+                                    device_class="power",
+                                )
+                            ),
+                        }
+                    ),
+                    SectionConfig(collapsed=True),
                 ),
                 vol.Required("health_thresholds"): section(
                     vol.Schema(health_fields),

@@ -117,6 +117,7 @@
           "farm_ambient": "Датчики температуры",
           "farm_pools": "Пулы и воркеры",
           "farm_tariff": "Тариф электроэнергии",
+          "farm_energy": "Счётчик энергии фермы",
           "farm_actions": "Массовые действия"
         },
         "menu_option_descriptions": {
@@ -124,6 +125,7 @@
           "farm_ambient": "Датчики температуры помещения для ambient-метрик",
           "farm_pools": "До пяти пресетов stratum для этой фермы",
           "farm_tariff": "Плоский или зональный тариф для оценки стоимости",
+          "farm_energy": "Необязательный физический счётчик всей фермы (PDU). Иначе суммируются майнеры.",
           "farm_actions": "Применить сохранённый пресет пула ко всем майнерам"
         },
         "description": "Выключатель питания, пороги оценки состояния и при необходимости смена stratum-пула (майнер должен быть доступен).",
@@ -132,6 +134,15 @@
             "name": "Выключатель питания",
             "data": {
               "power_switch": "Выключатель питания"
+            }
+          },
+          "energy": {
+            "name": "Источник энергии",
+            "description": "Канонический итог для Energy Dashboard. Предпочтителен физический счётчик switch; расчётные значения помечаются как estimated.",
+            "data": {
+              "energy_source_mode": "Режим источника",
+              "energy_physical_sensor": "Физический счётчик энергии",
+              "energy_power_sensor": "Внешний датчик мощности"
             }
           },
           "health_thresholds": {
@@ -341,6 +352,13 @@
           "farm_elec_tariff_mode": "Тип тарифа"
         }
       },
+      "farm_energy": {
+        "title": "Счётчик энергии фермы",
+        "description": "Необязательный физический счётчик всей фермы (например PDU). Если задан, энергия фермы берётся с него, а не суммируется с майнеров.",
+        "data": {
+          "farm_energy_physical_sensor": "Сенсор энергии всей фермы"
+        }
+      },
       "farm_tariff_flat": {
         "title": "Плоский тариф",
         "description": "Одна фиксированная цена за kВt·ч; при необходимости можно добавить ещё валюты.",
@@ -412,6 +430,11 @@
       "farm_device_set_conflict": "Другая ферма уже собрана из того же набора майнеров",
       "farm_emergency_stop_active": "Сначала снимите аварийный стоп фермы, затем меняйте состав",
       "invalid_switch": "Выбранная сущность не найдена или не является switch",
+      "invalid_energy_entity": "Выберите существующий sensor с классом energy",
+      "invalid_power_entity": "Выберите существующий sensor с классом power",
+      "energy_physical_required": "Для этого режима укажите физический счётчик энергии",
+      "energy_power_required": "Для этого режима укажите внешний датчик мощности",
+      "energy_physical_in_use": "Этот счётчик энергии уже назначен другому майнеру или ферме",
       "invalid_temp_entity": "Каждая запись должна быть существующей сущностью sensor",
       "pool_fields_required": "Укажите хост и порт stratum для этого действия.",
       "invalid_pool_port": "Порт должен быть от 1 до 65535.",
@@ -603,6 +626,75 @@
       "farm_total_power_kw": {
         "name": "Суммарная мощность"
       },
+      "energy_total": {
+        "name": "Энергия всего"
+      },
+      "energy_today": {
+        "name": "Энергия сегодня"
+      },
+      "energy_month": {
+        "name": "Энергия за месяц"
+      },
+      "energy_prev_month": {
+        "name": "Энергия за прошлый месяц"
+      },
+      "energy_source": {
+        "name": "Источник энергии"
+      },
+      "energy_data_quality": {
+        "name": "Качество данных энергии"
+      },
+      "energy_efficiency_today": {
+        "name": "Средняя эффективность сегодня"
+      },
+      "energy_efficiency_month": {
+        "name": "Средняя эффективность за месяц"
+      },
+      "energy_cost_per_th_hour_today": {
+        "name": "Стоимость энергии за TH/s·ч сегодня"
+      },
+      "energy_lost_hash_today": {
+        "name": "Потерянные TH сегодня"
+      },
+      "energy_lost_hash_month": {
+        "name": "Потерянные TH за месяц"
+      },
+      "energy_idle_saved_today": {
+        "name": "Сэкономленная энергия в простое сегодня"
+      },
+      "energy_idle_saved_month": {
+        "name": "Сэкономленная энергия в простое за месяц"
+      },
+      "farm_energy_total": {
+        "name": "Энергия всего"
+      },
+      "farm_energy_today": {
+        "name": "Энергия сегодня"
+      },
+      "farm_energy_month": {
+        "name": "Энергия за месяц"
+      },
+      "farm_energy_prev_month": {
+        "name": "Энергия за прошлый месяц"
+      },
+      "farm_energy_efficiency_today": {
+        "name": "Средняя эффективность сегодня"
+      },
+      "farm_energy_efficiency_month": {
+        "name": "Средняя эффективность за месяц"
+      },
+      "farm_energy_cost_per_th_hour_today": {
+        "name": "Стоимость энергии за TH/s·ч сегодня"
+      },
+      "farm_energy_cost_per_ph_day": {
+        "name": "Стоимость энергии за PH·день"
+      },
+      "farm_energy_lost_hash_today": {
+        "name": "Потерянные TH сегодня"
+      },
+      "farm_energy_idle_saved_today": {
+        "name": "Сэкономленная энергия в простое сегодня"
+      },
       "farm_miner_count": {
         "name": "Число майнеров"
       },
@@ -716,6 +808,14 @@
         "auto": "Авто (по производителю и модели)",
         "generic": "Общие значения",
         "custom": "Свои пороги"
+      }
+    },
+    "energy_source_mode": {
+      "options": {
+        "auto": "Автоматически (физический → мощность switch → майнер)",
+        "physical": "Физический счётчик энергии",
+        "switch_power": "Расчёт по мощности smart switch",
+        "miner_power": "Оценка по мощности майнера"
       }
     }
   },

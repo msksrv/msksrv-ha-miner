@@ -1,5 +1,67 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b19 (beta)
+
+### Added (Energy — point 8, phase 1)
+
+- **`energy/` module:** source selection, trapezoidal power integration, physical-meter reset stitching, HA Store persistence.
+- **Per-miner options:** energy source mode (auto / physical / switch power / miner power), optional physical and power sensors.
+- **Sensors:** `energy_total` (miner) and `farm_energy_total` — Energy Dashboard compatible (`device_class: energy`, monotonic TOTAL kWh).
+- **Farm option:** optional whole-farm physical energy meter (PDU); otherwise sums member totals.
+- **Attributes:** active source, estimated flag, data quality %, farm coverage breakdown.
+- **Guards:** max integration gap, no integration on missing power, duplicate physical sensor blocked across miners.
+
+### Added (Energy — point 8, phase 2)
+
+- **Period sensors:** today, month, previous month (miner + farm); `TOTAL_INCREASING` with calendar reset.
+- **Efficiency:** weighted average J/TH for today and month (energy ÷ delivered terahashes).
+- **Cost metrics:** cost per TH/s·hour (farm tariff); farm cost per PH·day.
+- **Idle metrics:** lost terahashes and energy saved during downtime (not speculative revenue).
+- **Diagnostics:** energy source and data quality % sensors.
+
+### Fixed (Energy — point 8, review round)
+
+- **Persistence:** `mark_dirty()` after every tick; totals, periods, offset, cost, hash work, and quality survive restart.
+- **Farm total:** canonical delta accumulator (`member_last_totals`); add/remove miners and PDU↔sum switches no longer jump the total.
+- **Physical source switch:** first reading anchors to current canonical total via offset (no false +4900 kWh spike).
+- **Physical reset:** only drops >10% stitch offset; small noise ignored.
+- **PH·day formula:** `cost × 1000 × 86400 / hash_th` (was ~41.7× too high).
+- **Baseline reference:** `"baseline"` hashrate_reference resolves via learned baseline (priority over ideal).
+- **Data quality:** every poll registers expected interval; integrated only on valid samples; day-scoped %.
+- **Calendar reset:** day/month buckets reset at tick start even without valid energy data.
+- **Double tick:** energy runs once on successful poll; failed poll ticks unavailable only in `async_refresh`.
+- **Duplicate physical:** registry scans all config entries + auto-resolved entities; farm PDU included; conflict → fallback.
+- **Units:** Wh/kWh/MWh and W/kW/MW only; unknown unit → skip read (no silent kWh/W guess).
+- **Cost sensors:** composite units use MEASUREMENT without MONETARY device class.
+
+### Fixed (Energy — point 8, review round 2)
+
+- **Offline hashrate:** `last_hashrate_th_s` now stores zero; idle intervals no longer repeat half-rate hash delivery.
+- **Lost hash offline:** persisted `last_reference_hashrate_th_s`; used when poll data is unavailable.
+- **Farm summed cost:** `record.last_ts` updated each summed tick so tariff integration has a valid interval.
+- **Re-added miner:** stale `member_last_totals` entries pruned when miner leaves the farm.
+- **Farm PDU conflict:** `physical_sensor_in_use()` blocks duplicate PDU assignment across farms.
+- **Data quality:** expected interval uses full elapsed time (no 30 s cap).
+- **Storage version:** kept at 2 — new fields load via `from_dict()` defaults.
+- **Idle saved:** nominal power tracked from miner telemetry regardless of energy source.
+
+### Fixed (Energy — point 8, review round 3)
+
+- **Farm PDU self-reject:** registry exclude now matches both `entry_id` and `farm_{entry_id}`.
+- **Farm PDU form validation:** `_async_farm_save_energy()` rejects sensors already assigned elsewhere.
+- **Period vs quality interval:** hash/lost-hash use capped `period_dt_s`; long gaps still degrade data quality.
+- **Physical energy after gap:** day/month kWh and cost still recorded when `delta_kwh > 0` even if `period_dt_s = 0`.
+- **Store version:** `STORAGE_VERSION = 3` with pass-through migrator for v2 installs.
+- **Nominal power:** updated only when hashrate ≥ 75% of reference.
+
+### Fixed (Energy — point 8, review round 4)
+
+- **Store migration:** `EnergyStore` subclass with `_async_migrate_func()` (HA-compatible API).
+- **PDU error text:** mentions miner or farm assignment conflict.
+- **Tests:** pytest coverage for physical reset/anchor, offline/lost hash, long gap, source switch, farm member prune, store migration.
+
+---
+
 ## v1.7.0b18 (beta)
 
 ### Added (Automatic recovery — point 7)

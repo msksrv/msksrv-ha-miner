@@ -117,6 +117,7 @@
           "farm_ambient": "Room temperature sensors",
           "farm_pools": "Pools and workers",
           "farm_tariff": "Electricity tariff",
+          "farm_energy": "Farm energy meter",
           "farm_actions": "Apply settings to miners"
         },
         "menu_option_descriptions": {
@@ -124,6 +125,7 @@
           "farm_ambient": "Optional room temperature sensors for ambient readings",
           "farm_pools": "Save up to five stratum presets for this farm",
           "farm_tariff": "Flat or time-of-use electricity tariffs for cost estimates",
+          "farm_energy": "Optional whole-farm physical energy meter (PDU). Otherwise totals sum member miners.",
           "farm_actions": "Apply a saved pool preset to all farm members"
         },
         "description": "Power switch, health scoring thresholds, and optional stratum pool changes (requires miner reachable).",
@@ -132,6 +134,15 @@
             "name": "Power switch",
             "data": {
               "power_switch": "Power switch"
+            }
+          },
+          "energy": {
+            "name": "Energy source",
+            "description": "Canonical energy total for Energy Dashboard. Physical switch meters are preferred; calculated values are marked estimated.",
+            "data": {
+              "energy_source_mode": "Source mode",
+              "energy_physical_sensor": "Physical energy sensor",
+              "energy_power_sensor": "External power sensor"
             }
           },
           "health_thresholds": {
@@ -341,6 +352,13 @@
           "farm_elec_tariff_mode": "Tariff type"
         }
       },
+      "farm_energy": {
+        "title": "Farm energy meter",
+        "description": "Optional physical meter for the whole farm (e.g. PDU). When set, farm energy uses this meter instead of summing miners.",
+        "data": {
+          "farm_energy_physical_sensor": "Whole-farm energy sensor"
+        }
+      },
       "farm_tariff_flat": {
         "title": "Flat electricity tariff",
         "description": "One fixed price per kWh; add more currencies only if you need them.",
@@ -412,6 +430,11 @@
       "farm_device_set_conflict": "Another farm already uses this exact set of miners",
       "farm_emergency_stop_active": "Clear the farm emergency stop before changing member devices",
       "invalid_switch": "The selected entity is missing or is not a switch",
+      "invalid_energy_entity": "Choose an existing sensor with device class energy",
+      "invalid_power_entity": "Choose an existing sensor with device class power",
+      "energy_physical_required": "Select a physical energy sensor for this mode",
+      "energy_power_required": "Select an external power sensor for this mode",
+      "energy_physical_in_use": "This energy sensor is already assigned to another miner or farm",
       "invalid_temp_entity": "Each entry must be an existing sensor entity",
       "pool_fields_required": "Enter both stratum host and port for this action.",
       "invalid_pool_port": "Port must be between 1 and 65535.",
@@ -591,6 +614,45 @@
       "health_score": {
         "name": "Miner condition"
       },
+      "energy_total": {
+        "name": "Energy total"
+      },
+      "energy_today": {
+        "name": "Energy today"
+      },
+      "energy_month": {
+        "name": "Energy this month"
+      },
+      "energy_prev_month": {
+        "name": "Energy previous month"
+      },
+      "energy_source": {
+        "name": "Energy source"
+      },
+      "energy_data_quality": {
+        "name": "Energy data quality"
+      },
+      "energy_efficiency_today": {
+        "name": "Average efficiency today"
+      },
+      "energy_efficiency_month": {
+        "name": "Average efficiency this month"
+      },
+      "energy_cost_per_th_hour_today": {
+        "name": "Energy cost per TH/s·hour today"
+      },
+      "energy_lost_hash_today": {
+        "name": "Lost terahashes today"
+      },
+      "energy_lost_hash_month": {
+        "name": "Lost terahashes this month"
+      },
+      "energy_idle_saved_today": {
+        "name": "Energy saved while idle today"
+      },
+      "energy_idle_saved_month": {
+        "name": "Energy saved while idle this month"
+      },
       "anomaly_score": {
         "name": "Anomaly score"
       },
@@ -602,6 +664,36 @@
       },
       "farm_total_power_kw": {
         "name": "Total power"
+      },
+      "farm_energy_total": {
+        "name": "Energy total"
+      },
+      "farm_energy_today": {
+        "name": "Energy today"
+      },
+      "farm_energy_month": {
+        "name": "Energy this month"
+      },
+      "farm_energy_prev_month": {
+        "name": "Energy previous month"
+      },
+      "farm_energy_efficiency_today": {
+        "name": "Average efficiency today"
+      },
+      "farm_energy_efficiency_month": {
+        "name": "Average efficiency this month"
+      },
+      "farm_energy_cost_per_th_hour_today": {
+        "name": "Energy cost per TH/s·hour today"
+      },
+      "farm_energy_cost_per_ph_day": {
+        "name": "Energy cost per PH·day"
+      },
+      "farm_energy_lost_hash_today": {
+        "name": "Lost terahashes today"
+      },
+      "farm_energy_idle_saved_today": {
+        "name": "Energy saved while idle today"
       },
       "farm_miner_count": {
         "name": "Miner count"
@@ -716,6 +808,14 @@
         "auto": "Auto (by manufacturer and model)",
         "generic": "Generic defaults",
         "custom": "Custom thresholds"
+      }
+    },
+    "energy_source_mode": {
+      "options": {
+        "auto": "Automatic (physical → switch power → miner)",
+        "physical": "Physical energy sensor",
+        "switch_power": "Calculate from switch power sensor",
+        "miner_power": "Estimate from miner-reported power"
       }
     }
   },

@@ -56,6 +56,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         coordinator = MinerFarmCoordinator(hass, config_entry)
         hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
         await coordinator.async_refresh_emergency_stop_cache()
+        await coordinator.energy.async_load()
         await coordinator.async_config_entry_first_refresh()
 
         async def _farm_options_changed(
@@ -80,6 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
     await coordinator.baseline.async_load()
     await coordinator.recovery.async_load()
+    await coordinator.energy.async_load()
 
     try:
         await coordinator.async_config_entry_first_refresh()
@@ -93,6 +95,21 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     )
 
     await hass.config_entries.async_forward_entry_setups(config_entry, PLATFORMS)
+
+    async def _miner_options_changed(
+        hass_inner: HomeAssistant, entry: ConfigEntry
+    ) -> None:
+        coord = hass_inner.data.get(DOMAIN, {}).get(entry.entry_id)
+        if coord is None:
+            return
+        if hasattr(coord, "energy"):
+            coord.energy.reload_options()
+        if hasattr(coord, "recovery"):
+            coord.recovery.reload_options()
+
+    config_entry.async_on_unload(
+        config_entry.add_update_listener(_miner_options_changed)
+    )
 
     return True
 
@@ -110,6 +127,8 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
                 await coord.baseline.async_save(force=True)
             if hasattr(coord, "recovery"):
                 await coord.recovery.async_prepare_unload()
+            if hasattr(coord, "energy"):
+                await coord.energy.async_save(force=True)
         hass.data[DOMAIN].pop(config_entry.entry_id, None)
 
     return unload_ok
@@ -127,6 +146,9 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     )
 
     if config_entry.data.get(CONF_IS_FARM):
+        from .energy.farm_manager import FarmEnergyManager
+
+        await FarmEnergyManager(hass, config_entry.entry_id).async_remove()
         for rtype in FARM_REPAIR_TYPES:
             ir.async_delete_issue(
                 hass, DOMAIN, farm_issue_id(config_entry.entry_id, rtype)
@@ -144,11 +166,14 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     from .health.recovery.storage import RecoveryStorage
     from .const import CONF_POWER_SWITCH
 
+    from .energy.storage import EnergyStorage
+
     storage = RecoveryStorage(hass, config_entry.entry_id)
     await storage.async_load()
     if storage.record.emergency_stop_latched:
         await storage.async_remove()
         await BaselineManager(hass, config_entry.entry_id).async_remove()
+        await EnergyStorage(hass, config_entry.entry_id).async_remove()
         return
 
     if storage.record.state in POWER_CRITICAL_STATES:
@@ -164,5 +189,6 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
                 await BaselineManager(hass, config_entry.entry_id).async_remove()
                 return
 
+    await EnergyStorage(hass, config_entry.entry_id).async_remove()
     await BaselineManager(hass, config_entry.entry_id).async_remove()
     await storage.async_remove()
