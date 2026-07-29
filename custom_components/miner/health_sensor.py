@@ -53,8 +53,23 @@ class MinerHealthScoreSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
             }
         flags = health.get("flags")
         if flags:
-            attrs["issues"] = [k for k, v in flags.items() if v and k != "share_stale"]
+            attrs["issues"] = [
+                k
+                for k, v in flags.items()
+                if v
+                and k
+                not in ("share_stale", "temperature_warning", "maintenance_required")
+            ]
+        if flags and flags.get("temperature_high"):
+            attrs["temperature_status"] = "critical"
+        elif flags and flags.get("temperature_warning"):
+            attrs["temperature_status"] = "warning"
+        else:
+            attrs["temperature_status"] = "ok"
         attrs["data_coverage"] = health.get("data_coverage", 0)
+        profile = health.get("threshold_profile")
+        if profile:
+            attrs["threshold_profile"] = profile
         attrs["operating_state"] = (
             "mining" if self.coordinator.data.get("is_mining") else "stopped"
         )

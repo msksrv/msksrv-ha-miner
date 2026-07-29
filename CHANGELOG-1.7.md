@@ -1,5 +1,37 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b4 (beta)
+
+Configurable health thresholds and model-based defaults.
+
+### Added
+
+- **Options → Miner health thresholds:** profile `Auto` (by make/model), `Generic`, or `Custom` with editable limits.
+- **Built-in model profiles** for WhatsMiner, Bitmain/Antminer, Canaan/Avalon, Innosilicon, Goldshell, IceRiver (extensible in code).
+- **`sensor.*_health_score`** attribute `threshold_profile` shows which profile was applied (e.g. `auto:whatsminer:m21s`).
+
+### Changed
+
+- Health scoring reads thresholds from profile/options instead of hardcoded globals.
+- **Uptime sensor:** state rounded to minutes (no seconds in display) so Activity/logbook is not flooded every poll; exact value in attribute `uptime_seconds`.
+
+---
+
+## v1.7.0b3 (beta)
+
+Temperature thresholds and maintenance logic tuned for real-world models (e.g. WhatsMiner M21S).
+
+### Changed
+
+- **Chip temperature:** warning 90 °C, critical 95 °C (was 75 / 85).
+- **Board temperature:** warning 75 °C, critical 85 °C (was 65 / 75).
+- **Warning zone:** partial score deduction only; binary sensor «Высокая температура» stays OFF.
+- **Critical zone:** zero temp component, «Высокая температура» ON, «Требуется внимание» ON.
+- **`sensor.*_health_score`:** attribute `temperature_status` (`ok` / `warning` / `critical`).
+- **Renamed (RU):** «Оценка здоровья» → «Состояние майнера»; «Аномалия мощности» → «Проблема с мощностью»; «Требуется обслуживание» → «Требуется внимание».
+
+---
+
 ## v1.7.0b2 (beta)
 
 Improvements from field testing and scoring refinements.

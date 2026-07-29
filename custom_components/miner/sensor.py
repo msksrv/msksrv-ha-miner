@@ -376,6 +376,18 @@ class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
         return self._sensor_data
 
     @property
+    def extra_state_attributes(self) -> dict | None:
+        if self._sensor != "uptime_formatted":
+            return None
+        raw = self.coordinator.data.get("uptime")
+        if raw is None:
+            return None
+        try:
+            return {"uptime_seconds": int(raw)}
+        except (TypeError, ValueError):
+            return None
+
+    @property
     def available(self) -> bool:
         """Return if entity is available or not."""
         return self.coordinator.available

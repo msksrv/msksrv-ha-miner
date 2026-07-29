@@ -21,6 +21,7 @@ from .const import (
     CONF_WEB_USERNAME,
     DOMAIN,
 )
+from .health.profiles import resolve_health_thresholds
 from .health.scoring import compute_health
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,7 +59,11 @@ REQUEST_REFRESH_DEFAULT_COOLDOWN = 5
 
 
 def _format_uptime(value) -> str | None:
-    """Format uptime seconds to human readable string."""
+    """Format uptime seconds to a human-readable string.
+
+    Seconds are omitted once uptime reaches one minute so the entity state
+    does not change on every coordinator poll (avoids logbook/activity spam).
+    """
     try:
         total_seconds = int(value)
     except (TypeError, ValueError):
@@ -69,19 +74,17 @@ def _format_uptime(value) -> str | None:
 
     days, remainder = divmod(total_seconds, 86400)
     hours, remainder = divmod(remainder, 3600)
-    minutes, seconds = divmod(remainder, 60)
+    minutes, _seconds = divmod(remainder, 60)
 
     parts = []
     if days:
         parts.append(f"{days}d")
     if hours:
         parts.append(f"{hours}h")
-    if minutes:
+    if minutes or not (days or hours):
         parts.append(f"{minutes}m")
-    if seconds and not days:
-        parts.append(f"{seconds}s")
 
-    return " ".join(parts) if parts else "0s"
+    return " ".join(parts) if parts else "0m"
 
 
 def _primary_pool_metrics(pools):
@@ -473,11 +476,19 @@ class MinerCoordinator(DataUpdateCoordinator):
                 "max": self.config_entry.data.get(CONF_MAX_POWER, 10000),
             },
         }
-        health = compute_health(data)
+        thresholds, profile = resolve_health_thresholds(
+            data.get("make"),
+            data.get("model"),
+            self.config_entry.options,
+        )
+        health = compute_health(
+            data, thresholds, threshold_profile=profile
+        )
         data["health"] = {
             "score": health.score,
             "components": health.components,
             "flags": health.flags,
             "data_coverage": health.data_coverage,
+            "threshold_profile": health.threshold_profile,
         }
         return data

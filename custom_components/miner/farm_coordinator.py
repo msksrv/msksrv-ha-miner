@@ -184,7 +184,11 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                 except (TypeError, ValueError):
                     pass
             for issue, active in (health.get("flags") or {}).items():
-                if active and issue != "share_stale":
+                if active and issue not in (
+                    "share_stale",
+                    "temperature_warning",
+                    "maintenance_required",
+                ):
                     health_issue_counts[str(issue)] += 1
             ms = coord.data.get("miner_sensors") or {}
             h = ms.get("hashrate")

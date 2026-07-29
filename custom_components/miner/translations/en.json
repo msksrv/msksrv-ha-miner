@@ -123,10 +123,13 @@
           "farm_tariff": "Flat or time-of-use electricity tariffs for cost estimates",
           "farm_actions": "Apply a saved pool preset to all farm members"
         },
-        "description": "Power switch for the miner plug, and optional stratum pool changes (requires miner reachable).",
+        "description": "Power switch, health scoring thresholds, and optional stratum pool changes (requires miner reachable).",
         "sections": {
           "linked_switch": {
             "name": "Power switch"
+          },
+          "health_thresholds": {
+            "name": "Miner health thresholds"
           },
           "stratum_pool": {
             "name": "Stratum pool"
@@ -134,6 +137,16 @@
         },
         "data": {
           "power_switch": "Power switch",
+          "health_profile": "Threshold profile",
+          "temp_chip_warn_c": "Chip temperature warning (°C)",
+          "temp_chip_high_c": "Chip temperature critical (°C)",
+          "temp_board_warn_c": "Board temperature warning (°C)",
+          "temp_board_high_c": "Board temperature critical (°C)",
+          "hashrate_low_ratio": "Low hashrate ratio",
+          "chip_low_percent": "Low effective chips (%)",
+          "reject_rate_high_pct": "High reject rate (%)",
+          "fan_min_rpm": "Minimum fan speed (RPM)",
+          "share_stale_seconds": "Share stale timeout (s)",
           "pool_action": "Stratum pool",
           "pool_host": "Stratum host",
           "pool_port": "Stratum port",
@@ -294,7 +307,9 @@
       "farm_tou_currency_required": "Choose a currency for time-of-use tariffs.",
       "farm_tou_zones_dual": "Two-zone mode needs two zones with a positive price per kWh each.",
       "farm_tou_zones_triple": "Three-zone mode needs three zones with a positive price per kWh each.",
-      "farm_tou_zones_coverage": "Time zones must cover the full day without gaps (use 24:00 for end of day)"
+      "farm_tou_zones_coverage": "Time zones must cover the full day without gaps (use 24:00 for end of day)",
+      "temp_warn_must_be_below_critical": "Warning threshold must be lower than critical",
+      "invalid_threshold": "Enter a valid number"
     }
   },
   "services": {
@@ -433,7 +448,7 @@
         "name": "Reject rate"
       },
       "health_score": {
-        "name": "Health score"
+        "name": "Miner condition"
       },
       "farm_total_hashrate": {
         "name": "Total hashrate"
@@ -492,10 +507,10 @@
         "name": "Pool problem"
       },
       "health_power_anomaly": {
-        "name": "Power anomaly"
+        "name": "Power problem"
       },
       "health_maintenance_required": {
-        "name": "Maintenance required"
+        "name": "Attention required"
       }
     },
     "select": {
@@ -523,6 +538,13 @@
         "flat": "Flat (up to 3 currencies)",
         "dual": "Two zones (by local time)",
         "triple": "Three zones (by local time)"
+      }
+    },
+    "health_profile": {
+      "options": {
+        "auto": "Auto (by manufacturer and model)",
+        "generic": "Generic defaults",
+        "custom": "Custom thresholds"
       }
     }
   }

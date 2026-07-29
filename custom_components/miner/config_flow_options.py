@@ -34,14 +34,21 @@ from .const import (
     CONF_FARM_ELEC_ZONES,
     CONF_FARM_ENERGY_RATES,
     CONF_FARM_POOL_PRESETS,
+    CONF_HEALTH_PROFILE,
+    CONF_HEALTH_THRESHOLDS,
     CONF_IS_FARM,
     CONF_POWER_SWITCH,
     DOMAIN,
     FARM_ELEC_TARIFF_DUAL,
     FARM_ELEC_TARIFF_FLAT,
     FARM_ELEC_TARIFF_TRIPLE,
+    HEALTH_PROFILE_AUTO,
+    HEALTH_PROFILE_CUSTOM,
+    HEALTH_PROFILE_OPTIONS,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
+from .health.profiles import health_threshold_defaults_for_ui
+from .health.thresholds import HealthThresholds
 from .farm_elec_tou import (
     FARM_TARIFF_MODE_OPTIONS,
     farm_tariff_mode,
@@ -79,6 +86,18 @@ _TEMP_ENTITY_SELECTOR = EntitySelector(
 )
 
 _POOL_ACTION_OPTIONS = ["none", "replace_primary", "append_backup"]
+
+_HEALTH_THRESHOLD_FIELDS: tuple[tuple[str, float, float], ...] = (
+    ("temp_chip_warn_c", 60.0, 110.0),
+    ("temp_chip_high_c", 60.0, 120.0),
+    ("temp_board_warn_c", 50.0, 100.0),
+    ("temp_board_high_c", 50.0, 110.0),
+    ("hashrate_low_ratio", 0.5, 0.99),
+    ("chip_low_percent", 50.0, 100.0),
+    ("reject_rate_high_pct", 0.1, 10.0),
+    ("fan_min_rpm", 100.0, 10000.0),
+    ("share_stale_seconds", 60.0, 3600.0),
+)
 
 
 def _password_from_input(value: Any, stored: str = "") -> str:
@@ -615,6 +634,36 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 flat[key] = val
         return flat
 
+    def _miner_identity(self) -> tuple[str | None, str | None]:
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        if coordinator is None:
+            return None, None
+        return coordinator.data.get("make"), coordinator.data.get("model")
+
+    @staticmethod
+    def _validate_health_thresholds(flat: dict[str, Any]) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        try:
+            chip_warn = float(flat.get("temp_chip_warn_c"))
+            chip_high = float(flat.get("temp_chip_high_c"))
+            if chip_warn >= chip_high:
+                errors["temp_chip_high_c"] = "temp_warn_must_be_below_critical"
+        except (TypeError, ValueError):
+            errors["temp_chip_warn_c"] = "invalid_threshold"
+        try:
+            board_warn = float(flat.get("temp_board_warn_c"))
+            board_high = float(flat.get("temp_board_high_c"))
+            if board_warn >= board_high:
+                errors["temp_board_high_c"] = "temp_warn_must_be_below_critical"
+        except (TypeError, ValueError):
+            errors["temp_board_warn_c"] = "invalid_threshold"
+        return errors
+
+    @staticmethod
+    def _health_thresholds_from_input(flat: dict[str, Any]) -> dict[str, float | int]:
+        stored = HealthThresholds.from_dict(flat)
+        return stored.as_dict()
+
     async def _async_miner_options(
         self,
         user_input: dict[str, Any] | None = None,
@@ -666,11 +715,32 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     errors=errors,
                 )
 
+            profile = str(
+                user_input.get(CONF_HEALTH_PROFILE)
+                or self.config_entry.options.get(CONF_HEALTH_PROFILE)
+                or HEALTH_PROFILE_AUTO
+            )
+            if profile == HEALTH_PROFILE_CUSTOM:
+                health_errors = self._validate_health_thresholds(user_input)
+                if health_errors:
+                    errors.update(_nest_section_errors("health_thresholds", health_errors))
+                    return self.async_show_form(
+                        step_id="init",
+                        data_schema=self._miner_options_schema(user_input),
+                        errors=errors,
+                    )
+
             new_options = {**self.config_entry.options}
             if entity_id:
                 new_options[CONF_POWER_SWITCH] = entity_id
             else:
                 new_options.pop(CONF_POWER_SWITCH, None)
+
+            new_options[CONF_HEALTH_PROFILE] = profile
+            if profile == HEALTH_PROFILE_CUSTOM:
+                new_options[CONF_HEALTH_THRESHOLDS] = self._health_thresholds_from_input(
+                    user_input
+                )
 
             if pool_action != "none" and port_int is not None:
                 entry_id = self.config_entry.entry_id
@@ -727,6 +797,33 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         if suggested:
             sw_kw["description"] = {"suggested_value": suggested}
 
+        make, model = self._miner_identity()
+        defaults = health_threshold_defaults_for_ui(
+            make, model, self.config_entry.options
+        )
+        default_map = defaults.as_dict()
+        opts = self.config_entry.options
+        profile = ui.get(
+            CONF_HEALTH_PROFILE, opts.get(CONF_HEALTH_PROFILE, HEALTH_PROFILE_AUTO)
+        )
+        stored_custom = opts.get(CONF_HEALTH_THRESHOLDS) or {}
+
+        health_fields: dict[Any, Any] = {
+            vol.Optional(
+                CONF_HEALTH_PROFILE,
+                description={"suggested_value": profile},
+            ): SelectSelector(
+                SelectSelectorConfig(options=list(HEALTH_PROFILE_OPTIONS))
+            ),
+        }
+        for key, lo, hi in _HEALTH_THRESHOLD_FIELDS:
+            raw = ui.get(key, stored_custom.get(key, default_map.get(key)))
+            health_fields[
+                vol.Optional(key, description={"suggested_value": raw})
+            ] = NumberSelector(
+                NumberSelectorConfig(min=lo, max=hi, mode="box", step="any")
+            )
+
         return vol.Schema(
             {
                 vol.Required("linked_switch"): section(
@@ -738,6 +835,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                         }
                     ),
                     SectionConfig(collapsed=False),
+                ),
+                vol.Required("health_thresholds"): section(
+                    vol.Schema(health_fields),
+                    SectionConfig(collapsed=True),
                 ),
                 vol.Required("stratum_pool"): section(
                     vol.Schema(
