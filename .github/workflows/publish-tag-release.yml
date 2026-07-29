@@ -71,6 +71,13 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
+          draft: ${{ steps.classify.outputs.prerelease == 'true' }}
           prerelease: ${{ steps.classify.outputs.prerelease == 'true' }}
           generate_release_notes: true
           files: ${{ github.workspace }}/custom_components/miner/miner.zip
+
+      - name: Publish draft pre-release
+        if: steps.classify.outputs.prerelease == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false
