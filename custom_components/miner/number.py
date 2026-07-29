@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.components.sensor import EntityCategory
+from homeassistant.const import EntityCategory
 from homeassistant.const import UnitOfPower
 
 from .const import DOMAIN
@@ -25,7 +25,8 @@ _LOGGER = logging.getLogger(__name__)
 
 NUMBER_DESCRIPTION_KEY_MAP: dict[str, NumberEntityDescription] = {
     "power_limit": NumberEntityDescription(
-        key="Power Limit",
+        key="power_limit",
+        translation_key="power_limit",
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=NumberDeviceClass.POWER,
         entity_category=EntityCategory.CONFIG,
@@ -41,7 +42,6 @@ async def async_setup_entry(
     """Add sensors for passed config_entry in HA."""
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
-    await coordinator.async_config_entry_first_refresh()
     miner = await coordinator.get_miner()
     if miner is not None and miner.supports_autotuning:
         async_add_entities(
@@ -57,6 +57,8 @@ async def async_setup_entry(
 class MinerPowerLimitNumber(CoordinatorEntity[MinerCoordinator], NumberEntity):
     """Defines a Miner Number to set the Power Limit of the Miner."""
 
+    _attr_has_entity_name = True
+
     def __init__(
         self, coordinator: MinerCoordinator, entity_description: NumberEntityDescription
     ):
@@ -65,11 +67,6 @@ class MinerPowerLimitNumber(CoordinatorEntity[MinerCoordinator], NumberEntity):
         self._attr_native_value = self.coordinator.data["miner_sensors"]["power_limit"]
         self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-power_limit"
         self.entity_description = entity_description
-
-    @property
-    def name(self) -> str | None:
-        """Return name of the entity."""
-        return f"{self.coordinator.config_entry.title} Power Limit"
 
     @property
     def device_info(self) -> entity.DeviceInfo:

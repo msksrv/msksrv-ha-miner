@@ -213,7 +213,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                     for name, count in sorted(algo_counts.items())
                 )
         else:
-            algorithm_summary = "SHA256d"
+            algorithm_summary = None
 
         chips_percent = (
             round(100.0 * chips_effective / chips_expected, 2)

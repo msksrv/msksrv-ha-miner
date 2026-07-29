@@ -107,6 +107,7 @@ class FarmTotalPowerKwSensor(_FarmSensor):
             SensorEntityDescription(
                 key="total_power_kw",
                 native_unit_of_measurement="kW",
+                device_class=SensorDeviceClass.POWER,
                 state_class=SensorStateClass.MEASUREMENT,
                 suggested_display_precision=3,
             ),

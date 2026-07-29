@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import CONF_IS_FARM
 from .const import CONF_POWER_SWITCH
 from .const import DOMAIN
+from .device_resolution import miner_entity_unique_suffix
 from .farm_button import async_setup_farm_buttons
 from .miner_device_info import get_miner_device_info
 
@@ -37,7 +38,6 @@ async def async_setup_entry(
     coordinator = cast(
         MinerCoordinator, hass.data[DOMAIN][config_entry.entry_id]
     )
-    await coordinator.async_config_entry_first_refresh()
     async_add_entities(
         [
             MinerRebootButton(coordinator=coordinator),
@@ -50,15 +50,16 @@ async def async_setup_entry(
 class MinerRebootButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
     """Button to reboot a miner."""
 
+    _attr_has_entity_name = True
+    _attr_translation_key = "reboot"
     _attr_device_class = ButtonDeviceClass.RESTART
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-reboot"
-
-    @property
-    def name(self) -> str | None:
-        return f"{self.coordinator.config_entry.title} reboot"
+        suffix = miner_entity_unique_suffix(
+            coordinator.config_entry, coordinator.data.get("mac")
+        )
+        self._attr_unique_id = f"{suffix}-reboot"
 
     @property
     def device_info(self) -> entity.DeviceInfo:
@@ -118,7 +119,10 @@ class MinerPowerOffButton(_MinerLinkedSwitchButton):
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-power-off"
+        suffix = miner_entity_unique_suffix(
+            coordinator.config_entry, coordinator.data.get("mac")
+        )
+        self._attr_unique_id = f"{suffix}-power-off"
 
     async def async_press(self) -> None:
         eid = self._power_switch_entity_id
@@ -140,7 +144,10 @@ class MinerPowerOnButton(_MinerLinkedSwitchButton):
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-power-on"
+        suffix = miner_entity_unique_suffix(
+            coordinator.config_entry, coordinator.data.get("mac")
+        )
+        self._attr_unique_id = f"{suffix}-power-on"
 
     async def async_press(self) -> None:
         eid = self._power_switch_entity_id

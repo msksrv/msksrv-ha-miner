@@ -26,10 +26,10 @@ from .farm_energy_rates import _FARM_CUR_OFF
 
 _LOGGER = logging.getLogger(__name__)
 
-FARM_TARIFF_MODE_OPTIONS: list[dict[str, str]] = [
-    {"value": FARM_ELEC_TARIFF_FLAT, "label": "Flat (up to 3 currencies)"},
-    {"value": FARM_ELEC_TARIFF_DUAL, "label": "Two zones (by local time)"},
-    {"value": FARM_ELEC_TARIFF_TRIPLE, "label": "Three zones (by local time)"},
+FARM_TARIFF_MODE_OPTIONS: list[str] = [
+    FARM_ELEC_TARIFF_FLAT,
+    FARM_ELEC_TARIFF_DUAL,
+    FARM_ELEC_TARIFF_TRIPLE,
 ]
 
 TOU_CURRENCY_OPTIONS: list[dict[str, str]] = [
@@ -104,8 +104,27 @@ def _hhmm_to_minutes(hhmm: str) -> int:
     return min(1440, max(0, h * 60 + m))
 
 
-def price_at_local_minute(minute_of_day: int, zones: list[dict[str, Any]]) -> float:
-    """minute_of_day in [0, 1440). First matching zone wins."""
+def _zone_prices(zones: list[dict[str, Any]]) -> list[float]:
+    prices: list[float] = []
+    for z in zones:
+        try:
+            p = float(z.get("price_kwh", 0))
+        except (TypeError, ValueError):
+            continue
+        if p > 0:
+            prices.append(p)
+    return prices
+
+
+def _minute_in_zone(minute_of_day: int, sm: int, em: int) -> bool:
+    m = minute_of_day % 1440
+    if sm <= em:
+        return sm <= m < em or (em == 1440 and m >= sm)
+    return m >= sm or m < em
+
+
+def _minute_covered(minute_of_day: int, zones: list[dict[str, Any]]) -> bool:
+    """True when at least one zone with positive price covers this minute."""
     m = minute_of_day % 1440
     for z in zones:
         sm = _hhmm_to_minutes(z["start"])
@@ -116,13 +135,27 @@ def price_at_local_minute(minute_of_day: int, zones: list[dict[str, Any]]) -> fl
             continue
         if price <= 0:
             continue
-        if sm <= em:
-            if sm <= m < em or (em == 1440 and m >= sm):
-                return price
-        else:
-            if m >= sm or m < em:
-                return price
-    return 0.0
+        if _minute_in_zone(m, sm, em):
+            return True
+    return False
+
+
+def price_at_local_minute(minute_of_day: int, zones: list[dict[str, Any]]) -> float:
+    """minute_of_day in [0, 1440). First matching zone wins; else highest zone price."""
+    m = minute_of_day % 1440
+    fallback = max(_zone_prices(zones), default=0.0)
+    for z in zones:
+        sm = _hhmm_to_minutes(z["start"])
+        em = _hhmm_to_minutes(z["end"])
+        try:
+            price = float(z["price_kwh"])
+        except (TypeError, ValueError):
+            continue
+        if price <= 0:
+            continue
+        if _minute_in_zone(m, sm, em):
+            return price
+    return fallback
 
 
 def price_at_local_dt(local_dt: datetime, zones: list[dict[str, Any]]) -> float:
@@ -273,4 +306,16 @@ def validate_tou_submission(mode: str, zones: list[dict[str, Any]]) -> str | Non
     elif mode == FARM_ELEC_TARIFF_TRIPLE:
         if len(zones) != 3:
             return "farm_tou_zones_triple"
+    if mode in (FARM_ELEC_TARIFF_DUAL, FARM_ELEC_TARIFF_TRIPLE):
+        return validate_tou_zone_coverage(zones)
+    return None
+
+
+def validate_tou_zone_coverage(zones: list[dict[str, Any]]) -> str | None:
+    """Ensure every minute of the day falls in at least one TOU zone."""
+    if not zones:
+        return "farm_tou_zones_coverage"
+    for minute in range(1440):
+        if not _minute_covered(minute, zones):
+            return "farm_tou_zones_coverage"
     return None

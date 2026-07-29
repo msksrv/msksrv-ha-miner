@@ -16,6 +16,7 @@ from pyasic.config.pools import PoolGroup
 
 from .const import CONF_IS_FARM
 from .const import DOMAIN
+from .device_resolution import miner_entity_unique_suffix
 from .miner_device_info import get_miner_device_info
 from .coordinator import MinerCoordinator
 
@@ -94,7 +95,6 @@ async def async_setup_entry(
 
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
-    await coordinator.async_config_entry_first_refresh()
     to_add: list[SelectEntity] = [MinerPoolPrioritySelect(coordinator=coordinator)]
     miner = await coordinator.get_miner()
     if (
@@ -109,13 +109,13 @@ async def async_setup_entry(
 class MinerPowerModeSelect(CoordinatorEntity[MinerCoordinator], SelectEntity):
     """Select entity for miner power mode."""
 
+    _attr_has_entity_name = True
+    _attr_translation_key = "power_mode"
+    _attr_icon = "mdi:speedometer"
+
     def __init__(self, coordinator: MinerCoordinator) -> None:
         super().__init__(coordinator=coordinator)
         self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-power-mode"
-
-    @property
-    def name(self) -> str | None:
-        return f"{self.coordinator.config_entry.title} power mode"
 
     @property
     def device_info(self) -> entity.DeviceInfo:
@@ -163,7 +163,10 @@ class MinerPoolPrioritySelect(CoordinatorEntity[MinerCoordinator], SelectEntity)
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.data['mac']}-pool-priority"
+        suffix = miner_entity_unique_suffix(
+            coordinator.config_entry, coordinator.data.get("mac")
+        )
+        self._attr_unique_id = f"{suffix}-pool-priority"
 
     @property
     def device_info(self) -> entity.DeviceInfo:

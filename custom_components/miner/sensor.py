@@ -33,164 +33,181 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+def _sensor_desc(
+    sensor_id: str,
+    *,
+    translation_key: str | None = None,
+    **kwargs,
+) -> SensorEntityDescription:
+    """Build a sensor description with native HA translation_key."""
+    return SensorEntityDescription(
+        key=sensor_id,
+        translation_key=translation_key or sensor_id,
+        **kwargs,
+    )
+
+
 ENTITY_DESCRIPTION_KEY_MAP: dict[str, SensorEntityDescription] = {
-    "temperature": SensorEntityDescription(
-        key="Temperature",
+    "temperature": _sensor_desc(
+        "temperature",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.TEMPERATURE,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "board_temperature": SensorEntityDescription(
-        key="Board Temperature",
+    "board_temperature": _sensor_desc(
+        "board_temperature",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.TEMPERATURE,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "chip_temperature": SensorEntityDescription(
-        key="Chip Temperature",
+    "chip_temperature": _sensor_desc(
+        "chip_temperature",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
         device_class=SensorDeviceClass.TEMPERATURE,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "hashrate": SensorEntityDescription(
-        key="Hashrate",
+    "hashrate": _sensor_desc(
+        "hashrate",
         native_unit_of_measurement=TERA_HASH_PER_SECOND,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "ideal_hashrate": SensorEntityDescription(
-        key="Ideal Hashrate",
+    "ideal_hashrate": _sensor_desc(
+        "ideal_hashrate",
         native_unit_of_measurement=TERA_HASH_PER_SECOND,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "active_preset_name": SensorEntityDescription(
-        key="Active Preset Name",
-        device_class=SensorDeviceClass.ENUM,
+    "active_preset_name": _sensor_desc(
+        "active_preset_name",
+        icon="mdi:tune-variant",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "board_hashrate": SensorEntityDescription(
-        key="Board Hashrate",
+    "board_hashrate": _sensor_desc(
+        "board_hashrate",
         native_unit_of_measurement=TERA_HASH_PER_SECOND,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "board_chips": SensorEntityDescription(
-        key="Board Chips",
+    "board_chips": _sensor_desc(
+        "board_chips",
         icon="mdi:chip",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "board_expected_chips": SensorEntityDescription(
-        key="Board Expected Chips",
+    "board_expected_chips": _sensor_desc(
+        "board_expected_chips",
         icon="mdi:chip-outline",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "board_effective_chips": SensorEntityDescription(
-        key="Board Effective Chips",
+    "board_effective_chips": _sensor_desc(
+        "board_effective_chips",
         icon="mdi:check-decagram-outline",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "board_effective_chips_percent": SensorEntityDescription(
-        key="Board Effective Chips Percent",
+    "board_effective_chips_percent": _sensor_desc(
+        "board_effective_chips_percent",
         icon="mdi:percent",
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "power_limit": SensorEntityDescription(
-        key="Power Limit",
+    "power_limit": _sensor_desc(
+        "power_limit",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "miner_consumption": SensorEntityDescription(
-        key="Miner Consumption",
+    "miner_consumption": _sensor_desc(
+        "miner_consumption",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfPower.WATT,
         device_class=SensorDeviceClass.POWER,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "efficiency": SensorEntityDescription(
-        key="Efficiency",
+    "efficiency": _sensor_desc(
+        "efficiency",
         native_unit_of_measurement=JOULES_PER_TERA_HASH,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "fan_speed": SensorEntityDescription(
-        key="Fan Speed",
+    "fan_speed": _sensor_desc(
+        "fan_speed",
         native_unit_of_measurement=REVOLUTIONS_PER_MINUTE,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "ip": SensorEntityDescription(
-        key="IP Address",
+    "ip": _sensor_desc(
+        "ip",
         icon="mdi:ip-network",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "mac": SensorEntityDescription(
-        key="MAC Address",
+    "mac": _sensor_desc(
+        "mac",
         icon="mdi:ethernet",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "model": SensorEntityDescription(
-        key="ASIC Model",
+    "model": _sensor_desc(
+        "model",
         icon="mdi:chip",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "fw_ver": SensorEntityDescription(
-        key="Firmware",
+    "fw_ver": _sensor_desc(
+        "fw_ver",
+        translation_key="firmware",
         icon="mdi:memory",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "uptime_formatted": SensorEntityDescription(
-        key="Uptime",
+    "uptime_formatted": _sensor_desc(
+        "uptime_formatted",
+        translation_key="uptime",
         icon="mdi:clock-time-eight-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "boards_count": SensorEntityDescription(
-        key="Boards",
+    "boards_count": _sensor_desc(
+        "boards_count",
+        translation_key="boards",
         icon="mdi:view-grid-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "pool_host": SensorEntityDescription(
-        key="Pool Host",
+    "pool_host": _sensor_desc(
+        "pool_host",
         icon="mdi:server-network",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "pool_port": SensorEntityDescription(
-        key="Pool Port",
+    "pool_port": _sensor_desc(
+        "pool_port",
         icon="mdi:numeric",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "pool_worker": SensorEntityDescription(
-        key="Pool Worker",
+    "pool_worker": _sensor_desc(
+        "pool_worker",
         icon="mdi:account",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "accepted_shares": SensorEntityDescription(
-        key="Accepted Shares",
+    "accepted_shares": _sensor_desc(
+        "accepted_shares",
         icon="mdi:check-circle-outline",
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "rejected_shares": SensorEntityDescription(
-        key="Rejected Shares",
+    "rejected_shares": _sensor_desc(
+        "rejected_shares",
         icon="mdi:close-circle-outline",
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
-    "reject_rate": SensorEntityDescription(
-        key="Reject Rate",
+    "reject_rate": _sensor_desc(
+        "reject_rate",
         icon="mdi:percent",
         native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT,
@@ -249,8 +266,6 @@ async def async_setup_entry(
             sensor=sensor,
             entity_description=description,
         )
-
-    await coordinator.async_config_entry_first_refresh()
 
     sensors = []
 
@@ -319,6 +334,8 @@ async def async_setup_entry(
 class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     """Defines a Miner Sensor."""
 
+    _attr_has_entity_name = True
+
     entity_description: SensorEntityDescription
 
     def __init__(
@@ -345,11 +362,6 @@ class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
             return None
 
     @property
-    def name(self) -> str | None:
-        """Return name of the entity."""
-        return f"{self.coordinator.config_entry.title} {self.entity_description.key}"
-
-    @property
     def device_info(self) -> entity.DeviceInfo:
         """Return device info."""
         return get_miner_device_info(self.coordinator)
@@ -368,6 +380,8 @@ class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
 class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     """Defines a Miner Board Sensor."""
 
+    _attr_has_entity_name = True
+
     entity_description: SensorEntityDescription
 
     def __init__(
@@ -385,6 +399,7 @@ class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
         self._board_num = board_num
         self._sensor = sensor
         self.entity_description = entity_description
+        self._attr_translation_placeholders = {"board": str(board_num)}
 
     @property
     def _sensor_data(self):
@@ -393,14 +408,6 @@ class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
             return self.coordinator.data["board_sensors"][self._board_num][self._sensor]
         except LookupError:
             return None
-
-    @property
-    def name(self) -> str | None:
-        """Return name of the entity."""
-        return (
-            f"{self.coordinator.config_entry.title} "
-            f"Board #{self._board_num} {self.entity_description.key}"
-        )
 
     @property
     def device_info(self) -> entity.DeviceInfo:
@@ -421,6 +428,8 @@ class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
 class MinerFanSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     """Defines a Miner Fan Sensor."""
 
+    _attr_has_entity_name = True
+
     entity_description: SensorEntityDescription
 
     def __init__(
@@ -438,6 +447,7 @@ class MinerFanSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
         self._fan_num = fan_num
         self._sensor = sensor
         self.entity_description = entity_description
+        self._attr_translation_placeholders = {"fan": str(fan_num)}
         self._attr_force_update = True
 
     @property
@@ -447,14 +457,6 @@ class MinerFanSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
             return self.coordinator.data["fan_sensors"][self._fan_num][self._sensor]
         except LookupError:
             return None
-
-    @property
-    def name(self) -> str | None:
-        """Return name of the entity."""
-        return (
-            f"{self.coordinator.config_entry.title} "
-            f"Fan #{self._fan_num} {self.entity_description.key}"
-        )
 
     @property
     def device_info(self) -> entity.DeviceInfo:

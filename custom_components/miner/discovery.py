@@ -6,6 +6,10 @@ import ipaddress
 import logging
 from dataclasses import dataclass
 
+from homeassistant.core import HomeAssistant
+
+from .device_resolution import is_miner_already_configured
+from .device_resolution import normalize_hardware_id
 from .const import (
     SCAN_CONCURRENCY,
     SCAN_MAX_HOSTS,
@@ -76,12 +80,14 @@ def normalize_model_name(miner) -> str:
 
 
 def get_stable_identifier(miner) -> str | None:
-    """Return stable device identifier if available."""
+    """Return stable device identifier if available (normalized for matching)."""
     try:
         for attr in ("mac", "mac_address", "serial", "serial_number"):
             value = getattr(miner, attr, None)
             if value:
-                return str(value).lower()
+                normalized = normalize_hardware_id(str(value))
+                if normalized:
+                    return normalized
     except Exception:
         pass
 
@@ -188,3 +194,26 @@ async def async_scan_subnet(
 
     await asyncio.gather(*(_scan_host(ip) for ip in hosts))
     return sorted(found.values(), key=lambda item: tuple(int(x) for x in item.ip.split(".")))
+
+
+def filter_unconfigured_miners(
+    hass: HomeAssistant, miners: list[DiscoveredMiner]
+) -> list[DiscoveredMiner]:
+    """Drop miners that are already set up (by IP, MAC, or stable unique key)."""
+    out: list[DiscoveredMiner] = []
+    for item in miners:
+        mac_hint = item.unique_key if item.unique_key != item.ip else None
+        if is_miner_already_configured(
+            hass,
+            ip=item.ip,
+            mac=mac_hint,
+            unique_key=item.unique_key,
+        ):
+            _LOGGER.debug(
+                "Skipping already configured miner at %s (key=%s)",
+                item.ip,
+                item.unique_key,
+            )
+            continue
+        out.append(item)
+    return out
