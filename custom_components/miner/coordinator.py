@@ -91,7 +91,7 @@ def _primary_pool_metrics(pools):
             if getattr(p, "active", None) is True:
                 return p
         except Exception:
-            pass
+            _LOGGER.debug("Failed to pick active pool", exc_info=True)
     return pools[0]
 
 
@@ -258,20 +258,11 @@ class MinerCoordinator(DataUpdateCoordinator):
 
         if miner is None:
             self._failure_count += 1
-
-            if self._failure_count == 1:
-                _LOGGER.warning(
-                    "Miner is offline – returning zeroed data (first failure)."
-                )
-                return {
-                    **DEFAULT_DATA,
-                    "power_limit_range": {
-                        "min": self.config_entry.data.get(CONF_MIN_POWER, 15),
-                        "max": self.config_entry.data.get(CONF_MAX_POWER, 10000),
-                    },
-                }
-
-            raise UpdateFailed("Miner Offline (consecutive failure)")
+            _LOGGER.warning(
+                "Miner is offline (failure %s) – keeping previous data unavailable",
+                self._failure_count,
+            )
+            raise UpdateFailed("Miner offline")
 
         try:
             miner_data = await self.miner.get_data(
@@ -293,20 +284,13 @@ class MinerCoordinator(DataUpdateCoordinator):
             )
         except Exception as err:
             self._failure_count += 1
-
-            if self._failure_count == 1:
-                _LOGGER.warning(
-                    f"Error fetching miner data: {err} – returning zeroed data (first failure)."
-                )
-                return {
-                    **DEFAULT_DATA,
-                    "power_limit_range": {
-                        "min": self.config_entry.data.get(CONF_MIN_POWER, 15),
-                        "max": self.config_entry.data.get(CONF_MAX_POWER, 10000),
-                    },
-                }
-
-            _LOGGER.exception(err)
+            _LOGGER.warning(
+                "Error fetching miner data (failure %s): %s",
+                self._failure_count,
+                err,
+            )
+            if self._failure_count >= 2:
+                _LOGGER.debug("Repeated miner poll failure", exc_info=True)
             raise UpdateFailed from err
 
         self._failure_count = 0
@@ -333,6 +317,7 @@ class MinerCoordinator(DataUpdateCoordinator):
         try:
             boards_count = len(miner_data.hashboards)
         except Exception:
+            _LOGGER.debug("Failed to read board count", exc_info=True)
             boards_count = 0
 
         pool = None
@@ -362,7 +347,7 @@ class MinerCoordinator(DataUpdateCoordinator):
                         pool_host = pool_no_proto
                         pool_port = None
         except Exception:
-            pass
+            _LOGGER.debug("Failed to parse pool metrics", exc_info=True)
 
         try:
             total = (float(accepted) if accepted is not None else 0.0) + (
@@ -370,11 +355,13 @@ class MinerCoordinator(DataUpdateCoordinator):
             )
             reject_rate = round((float(rejected) / total) * 100, 2) if total else 0
         except Exception:
+            _LOGGER.debug("Failed to compute reject rate", exc_info=True)
             reject_rate = 0
 
         try:
             algorithm = miner_data.algo
         except Exception:
+            _LOGGER.debug("Failed to read mining algorithm", exc_info=True)
             algorithm = None
         if algorithm is not None:
             algorithm = str(algorithm).strip() or None

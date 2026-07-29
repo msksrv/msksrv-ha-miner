@@ -20,6 +20,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_IS_FARM, DOMAIN, JOULES_PER_TERA_HASH, TERA_HASH_PER_SECOND
+from .device_resolution import miner_entity_unique_suffix
 from .farm_sensor import async_setup_farm_sensors
 from .miner_device_info import get_miner_device_info
 
@@ -227,6 +228,9 @@ async def async_setup_entry(
     coordinator = cast(
         MinerCoordinator, hass.data[DOMAIN][config_entry.entry_id]
     )
+    entity_suffix = miner_entity_unique_suffix(
+        coordinator.config_entry, coordinator.data.get("mac")
+    )
 
     def _create_miner_entity(sensor: str) -> MinerSensor:
         """Create a miner sensor entity."""
@@ -237,6 +241,7 @@ async def async_setup_entry(
             coordinator=coordinator,
             sensor=sensor,
             entity_description=description,
+            entity_suffix=entity_suffix,
         )
 
     def _create_board_entity(board_num: int, sensor: str) -> MinerBoardSensor:
@@ -249,6 +254,7 @@ async def async_setup_entry(
             board_num=board_num,
             sensor=sensor,
             entity_description=description,
+            entity_suffix=entity_suffix,
         )
 
     def _create_fan_entity(fan_num: int, sensor: str) -> MinerFanSensor:
@@ -261,6 +267,7 @@ async def async_setup_entry(
             fan_num=fan_num,
             sensor=sensor,
             entity_description=description,
+            entity_suffix=entity_suffix,
         )
 
     sensors = []
@@ -288,6 +295,7 @@ async def async_setup_entry(
     try:
         board_keys = sorted(coordinator.data.get("board_sensors", {}).keys())
     except Exception:
+        _LOGGER.debug("Failed to read board sensor keys", exc_info=True)
         board_keys = []
 
     if not board_keys:
@@ -296,7 +304,8 @@ async def async_setup_entry(
             if coordinator.miner
             else None
         )
-        board_keys = list(range(expected_hashboards or 3))
+        if expected_hashboards:
+            board_keys = list(range(int(expected_hashboards)))
 
     for board in board_keys:
         for s in [
@@ -314,11 +323,13 @@ async def async_setup_entry(
     try:
         fan_keys = sorted(coordinator.data.get("fan_sensors", {}).keys())
     except Exception:
+        _LOGGER.debug("Failed to read fan sensor keys", exc_info=True)
         fan_keys = []
 
     if not fan_keys:
         expected_fans = getattr(coordinator.miner, "expected_fans", None) if coordinator.miner else None
-        fan_keys = list(range(expected_fans or 4))
+        if expected_fans:
+            fan_keys = list(range(int(expected_fans)))
 
     for fan in fan_keys:
         for s in ["fan_speed"]:
@@ -339,10 +350,11 @@ class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
         coordinator: MinerCoordinator,
         sensor: str,
         entity_description: SensorEntityDescription,
+        entity_suffix: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = f"{self.coordinator.config_entry.entry_id}-{sensor}"
+        self._attr_unique_id = f"{entity_suffix}-{sensor}"
         self._sensor = sensor
         self.entity_description = entity_description
 
@@ -386,12 +398,11 @@ class MinerBoardSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
         board_num: int,
         sensor: str,
         entity_description: SensorEntityDescription,
+        entity_suffix: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = (
-            f"{self.coordinator.config_entry.entry_id}-board-{board_num}-{sensor}"
-        )
+        self._attr_unique_id = f"{entity_suffix}-board-{board_num}-{sensor}"
         self._board_num = board_num
         self._sensor = sensor
         self.entity_description = entity_description
@@ -434,12 +445,11 @@ class MinerFanSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
         fan_num: int,
         sensor: str,
         entity_description: SensorEntityDescription,
+        entity_suffix: str,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator=coordinator)
-        self._attr_unique_id = (
-            f"{self.coordinator.config_entry.entry_id}-fan-{fan_num}-{sensor}"
-        )
+        self._attr_unique_id = f"{entity_suffix}-fan-{fan_num}-{sensor}"
         self._fan_num = fan_num
         self._sensor = sensor
         self.entity_description = entity_description
