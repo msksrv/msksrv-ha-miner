@@ -2,28 +2,24 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-from homeassistant.components.sensor import EntityCategory
-from homeassistant.components.sensor import SensorDeviceClass
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.components.sensor import SensorEntityDescription
-from homeassistant.components.sensor import SensorStateClass
+from homeassistant.components.sensor import (
+    EntityCategory,
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import REVOLUTIONS_PER_MINUTE
-from homeassistant.const import UnitOfPower
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import REVOLUTIONS_PER_MINUTE, UnitOfPower, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_IS_FARM
-from .const import DOMAIN
-from .const import JOULES_PER_TERA_HASH
-from .const import TERA_HASH_PER_SECOND
+from .const import CONF_IS_FARM, DOMAIN, JOULES_PER_TERA_HASH, TERA_HASH_PER_SECOND
 from .farm_sensor import async_setup_farm_sensors
 from .miner_device_info import get_miner_device_info
 

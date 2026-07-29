@@ -7,9 +7,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 
-from .const import CONF_IP
-from .const import CONF_IS_FARM
-from .const import DOMAIN
+from .const import CONF_IP, CONF_IS_FARM, DOMAIN
 from .farm_coordinator import MinerFarmCoordinator
 
 PLATFORMS: list[Platform] = [

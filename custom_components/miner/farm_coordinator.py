@@ -11,11 +11,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES
-from .const import CONF_FARM_DEVICE_IDS
-from .const import CONF_IP
-from .const import CONF_POWER_SWITCH
-from .const import DOMAIN
+from .const import (
+    CONF_FARM_AMBIENT_TEMP_ENTITIES,
+    CONF_FARM_DEVICE_IDS,
+    CONF_IP,
+    CONF_POWER_SWITCH,
+    DOMAIN,
+)
 from .device_resolution import async_get_miner_config_entry_for_device
 
 _LOGGER = logging.getLogger(__name__)

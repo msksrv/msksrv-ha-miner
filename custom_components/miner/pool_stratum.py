@@ -5,8 +5,7 @@ import logging
 from typing import Any
 from urllib.parse import urlparse
 
-from pyasic.config.pools import Pool
-from pyasic.config.pools import PoolGroup
+from pyasic.config.pools import Pool, PoolGroup
 
 _LOGGER = logging.getLogger(__name__)
 

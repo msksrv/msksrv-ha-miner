@@ -4,29 +4,30 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from homeassistant.components.sensor import SensorDeviceClass
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.components.sensor import SensorEntityDescription
-from homeassistant.components.sensor import SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
-from .const import FARM_ELEC_TARIFF_DUAL
-from .const import FARM_ELEC_TARIFF_FLAT
+from .const import DOMAIN, FARM_ELEC_TARIFF_DUAL, FARM_ELEC_TARIFF_FLAT
 from .farm_coordinator import MinerFarmCoordinator
-from .farm_elec_tou import farm_tariff_mode
-from .farm_elec_tou import farm_tou_currency
-from .farm_elec_tou import farm_tou_zones_stored
-from .farm_elec_tou import integrate_tou_energy_cost
-from .farm_elec_tou import price_at_local_dt
+from .farm_elec_tou import (
+    farm_tariff_mode,
+    farm_tou_currency,
+    farm_tou_zones_stored,
+    integrate_tou_energy_cost,
+    price_at_local_dt,
+)
 from .farm_energy_rates import farm_energy_rates_list
 
 PeriodKind = Literal["hour", "day", "month", "all"]

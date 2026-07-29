@@ -11,17 +11,24 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_HOST
+from homeassistant.core import callback, split_entity_id
 from homeassistant.data_entry_flow import AbortFlow
-from homeassistant.core import callback
-from homeassistant.core import split_entity_id
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.selector import BooleanSelector
-from homeassistant.helpers.selector import DeviceSelector, DeviceSelectorConfig
-from homeassistant.helpers.selector import EntitySelector, EntitySelectorConfig
-from homeassistant.helpers.selector import NumberSelector, NumberSelectorConfig
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import (
+    BooleanSelector,
+    DeviceSelector,
+    DeviceSelectorConfig,
+    EntitySelector,
+    EntitySelectorConfig,
+    NumberSelector,
+    NumberSelectorConfig,
+    SelectSelector,
+    SelectSelectorConfig,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .const import (
@@ -54,23 +61,31 @@ from .const import (
     FARM_ELEC_TARIFF_TRIPLE,
     SCAN_MAX_HOSTS,
 )
-from .device_resolution import async_get_miner_config_entry_for_device
-from .device_resolution import is_miner_already_configured
-from .farm_pool_presets import FARM_POOL_SLOT_COUNT
-from .farm_pool_presets import farm_pool_preset_slots
-from .farm_pool_presets import farm_pool_slots_from_user_input
-from .farm_elec_tou import farm_tariff_schema_fields
-from .farm_elec_tou import tou_zones_from_user_input
-from .farm_elec_tou import validate_tou_submission
-from .farm_energy_rates import farm_electricity_schema_fields
-from .farm_energy_rates import farm_energy_rates_from_user_input
-from .farm_pool_presets import strip_legacy_farm_pool_keys
+from .device_resolution import (
+    async_get_miner_config_entry_for_device,
+    is_miner_already_configured,
+)
 from .discovery import (
     DiscoveredMiner,
     async_scan_subnet,
     filter_unconfigured_miners,
     get_stable_identifier,
     normalize_model_name,
+)
+from .farm_elec_tou import (
+    farm_tariff_schema_fields,
+    tou_zones_from_user_input,
+    validate_tou_submission,
+)
+from .farm_energy_rates import (
+    farm_electricity_schema_fields,
+    farm_energy_rates_from_user_input,
+)
+from .farm_pool_presets import (
+    FARM_POOL_SLOT_COUNT,
+    farm_pool_preset_slots,
+    farm_pool_slots_from_user_input,
+    strip_legacy_farm_pool_keys,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -953,36 +968,35 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                             errors["base"] = "farm_device_set_conflict"
                             break
 
-            if not errors:
-                if (
-                    pool_action != "none"
-                    and preset_for_apply is not None
-                    and pool_port_int is not None
-                    and devices
+            if not errors and (
+                pool_action != "none"
+                and preset_for_apply is not None
+                and pool_port_int is not None
+                and devices
+            ):
+                if farm_coord is None or not hasattr(
+                    farm_coord, "async_apply_stratum_to_members"
                 ):
-                    if farm_coord is None or not hasattr(
-                        farm_coord, "async_apply_stratum_to_members"
-                    ):
-                        errors["base"] = "farm_not_loaded"
-                    else:
-                        use_ssl = bool(preset_for_apply.get("use_ssl", False))
-                        uname_eff = str(preset_for_apply.get("username") or "")
-                        pwd_eff = str(preset_for_apply.get("password") or "")
-                        try:
-                            ok, err_key = await farm_coord.async_apply_stratum_to_members(
-                                device_ids=devices,
-                                replace_primary=pool_action == "replace_primary",
-                                host=str(preset_for_apply["host"]),
-                                port=pool_port_int,
-                                use_ssl=use_ssl,
-                                username=uname_eff,
-                                password=pwd_eff,
-                            )
-                            if not ok:
-                                errors["base"] = err_key or "farm_pool_apply_failed"
-                        except Exception:
-                            _LOGGER.exception("Farm stratum from options")
-                            errors["base"] = "farm_pool_apply_failed"
+                    errors["base"] = "farm_not_loaded"
+                else:
+                    use_ssl = bool(preset_for_apply.get("use_ssl", False))
+                    uname_eff = str(preset_for_apply.get("username") or "")
+                    pwd_eff = str(preset_for_apply.get("password") or "")
+                    try:
+                        ok, err_key = await farm_coord.async_apply_stratum_to_members(
+                            device_ids=devices,
+                            replace_primary=pool_action == "replace_primary",
+                            host=str(preset_for_apply["host"]),
+                            port=pool_port_int,
+                            use_ssl=use_ssl,
+                            username=uname_eff,
+                            password=pwd_eff,
+                        )
+                        if not ok:
+                            errors["base"] = err_key or "farm_pool_apply_failed"
+                    except Exception:
+                        _LOGGER.exception("Farm stratum from options")
+                        errors["base"] = "farm_pool_apply_failed"
 
             if not errors:
                 new_options = {**self.config_entry.options}

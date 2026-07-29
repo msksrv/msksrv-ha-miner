@@ -6,16 +6,14 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
-from homeassistant.core import callback
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .farm_coordinator import MinerFarmCoordinator
-from .farm_pool_presets import farm_pool_preset_slots
-from .farm_pool_presets import farm_pool_select_option_labels
+from .farm_pool_presets import farm_pool_preset_slots, farm_pool_select_option_labels
 
 _LOGGER = logging.getLogger(__name__)
 

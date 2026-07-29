@@ -34,6 +34,9 @@ jobs:
           zip miner.zip -r ./
 
       - name: "Upload the ZIP file to the release"
-        uses: softprops/action-gh-release@v3.0.0
-        with:
-          files: ${{ github.workspace }}/custom_components/miner/miner.zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.event.release.tag_name }}" \
+            "${{ github.workspace }}/custom_components/miner/miner.zip" \
+            --clobber

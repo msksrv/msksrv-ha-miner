@@ -1,8 +1,7 @@
 """Support for Miner action buttons."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from homeassistant.components.button import ButtonDeviceClass, ButtonEntity
 from homeassistant.config_entries import ConfigEntry
@@ -12,9 +11,7 @@ from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_IS_FARM
-from .const import CONF_POWER_SWITCH
-from .const import DOMAIN
+from .const import CONF_IS_FARM, CONF_POWER_SWITCH, DOMAIN
 from .device_resolution import miner_entity_unique_suffix
 from .farm_button import async_setup_farm_buttons
 from .miner_device_info import get_miner_device_info

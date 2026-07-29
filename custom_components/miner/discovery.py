@@ -8,8 +8,6 @@ from dataclasses import dataclass
 
 from homeassistant.core import HomeAssistant
 
-from .device_resolution import is_miner_already_configured
-from .device_resolution import normalize_hardware_id
 from .const import (
     SCAN_CONCURRENCY,
     SCAN_MAX_HOSTS,
@@ -17,6 +15,7 @@ from .const import (
     SCAN_PORTS,
     SCAN_TCP_TIMEOUT,
 )
+from .device_resolution import is_miner_already_configured, normalize_hardware_id
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,7 +98,7 @@ async def async_port_open(ip: str, port: int, timeout: float = SCAN_TCP_TIMEOUT)
     writer = None
     try:
         connect = asyncio.open_connection(ip, port)
-        reader, writer = await asyncio.wait_for(connect, timeout=timeout)
+        _reader, writer = await asyncio.wait_for(connect, timeout=timeout)
         return True
     except Exception:
         return False

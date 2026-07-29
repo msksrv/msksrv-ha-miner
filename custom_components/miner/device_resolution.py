@@ -4,12 +4,9 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
-from homeassistant.helpers.device_registry import format_mac
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, format_mac
 
-from .const import CONF_IP
-from .const import CONF_IS_FARM
-from .const import DOMAIN
+from .const import CONF_IP, CONF_IS_FARM, DOMAIN
 
 
 def normalize_hardware_id(value: str | None) -> str:
@@ -64,23 +61,27 @@ def is_miner_already_configured(
     dev_reg = dr.async_get(hass)
     if mac_norm and len(mac_norm) == 12:
         formatted = format_mac(mac_norm)
-        if device := dev_reg.async_get_device(
+        if (device := dev_reg.async_get_device(
             connections={(CONNECTION_NETWORK_MAC, formatted)}
-        ):
-            if async_get_miner_config_entry_for_device(hass, device) is not None:
-                return True
+        )) and async_get_miner_config_entry_for_device(hass, device) is not None:
+            return True
 
-    if ip_s:
-        if device := dev_reg.async_get_device(connections={("ip", ip_s)}):
-            if async_get_miner_config_entry_for_device(hass, device) is not None:
-                return True
+    if (
+        ip_s
+        and (device := dev_reg.async_get_device(connections={("ip", ip_s)}))
+        and async_get_miner_config_entry_for_device(hass, device) is not None
+    ):
+        return True
 
     for entry in _iter_miner_config_entries(hass):
         for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
             for conn_type, conn_id in device.connections:
-                if conn_type == CONNECTION_NETWORK_MAC and mac_norm:
-                    if normalize_hardware_id(conn_id) == mac_norm:
-                        return True
+                if (
+                    conn_type == CONNECTION_NETWORK_MAC
+                    and mac_norm
+                    and normalize_hardware_id(conn_id) == mac_norm
+                ):
+                    return True
                 if conn_type == "ip" and ip_s and str(conn_id).strip() == ip_s:
                     return True
             for domain, identifier in device.identifiers:

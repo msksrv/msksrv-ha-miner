@@ -18,8 +18,10 @@ from .const import (
     SERVICE_SET_POOL,
     SERVICE_SET_WORK_MODE,
 )
-from .device_resolution import async_get_farm_config_entry_for_device
-from .device_resolution import async_get_miner_config_entry_for_device
+from .device_resolution import (
+    async_get_farm_config_entry_for_device,
+    async_get_miner_config_entry_for_device,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -102,9 +104,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_SET_WORK_MODE, set_work_mode)
 
     async def set_pool(call: ServiceCall) -> None:
-        from .pool_stratum import async_append_stratum_pool
-        from .pool_stratum import async_apply_primary_stratum
-        from .pool_stratum import ensure_first_pool_group
+        from .pool_stratum import (
+            async_append_stratum_pool,
+            async_apply_primary_stratum,
+            ensure_first_pool_group,
+        )
 
         targets = await get_targets(call)
         mode = str(call.data.get("mode", "existing")).lower()
