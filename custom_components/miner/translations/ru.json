@@ -362,17 +362,13 @@
       },
       "farm_tariff_flat": {
         "title": "Плоский тариф",
-        "description": "Одна фиксированная цена за kВt·ч; при необходимости можно добавить ещё валюты.",
+        "description": "Одна валюта и фиксированная цена за kWh для расчёта стоимости энергии фермы.",
         "sections": {
           "farm_tariff_flat": {
             "name": "Плоский тариф",
             "data": {
               "farm_elec_currency_1": "Валюта",
-              "farm_elec_price_kwh_1": "Цена за kВt·ч",
-              "farm_elec_currency_2": "Доп. валюта (необяз.)",
-              "farm_elec_price_kwh_2": "Цена за kВt·ч",
-              "farm_elec_currency_3": "Доп. валюта (необяз.)",
-              "farm_elec_price_kwh_3": "Цена за kВt·ч"
+              "farm_elec_price_kwh_1": "Цена за kWh"
             }
           }
         }

@@ -1,4 +1,4 @@
-"""Farm electricity tariffs (optional, up to 3 currencies)."""
+"""Farm electricity flat tariff (single currency + price per kWh)."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ FARM_ELECTRICITY_CURRENCY_OPTIONS: list[dict[str, str]] = [
 
 
 def farm_energy_rates_list(options: dict[str, Any]) -> list[tuple[str, float]]:
-    """Return [(currency, price_kwh), ...] from config entry options."""
+    """Return [(currency, price_kwh), ...] — energy accounting uses the first entry only."""
     raw = options.get(CONF_FARM_ENERGY_RATES)
     if not raw or not isinstance(raw, list):
         return []
@@ -61,111 +61,74 @@ def farm_energy_rates_list(options: dict[str, Any]) -> list[tuple[str, float]]:
     return out
 
 
+def farm_primary_energy_rate(options: dict[str, Any]) -> tuple[str, float] | None:
+    """Primary (only) flat tariff used by energy cost integration."""
+    rates = farm_energy_rates_list(options)
+    if not rates:
+        return None
+    return rates[0]
+
+
 def farm_energy_rates_from_user_input(user_input: dict[str, Any]) -> list[dict[str, Any]]:
-    """Build stored list from options flow fields."""
-    stored: list[dict[str, Any]] = []
-    for i in range(1, 4):
-        raw_cur = str(user_input.get(f"farm_elec_currency_{i}") or _FARM_CUR_OFF).strip()
-        if raw_cur.lower() == _FARM_CUR_OFF or not raw_cur:
-            continue
-        c = raw_cur.upper()
-        pr = user_input.get(f"farm_elec_price_kwh_{i}")
-        try:
-            pf = float(pr) if pr is not None else 0.0
-        except (TypeError, ValueError):
-            pf = 0.0
-        if c and pf > 0:
-            stored.append({"currency": c, "price_kwh": round(pf, 6)})
-    return stored
-
-
-def _flat_slot_active(
-    stored: list[dict[str, Any]], ui: dict[str, Any], index: int
-) -> bool:
-    """True when flat tariff slot *index* (1-based) has currency or price set."""
-    cur_key = f"farm_elec_currency_{index}"
-    price_key = f"farm_elec_price_kwh_{index}"
-    raw_cur = str(ui.get(cur_key) or "").strip()
-    if raw_cur and raw_cur.lower() not in (_FARM_CUR_OFF, "none"):
-        return True
-    pr = ui.get(price_key)
+    """Build stored list from options flow fields (single currency slot)."""
+    raw_cur = str(user_input.get("farm_elec_currency_1") or _FARM_CUR_OFF).strip()
+    if raw_cur.lower() in (_FARM_CUR_OFF, "none") or not raw_cur:
+        return []
+    c = raw_cur.upper()
+    pr = user_input.get("farm_elec_price_kwh_1")
     try:
-        if pr is not None and float(pr) > 0:
-            return True
+        pf = float(pr) if pr is not None else 0.0
     except (TypeError, ValueError):
-        pass
-    if index - 1 < len(stored):
-        c = str(stored[index - 1].get("currency") or "").strip()
-        try:
-            p = float(stored[index - 1].get("price_kwh", 0))
-        except (TypeError, ValueError):
-            p = 0.0
-        if c and p > 0:
-            return True
-    return False
-
-
-def flat_tariff_visible_slot_count(
-    stored: list[dict[str, Any]], ui: dict[str, Any]
-) -> int:
-    """Show one slot by default; reveal the next only while the previous is in use."""
-    count = 1
-    for index in range(1, 3):
-        if _flat_slot_active(stored, ui, index):
-            count = min(index + 1, 3)
-    return count
+        pf = 0.0
+    if c and pf > 0:
+        return [{"currency": c, "price_kwh": round(pf, 6)}]
+    return []
 
 
 def farm_electricity_schema_fields(
     options: dict[str, Any], user_input: dict[str, Any] | None = None
 ) -> dict[Any, Any]:
-    """Vol schema fragment for optional currency + price/kWh slots (flat tariff)."""
+    """Vol schema for optional currency + price/kWh (flat tariff, one slot)."""
     ui = user_input or {}
     stored_raw = options.get(CONF_FARM_ENERGY_RATES) or []
     stored: list[dict[str, Any]] = (
         [x for x in stored_raw if isinstance(x, dict)] if isinstance(stored_raw, list) else []
     )
-    slot_count = flat_tariff_visible_slot_count(stored, ui)
-    fields: dict[Any, Any] = {}
-    for i in range(1, slot_count + 1):
-        cur_key = f"farm_elec_currency_{i}"
-        price_key = f"farm_elec_price_kwh_{i}"
-        if i - 1 < len(stored):
-            def_cur = str(stored[i - 1].get("currency") or "")
-            try:
-                def_price = float(stored[i - 1].get("price_kwh", 0))
-            except (TypeError, ValueError):
-                def_price = 0.0
-        else:
-            def_cur = ""
-            def_price = 0.0
-        sug_cur = ui.get(cur_key, def_cur)
-        if isinstance(sug_cur, str) and sug_cur.strip():
-            select_suggested = sug_cur.strip().upper()
-        else:
-            select_suggested = _FARM_CUR_OFF
-        sug_price = ui.get(price_key, def_price)
+    if stored:
+        def_cur = str(stored[0].get("currency") or "")
         try:
-            price_suggested = float(sug_price) if sug_price is not None else 0.0
+            def_price = float(stored[0].get("price_kwh", 0))
         except (TypeError, ValueError):
-            price_suggested = 0.0
-        fields[
-            vol.Optional(
-                cur_key,
-                description={"suggested_value": select_suggested},
-            )
-        ] = SelectSelector(SelectSelectorConfig(options=FARM_ELECTRICITY_CURRENCY_OPTIONS))
-        fields[
-            vol.Optional(
-                price_key,
-                description={"suggested_value": price_suggested},
-            )
-        ] = NumberSelector(
+            def_price = 0.0
+    else:
+        def_cur = ""
+        def_price = 0.0
+
+    sug_cur = ui.get("farm_elec_currency_1", def_cur)
+    if isinstance(sug_cur, str) and sug_cur.strip():
+        select_suggested = sug_cur.strip().upper()
+    else:
+        select_suggested = _FARM_CUR_OFF
+    sug_price = ui.get("farm_elec_price_kwh_1", def_price)
+    try:
+        price_suggested = float(sug_price) if sug_price is not None else 0.0
+    except (TypeError, ValueError):
+        price_suggested = 0.0
+
+    return {
+        vol.Optional(
+            "farm_elec_currency_1",
+            description={"suggested_value": select_suggested},
+        ): SelectSelector(SelectSelectorConfig(options=FARM_ELECTRICITY_CURRENCY_OPTIONS)),
+        vol.Optional(
+            "farm_elec_price_kwh_1",
+            description={"suggested_value": price_suggested},
+        ): NumberSelector(
             NumberSelectorConfig(
                 min=0,
                 max=9999,
                 step="any",
                 mode="box",
             )
-        )
-    return fields
+        ),
+    }

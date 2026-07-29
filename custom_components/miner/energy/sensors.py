@@ -142,7 +142,7 @@ class _MinerEnergySensorBase(CoordinatorEntity["MinerCoordinator"], SensorEntity
 
 class MinerEnergyTotalSensor(_MinerEnergySensorBase):
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.TOTAL
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_suggested_display_precision = 3
 
@@ -434,7 +434,7 @@ class _FarmEnergySensorBase(CoordinatorEntity["MinerFarmCoordinator"], SensorEnt
 
 class FarmEnergyTotalSensor(_FarmEnergySensorBase):
     _attr_device_class = SensorDeviceClass.ENERGY
-    _attr_state_class = SensorStateClass.TOTAL
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
     _attr_suggested_display_precision = 3
     _attr_translation_key = "farm_energy_total"

@@ -362,17 +362,13 @@
       },
       "farm_tariff_flat": {
         "title": "Flat electricity tariff",
-        "description": "One fixed price per kWh; add more currencies only if you need them.",
+        "description": "One currency and fixed price per kWh for farm energy cost.",
         "sections": {
           "farm_tariff_flat": {
             "name": "Flat tariff",
             "data": {
               "farm_elec_currency_1": "Currency",
-              "farm_elec_price_kwh_1": "Price per kWh",
-              "farm_elec_currency_2": "Extra currency (optional)",
-              "farm_elec_price_kwh_2": "Price per kWh",
-              "farm_elec_currency_3": "Extra currency (optional)",
-              "farm_elec_price_kwh_3": "Price per kWh"
+              "farm_elec_price_kwh_1": "Price per kWh"
             }
           }
         }

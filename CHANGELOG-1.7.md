@@ -1,5 +1,15 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b21 (beta)
+
+### Changed
+
+- **`energy_total` state class:** `TOTAL_INCREASING` for miner and farm (monotonic Energy Dashboard totals).
+- **Legacy `farm_cost_*`:** auto-disabled in Entity Registry (`disabled_by=integration`) on load unless legacy option enabled.
+- **Flat tariff UI:** single currency + price slot; energy cost uses the primary rate only (extra stored slots ignored).
+
+---
+
 ## v1.7.0b20 (beta)
 
 ### Added (Energy cost — farm UI alignment)
