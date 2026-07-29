@@ -13,7 +13,6 @@ from ...const import CONF_IP, DOMAIN
 from ..baseline.detector import AnomalyFinding, AnomalyState
 from .definitions import (
     BOARD_ANOMALY_REASONS,
-    CONFIRM_FAN_IMBALANCE_SECONDS,
     FAN_ANOMALY_REASONS,
     HASHRATE_ANOMALY_REASONS,
     LEARN_MORE_URL,
@@ -28,6 +27,7 @@ from .definitions import (
 from .lifecycle import RepairLifecycle, monotonic_now
 from .membership import miner_belongs_to_farm
 from .registry_sync import sync_open_from_registry
+from .timing import resolve_confirm_seconds, resolve_recovery_seconds
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -39,7 +39,9 @@ class RepairManager:
         self.hass = hass
         self.entry = entry
         self.entry_id = entry.entry_id
-        self._lifecycle = RepairLifecycle()
+        self._lifecycle = RepairLifecycle(
+            recovery_seconds=resolve_recovery_seconds(entry)
+        )
         self._open: set[str] = set()
         sync_open_from_registry(
             hass,
@@ -59,6 +61,7 @@ class RepairManager:
         available: bool,
     ) -> None:
         """Evaluate miner repairs after each coordinator poll."""
+        self._lifecycle.set_recovery_seconds(resolve_recovery_seconds(self.entry))
         now = monotonic_now()
         name = self._device_name(data) if data else (self.entry.title or "Miner")
         raw_active: dict[str, bool] = {}
@@ -76,6 +79,7 @@ class RepairManager:
                     RepairType.POOL: self._pool_raw(data, anomaly),
                     RepairType.RECOVERY: self._recovery_raw(anomaly),
                     RepairType.REJECT: self._reject_raw(data, anomaly),
+                    RepairType.POWER: self._power_raw(data),
                 }
             )
         else:
@@ -140,12 +144,12 @@ class RepairManager:
         self, rtype: str, data: dict[str, Any], anomaly: AnomalyState
     ) -> float:
         if rtype == RepairType.FAN and self._fan_imbalance(anomaly):
-            return CONFIRM_FAN_IMBALANCE_SECONDS
+            return 0
         if rtype == RepairType.REJECT and self._reject_anomaly_active(anomaly):
             return 0
-        if rtype == RepairType.RECOVERY:
-            return REPAIR_DEFINITIONS[rtype].confirm_seconds
-        return REPAIR_DEFINITIONS[rtype].confirm_seconds
+        if rtype == RepairType.HASHRATE and self._hashrate_anomaly_active(anomaly):
+            return 0
+        return resolve_confirm_seconds(self.entry, rtype)
 
     def _create_or_update(
         self,
@@ -188,11 +192,25 @@ class RepairManager:
     def _hashrate_raw(data: dict[str, Any], anomaly: AnomalyState) -> bool:
         if not data.get("is_mining"):
             return False
+        flags = (data.get("health") or {}).get("flags") or {}
+        if flags.get("hashrate_low"):
+            return True
+        return RepairManager._hashrate_anomaly_active(anomaly)
+
+    @staticmethod
+    def _hashrate_anomaly_active(anomaly: AnomalyState) -> bool:
         if not anomaly.detected or anomaly.confidence < 20:
             return False
         if anomaly.reason in HASHRATE_ANOMALY_REASONS:
             return True
         return any(f.reason in HASHRATE_ANOMALY_REASONS for f in anomaly.findings)
+
+    @staticmethod
+    def _power_raw(data: dict[str, Any]) -> bool:
+        if not data.get("is_mining"):
+            return False
+        flags = (data.get("health") or {}).get("flags") or {}
+        return bool(flags.get("power_anomaly"))
 
     @staticmethod
     def _temperature_raw(data: dict[str, Any]) -> bool:
@@ -305,6 +323,8 @@ class RepairManager:
             return self._recovery_placeholders(anomaly, name)
         if rtype == RepairType.REJECT:
             return self._reject_placeholders(data, anomaly, name)
+        if rtype == RepairType.POWER:
+            return self._power_placeholders(data, name)
         return self._fan_placeholders(data, anomaly, name)
 
     def _offline_placeholders(self, data: dict[str, Any], name: str) -> dict[str, str]:
@@ -364,6 +384,23 @@ class RepairManager:
             }
         reject = _fmt(data.get("reject_rate"), "—")
         return {"name": name, "current_reject_rate": reject, "baseline_reject_rate": "—"}
+
+    def _power_placeholders(self, data: dict[str, Any], name: str) -> dict[str, str]:
+        ms = data.get("miner_sensors") or {}
+        learned = (data.get("health") or {}).get("learned_baseline") or {}
+        current = _fmt(ms.get("miner_consumption"), "—", decimals=0)
+        baseline = _fmt(learned.get("power_w"), "—", decimals=0)
+        mode = str(
+            learned.get("mode")
+            or ms.get("active_preset_name")
+            or "—"
+        )
+        return {
+            "name": name,
+            "current_power": current,
+            "baseline_power": baseline,
+            "power_mode": mode,
+        }
 
     def _hashboard_placeholders(
         self, data: dict[str, Any], anomaly: AnomalyState, name: str

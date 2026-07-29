@@ -17,6 +17,7 @@ from .definitions import (
 from .lifecycle import RepairLifecycle, monotonic_now
 from .membership import format_offline_miner_list
 from .registry_sync import sync_open_from_registry
+from .timing import resolve_confirm_seconds, resolve_recovery_seconds
 
 
 class FarmRepairManager:
@@ -26,7 +27,9 @@ class FarmRepairManager:
         self.hass = hass
         self.entry = entry
         self.entry_id = entry.entry_id
-        self._lifecycle = RepairLifecycle()
+        self._lifecycle = RepairLifecycle(
+            recovery_seconds=resolve_recovery_seconds(entry)
+        )
         self._open: set[str] = set()
         sync_open_from_registry(
             hass,
@@ -45,11 +48,12 @@ class FarmRepairManager:
         miner_count: int,
         offline_names: list[str],
     ) -> None:
+        self._lifecycle.set_recovery_seconds(resolve_recovery_seconds(self.entry))
         now = monotonic_now()
         rtype = FarmRepairType.OFFLINE
         key = farm_issue_id(self.entry_id, rtype)
         raw = offline_count > 0
-        confirm = FARM_REPAIR_DEFINITIONS[rtype].confirm_seconds
+        confirm = resolve_confirm_seconds(self.entry, rtype)
         name = self.entry.title or "Farm"
 
         if rtype in self._open:

@@ -20,6 +20,10 @@ class RepairLifecycle:
         self._active_since.setdefault(key, now)
         self._recovery_since.pop(key, None)
 
+    def set_recovery_seconds(self, value: float) -> None:
+        """Apply updated recovery period from config entry options."""
+        self._recovery_seconds = value
+
     def confirmed(self, key: str, condition: bool, now: float, confirm_seconds: float) -> bool:
         """True when *condition* held continuously for *confirm_seconds*."""
         if not condition:

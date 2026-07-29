@@ -126,14 +126,79 @@
         "description": "Power switch, health scoring thresholds, and optional stratum pool changes (requires miner reachable).",
         "sections": {
           "linked_switch": {
-            "name": "Power switch"
+            "name": "Power switch",
+            "data": {
+              "power_switch": "Power switch"
+            }
           },
           "health_thresholds": {
             "name": "Miner health thresholds",
-            "description": "Auto profile picks thresholds by manufacturer and model (starting recommendations — verify for your firmware). Number fields below apply only when profile is Custom."
+            "description": "Auto profile picks thresholds by manufacturer and model (starting recommendations — verify for your firmware). Number fields below apply only when profile is Custom.",
+            "data": {
+              "health_profile": "Threshold profile",
+              "temp_chip_warn_c": "Chip temperature warning (°C)",
+              "temp_chip_high_c": "Chip temperature critical (°C)",
+              "temp_board_warn_c": "Board temperature warning (°C)",
+              "temp_board_high_c": "Board temperature critical (°C)",
+              "hashrate_low_ratio": "Low hashrate ratio (see profile: Auto = learned baseline, Generic/Custom = ideal hashrate from miner)",
+              "chip_low_percent": "Low effective chips (%)",
+              "reject_rate_high_pct": "High reject rate (%)",
+              "fan_min_rpm": "Minimum fan speed (RPM)",
+              "share_stale_seconds": "Share stale timeout (s)",
+              "power_low_ratio": "Low power ratio (vs learned baseline)",
+              "power_high_ratio": "High power ratio (vs learned baseline)"
+            },
+            "data_description": {
+              "health_profile": "Auto uses built-in profiles by make/model. Generic uses universal defaults. Custom uses the numbers below.",
+              "temp_chip_warn_c": "Chip junction temperature: partial score reduction starts here. Meaning varies by firmware and hardware.",
+              "temp_chip_high_c": "Chip temperature critical: triggers High temperature and Attention required.",
+              "temp_board_warn_c": "PCB/board temperature warning — usually lower than chip limits.",
+              "temp_board_high_c": "PCB/board temperature critical.",
+              "hashrate_low_ratio": "Auto profile: fraction of learned baseline hashrate for this power mode. Generic/Custom: fraction of ideal hashrate reported by the miner.",
+              "chip_low_percent": "Minimum effective chips per board (%). Evaluated only while mining.",
+              "reject_rate_high_pct": "Pool reject rate (%) above which scoring penalizes the miner.",
+              "fan_min_rpm": "Minimum fan speed (RPM) while mining.",
+              "share_stale_seconds": "No accepted share for this long while mining reduces the score.",
+              "power_low_ratio": "Consumption below reference × this ratio triggers a power anomaly. Before baseline is learned, reference is power limit; after learning, reference is baseline for the current mode.",
+              "power_high_ratio": "Consumption above reference × this ratio triggers a power anomaly. Before baseline is learned, reference is power limit; after learning, reference is baseline for the current mode."
+            }
+          },
+          "repair_timing": {
+            "name": "Repair timing",
+            "description": "Default warning delay applies to most repairs. Advanced per-type overrides below; temperature and offline keep safer built-in defaults unless you set them explicitly.",
+            "data": {
+              "repair_confirm_default_seconds": "Default warning delay (s)",
+              "repair_recovery_seconds": "Recovery period (s)",
+              "repair_confirm_temperature_seconds": "Temperature warning delay (s)",
+              "repair_confirm_offline_seconds": "Offline warning delay (s)",
+              "repair_confirm_fan_seconds": "Fan warning delay (s)",
+              "repair_confirm_hashboard_seconds": "Hashboard warning delay (s)",
+              "repair_confirm_pool_seconds": "Pool warning delay (s)",
+              "repair_confirm_reject_seconds": "Reject rate warning delay (s)",
+              "repair_confirm_hashrate_seconds": "Hashrate warning delay (s)",
+              "repair_confirm_power_seconds": "Power warning delay (s)"
+            },
+            "data_description": {
+              "repair_confirm_default_seconds": "How long a condition must persist before a repair appears (most types). Default 300 s (5 min).",
+              "repair_recovery_seconds": "How long the condition must stay normal before the repair clears. Default 240 s (4 min).",
+              "repair_confirm_temperature_seconds": "Optional override for critical temperature repairs (default 180 s if unset).",
+              "repair_confirm_offline_seconds": "Optional override for offline repairs (default 600 s if unset)."
+            }
           },
           "stratum_pool": {
-            "name": "Stratum pool"
+            "name": "Stratum pool",
+            "data": {
+              "pool_action": "Stratum pool",
+              "pool_host": "Stratum host",
+              "pool_port": "Stratum port",
+              "pool_use_ssl": "Use stratum+ssl",
+              "pool_username": "Worker username",
+              "pool_password": "Worker password"
+            },
+            "data_description": {
+              "pool_action": "Leave unchanged, replace the primary slot, or add a backup (max 3 pools).",
+              "pool_password": "Leave empty if the pool does not require a password."
+            }
           }
         },
         "data": {
@@ -143,11 +208,23 @@
           "temp_chip_high_c": "Chip temperature critical (°C)",
           "temp_board_warn_c": "Board temperature warning (°C)",
           "temp_board_high_c": "Board temperature critical (°C)",
-          "hashrate_low_ratio": "Low hashrate ratio",
+          "hashrate_low_ratio": "Low hashrate ratio (see profile: Auto = learned baseline, Generic/Custom = ideal hashrate from miner)",
           "chip_low_percent": "Low effective chips (%)",
           "reject_rate_high_pct": "High reject rate (%)",
           "fan_min_rpm": "Minimum fan speed (RPM)",
           "share_stale_seconds": "Share stale timeout (s)",
+          "power_low_ratio": "Low power ratio (vs learned baseline)",
+          "power_high_ratio": "High power ratio (vs learned baseline)",
+          "repair_confirm_default_seconds": "Default warning delay (s)",
+          "repair_recovery_seconds": "Recovery period (s)",
+          "repair_confirm_temperature_seconds": "Temperature warning delay (s)",
+          "repair_confirm_offline_seconds": "Offline warning delay (s)",
+          "repair_confirm_fan_seconds": "Fan warning delay (s)",
+          "repair_confirm_hashboard_seconds": "Hashboard warning delay (s)",
+          "repair_confirm_pool_seconds": "Pool warning delay (s)",
+          "repair_confirm_reject_seconds": "Reject rate warning delay (s)",
+          "repair_confirm_hashrate_seconds": "Hashrate warning delay (s)",
+          "repair_confirm_power_seconds": "Power warning delay (s)",
           "pool_action": "Stratum pool",
           "pool_host": "Stratum host",
           "pool_port": "Stratum port",
@@ -161,11 +238,17 @@
           "temp_chip_high_c": "Chip temperature critical: triggers High temperature and Attention required.",
           "temp_board_warn_c": "PCB/board temperature warning — usually lower than chip limits.",
           "temp_board_high_c": "PCB/board temperature critical.",
-          "hashrate_low_ratio": "Actual hashrate vs ideal from the miner (0.85 = 85%). Evaluated only while mining.",
+          "hashrate_low_ratio": "Auto profile: fraction of learned baseline hashrate for this power mode. Generic/Custom: fraction of ideal hashrate reported by the miner.",
           "chip_low_percent": "Minimum effective chips per board (%). Evaluated only while mining.",
           "reject_rate_high_pct": "Pool reject rate (%) above which scoring penalizes the miner.",
           "fan_min_rpm": "Minimum fan speed (RPM) while mining.",
           "share_stale_seconds": "No accepted share for this long while mining reduces the score.",
+          "power_low_ratio": "Consumption below reference × this ratio triggers a power anomaly. Before baseline is learned, reference is power limit; after learning, reference is baseline for the current mode.",
+          "power_high_ratio": "Consumption above reference × this ratio triggers a power anomaly. Before baseline is learned, reference is power limit; after learning, reference is baseline for the current mode.",
+          "repair_confirm_default_seconds": "How long a condition must persist before a repair appears (most types). Default 300 s (5 min).",
+          "repair_recovery_seconds": "How long the condition must stay normal before the repair clears. Default 240 s (4 min).",
+          "repair_confirm_temperature_seconds": "Optional override for critical temperature repairs (default 180 s if unset).",
+          "repair_confirm_offline_seconds": "Optional override for offline repairs (default 600 s if unset).",
           "pool_action": "Leave unchanged, replace the primary slot, or add a backup (max 3 pools).",
           "pool_password": "Leave empty if the pool does not require a password."
         }
@@ -618,6 +701,10 @@
     "farm_offline": {
       "title": "{name}: miners offline",
       "description": "{offline} of {total} miners unreachable: {miners}{miners_more}."
+    },
+    "miner_power": {
+      "title": "{name}: abnormal power consumption",
+      "description": "Power draw is {current_power} W in mode {power_mode} (learned baseline {baseline_power} W)."
     }
   },
   "repairs": {
@@ -654,13 +741,25 @@
           "temp_chip_high_c": "Chip temperature high (°C)",
           "temp_board_warn_c": "Board temperature warning (°C)",
           "temp_board_high_c": "Board temperature high (°C)",
-          "reject_rate_high_pct": "Maximum reject rate (%)"
+          "reject_rate_high_pct": "Maximum reject rate (%)",
+          "power_low_ratio": "Low power ratio (vs baseline)",
+          "power_high_ratio": "High power ratio (vs baseline)",
+          "hashrate_low_ratio": "Minimum hashrate (fraction of reference — Auto: learned baseline, Generic/Custom: ideal)"
         }
+      },
+      "check_power": {
+        "title": "Check power to {name}",
+        "description": "Current draw {current_power} W; learned baseline {baseline_power} W. Verify PSU, cables, and breaker, then go back."
+      },
+      "check_profile": {
+        "title": "Power profile on {name}",
+        "description": "Active mode: {power_mode}. Confirm the miner is on the intended power preset, then go back."
       }
     },
     "error": {
       "temp_warn_must_be_below_critical": "Warning threshold must be lower than high threshold",
-      "invalid_threshold": "Enter a valid number"
+      "invalid_threshold": "Enter a valid number",
+      "power_low_must_be_below_high": "Low power ratio must be below high power ratio"
     },
     "miner_not_loaded": {
       "title": "Miner not loaded",

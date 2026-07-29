@@ -17,9 +17,9 @@ CONFIRM_SECONDS: dict[str, float] = {
     "pool": 300,
     "recovery": 0,
     "reject": 300,
+    "power": 300,
 }
 
-CONFIRM_FAN_IMBALANCE_SECONDS = 300
 RECOVERY_SECONDS = 240
 FARM_OFFLINE_MAX_NAMES = 3
 
@@ -48,6 +48,7 @@ class RepairType:
     POOL = "pool"
     RECOVERY = "recovery"
     REJECT = "reject"
+    POWER = "power"
 
 
 class FarmRepairType:
@@ -86,6 +87,9 @@ REPAIR_DEFINITIONS: dict[str, RepairDefinition] = {
     RepairType.REJECT: RepairDefinition(
         RepairType.REJECT, "miner_reject", CONFIRM_SECONDS["reject"]
     ),
+    RepairType.POWER: RepairDefinition(
+        RepairType.POWER, "miner_power", CONFIRM_SECONDS["power"]
+    ),
 }
 
 FARM_REPAIR_DEFINITIONS: dict[str, RepairDefinition] = {
@@ -103,6 +107,7 @@ MINER_REPAIR_TYPES: tuple[str, ...] = (
     RepairType.POOL,
     RepairType.RECOVERY,
     RepairType.REJECT,
+    RepairType.POWER,
 )
 
 FARM_REPAIR_TYPES: tuple[str, ...] = (FarmRepairType.OFFLINE,)

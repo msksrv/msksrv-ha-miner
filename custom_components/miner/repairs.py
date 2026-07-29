@@ -33,6 +33,8 @@ ACTION_CHECKED = "checked"
 ACTION_RETRY = "retry_refresh"
 ACTION_RESTART_BACKEND = "restart_backend"
 ACTION_THRESHOLDS = "thresholds"
+ACTION_CHECK_POWER = "check_power"
+ACTION_CHECK_PROFILE = "check_profile"
 
 _ACTION_LABELS: dict[str, dict[str, str]] = {
     "en": {
@@ -43,6 +45,8 @@ _ACTION_LABELS: dict[str, dict[str, str]] = {
         ACTION_RETRY: "Retry connection",
         ACTION_RESTART_BACKEND: "Restart miner backend",
         ACTION_THRESHOLDS: "Adjust health thresholds",
+        ACTION_CHECK_POWER: "Check power supply",
+        ACTION_CHECK_PROFILE: "Check power profile",
     },
     "ru": {
         ACTION_REBOOT: "Перезагрузить майнер",
@@ -52,18 +56,27 @@ _ACTION_LABELS: dict[str, dict[str, str]] = {
         ACTION_RETRY: "Повторить опрос",
         ACTION_RESTART_BACKEND: "Перезапустить службу управления",
         ACTION_THRESHOLDS: "Настроить пороги состояния",
+        ACTION_CHECK_POWER: "Проверить питание",
+        ACTION_CHECK_PROFILE: "Проверить профиль мощности",
     },
 }
 
 _REPAIR_ACTIONS: dict[str, tuple[str, ...]] = {
     "hashboard": (ACTION_REBOOT, ACTION_CHECKED),
-    "hashrate": (ACTION_REBOOT, ACTION_CHECKED),
+    "hashrate": (ACTION_REBOOT, ACTION_THRESHOLDS, ACTION_CHECKED),
     "temperature": (ACTION_THRESHOLDS, ACTION_POWER_OFF, ACTION_REBOOT, ACTION_CHECKED),
     "fan": (ACTION_POWER_OFF, ACTION_REBOOT, ACTION_CHECKED),
     "offline": (ACTION_RETRY, ACTION_POWER_ON, ACTION_CHECKED),
     "pool": (ACTION_RETRY, ACTION_REBOOT, ACTION_RESTART_BACKEND, ACTION_CHECKED),
     "recovery": (ACTION_CHECKED,),
     "reject": (ACTION_THRESHOLDS, ACTION_CHECKED),
+    "power": (
+        ACTION_CHECK_POWER,
+        ACTION_CHECK_PROFILE,
+        ACTION_REBOOT,
+        ACTION_THRESHOLDS,
+        ACTION_CHECKED,
+    ),
 }
 
 _FARM_REPAIR_ACTIONS: dict[str, tuple[str, ...]] = {
@@ -128,6 +141,10 @@ class MinerRepairFlow(RepairsFlow):
                 return await self.async_step_confirm_restart_backend()
             if action == ACTION_THRESHOLDS:
                 return await self.async_step_open_thresholds()
+            if action == ACTION_CHECK_POWER:
+                return await self.async_step_check_power()
+            if action == ACTION_CHECK_PROFILE:
+                return await self.async_step_check_profile()
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
@@ -283,6 +300,28 @@ class MinerRepairFlow(RepairsFlow):
             data_schema=build_threshold_schema(
                 self._repair_type, defaults, stored
             ),
+            description_placeholders=self._description_placeholders(),
+        )
+
+    async def async_step_check_power(
+        self, user_input: dict[str, str] | None = None
+    ) -> data_entry_flow.FlowResult:
+        if user_input is not None:
+            return await self.async_step_init()
+        return self.async_show_form(
+            step_id="check_power",
+            data_schema=vol.Schema({}),
+            description_placeholders=self._description_placeholders(),
+        )
+
+    async def async_step_check_profile(
+        self, user_input: dict[str, str] | None = None
+    ) -> data_entry_flow.FlowResult:
+        if user_input is not None:
+            return await self.async_step_init()
+        return self.async_show_form(
+            step_id="check_profile",
+            data_schema=vol.Schema({}),
             description_placeholders=self._description_placeholders(),
         )
 

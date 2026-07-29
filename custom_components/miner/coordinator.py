@@ -495,8 +495,22 @@ class MinerCoordinator(DataUpdateCoordinator):
             data.get("model"),
             self.config_entry.options,
         )
+        learned = self.baseline.baseline_for_health(data)
+        baseline_medians = self.baseline.baseline_medians(data)
+        profile_is_auto = str(profile).startswith("auto:")
+        hashrate_baseline = (
+            baseline_medians
+            if learned.get("ready") and profile_is_auto
+            else None
+        )
+        power_baseline = baseline_medians if learned.get("ready") else None
         health = compute_health(
-            data, thresholds, threshold_profile=profile
+            data,
+            thresholds,
+            threshold_profile=profile,
+            power_baseline=power_baseline,
+            hashrate_baseline=hashrate_baseline,
+            learned_baseline=learned,
         )
         data["health"] = {
             "score": health.score,
@@ -504,6 +518,8 @@ class MinerCoordinator(DataUpdateCoordinator):
             "flags": health.flags,
             "data_coverage": health.data_coverage,
             "threshold_profile": health.threshold_profile,
+            "learned_baseline": health.learned_baseline,
+            "hashrate_reference": health.hashrate_reference,
             "profile_name": format_profile_name(
                 health.threshold_profile,
                 data.get("make"),

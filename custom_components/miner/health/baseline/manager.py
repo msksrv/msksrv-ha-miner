@@ -95,6 +95,29 @@ class BaselineManager:
         """Delete persisted baseline when the miner config entry is removed."""
         await self._store.async_remove()
 
+    @callback
+    def baseline_for_health(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Learned medians for the active power/preset mode (for health UI)."""
+        mode = baseline_mode_key(data)
+        profile = self._profiles.get(mode) or {}
+        now = time.monotonic()
+        values = self._baseline_values(profile)
+        confidence = self._confidence(now, profile) if profile else 0
+        return {
+            "mode": mode,
+            "hashrate_th": values.get("hashrate"),
+            "power_w": values.get("power"),
+            "confidence": confidence,
+            "ready": confidence >= 20
+            and (values.get("power") is not None or values.get("hashrate") is not None),
+        }
+
+    def baseline_medians(self, data: dict[str, Any]) -> dict[str, float]:
+        """Numeric baseline medians for health scoring in the current mode."""
+        mode = baseline_mode_key(data)
+        profile = self._profiles.get(mode) or {}
+        return self._baseline_values(profile)
+
     def notify_reboot(self) -> None:
         self._reboot_warmup_until = time.monotonic() + REBOOT_WARMUP_SECONDS
         self._rule_timers.clear()

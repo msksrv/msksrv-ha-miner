@@ -84,8 +84,46 @@ def resolve_health_thresholds(
         custom = HealthThresholds.from_dict(opts.get(CONF_HEALTH_THRESHOLDS))
         return custom, _PROFILE_LABELS[HEALTH_PROFILE_CUSTOM]
 
+    if profile == HEALTH_PROFILE_AUTO:
+        auto, auto_label = lookup_auto_profile(make, model)
+        generic = GENERIC_THRESHOLDS
+        hybrid = HealthThresholds(
+            temp_chip_warn_c=auto.temp_chip_warn_c,
+            temp_chip_high_c=auto.temp_chip_high_c,
+            temp_board_warn_c=auto.temp_board_warn_c,
+            temp_board_high_c=auto.temp_board_high_c,
+            hashrate_low_ratio=generic.hashrate_low_ratio,
+            chip_low_percent=generic.chip_low_percent,
+            reject_rate_high_pct=generic.reject_rate_high_pct,
+            fan_min_rpm=generic.fan_min_rpm,
+            share_stale_seconds=generic.share_stale_seconds,
+            maintenance_score=generic.maintenance_score,
+            maintenance_min_flags=generic.maintenance_min_flags,
+            power_low_ratio=generic.power_low_ratio,
+            power_high_ratio=generic.power_high_ratio,
+            pool_stale_high_pct=generic.pool_stale_high_pct,
+        )
+        return hybrid, f"{_PROFILE_LABELS[HEALTH_PROFILE_AUTO]}:{auto_label}"
+
     auto, auto_label = lookup_auto_profile(make, model)
-    return auto, f"{_PROFILE_LABELS[HEALTH_PROFILE_AUTO]}:{auto_label}"
+    generic = GENERIC_THRESHOLDS
+    hybrid = HealthThresholds(
+        temp_chip_warn_c=auto.temp_chip_warn_c,
+        temp_chip_high_c=auto.temp_chip_high_c,
+        temp_board_warn_c=auto.temp_board_warn_c,
+        temp_board_high_c=auto.temp_board_high_c,
+        hashrate_low_ratio=generic.hashrate_low_ratio,
+        chip_low_percent=generic.chip_low_percent,
+        reject_rate_high_pct=generic.reject_rate_high_pct,
+        fan_min_rpm=generic.fan_min_rpm,
+        share_stale_seconds=generic.share_stale_seconds,
+        maintenance_score=generic.maintenance_score,
+        maintenance_min_flags=generic.maintenance_min_flags,
+        power_low_ratio=generic.power_low_ratio,
+        power_high_ratio=generic.power_high_ratio,
+        pool_stale_high_pct=generic.pool_stale_high_pct,
+    )
+    return hybrid, f"{_PROFILE_LABELS[HEALTH_PROFILE_AUTO]}:{auto_label}"
 
 
 def health_threshold_defaults_for_ui(

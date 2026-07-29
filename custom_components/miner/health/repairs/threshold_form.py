@@ -24,6 +24,11 @@ THRESHOLD_FIELDS_BY_REPAIR: dict[str, tuple[tuple[str, float, float], ...]] = {
         ("temp_board_high_c", 50.0, 110.0),
     ),
     "reject": (("reject_rate_high_pct", 0.1, 10.0),),
+    "power": (
+        ("power_low_ratio", 0.5, 0.99),
+        ("power_high_ratio", 1.01, 1.5),
+    ),
+    "hashrate": (("hashrate_low_ratio", 0.5, 0.99),),
 }
 
 
@@ -63,6 +68,14 @@ def validate_threshold_input(
             board_high = float(user_input["temp_board_high_c"])
             if board_warn >= board_high:
                 errors["temp_board_high_c"] = "temp_warn_must_be_below_critical"
+        except (KeyError, TypeError, ValueError):
+            errors["base"] = "invalid_threshold"
+    if repair_type == "power":
+        try:
+            low = float(user_input["power_low_ratio"])
+            high = float(user_input["power_high_ratio"])
+            if low >= high:
+                errors["power_high_ratio"] = "power_low_must_be_below_high"
         except (KeyError, TypeError, ValueError):
             errors["base"] = "invalid_threshold"
     return errors

@@ -1,5 +1,26 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b15 (beta)
+
+### Added (Health & Repairs — point 4)
+
+- **Power thresholds:** `power_low_ratio` / `power_high_ratio` vs learned baseline per power mode (fallback to power limit when baseline not ready).
+- **Configurable repair timing:** default warning delay (5 min) and recovery (4 min) in options; advanced per-type overrides; temperature/offline keep safer fixed defaults unless overridden.
+- **Hashrate repair:** triggers on `health.flags.hashrate_low` with user confirm delay (anomaly rules still instant).
+- **Power repair:** new issue type with check power / profile / reboot / thresholds actions.
+- **Auto profile hybrid:** model/manufacturer temps + generic performance thresholds; baseline medians exposed on health sensor when learned.
+
+### Fixed (b15 review)
+
+- **Recovery timing** applied on every poll via `set_recovery_seconds()` (no reload required).
+- **Hashrate reference:** Auto → learned baseline; Generic/Custom → ideal hashrate (`hashrate_reference` attribute).
+- **Fan imbalance:** zero extra confirm in Repairs (detector already waited).
+- **Power low ratio** applies via `power_limit × ratio` before baseline is ready.
+- **Options sections:** field labels moved to `sections.*.data` (health thresholds, repair timing, etc.).
+- Removed unused `CONFIRM_FAN_IMBALANCE_SECONDS`.
+
+---
+
 ## v1.7.0b14 (beta)
 
 ### Fixed (Repairs blockers)

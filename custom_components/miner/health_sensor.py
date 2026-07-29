@@ -87,6 +87,18 @@ class MinerHealthScoreSensor(CoordinatorEntity[MinerCoordinator], SensorEntity):
             attrs["errors"] = errors
         if self.coordinator.data.get("fault_light"):
             attrs["fault_light"] = True
+        learned = health.get("learned_baseline") or {}
+        if learned.get("ready"):
+            if learned.get("hashrate_th") is not None:
+                attrs["baseline_hashrate_th"] = learned["hashrate_th"]
+            if learned.get("power_w") is not None:
+                attrs["baseline_power_w"] = learned["power_w"]
+            if learned.get("mode"):
+                attrs["baseline_mode"] = learned["mode"]
+            attrs["baseline_confidence"] = learned.get("confidence")
+        ref = health.get("hashrate_reference")
+        if ref:
+            attrs["hashrate_reference"] = ref
         return attrs
 
     @property

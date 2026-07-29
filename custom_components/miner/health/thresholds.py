@@ -26,6 +26,8 @@ class HealthThresholds:
     share_stale_seconds: float = 600.0
     maintenance_score: int = 70
     maintenance_min_flags: int = 3
+    power_low_ratio: float = 0.80
+    power_high_ratio: float = 1.10
     power_over_limit_ratio: float = 1.05
     pool_stale_high_pct: float = 5.0
 
@@ -48,7 +50,10 @@ class HealthThresholds:
                     )
                 except (TypeError, ValueError):
                     pass
-        return cls(**{**asdict(GENERIC_THRESHOLDS), **kwargs})
+        merged = {**asdict(GENERIC_THRESHOLDS), **kwargs}
+        if "power_high_ratio" not in kwargs and "power_over_limit_ratio" in kwargs:
+            merged["power_high_ratio"] = kwargs["power_over_limit_ratio"]
+        return cls(**merged)
 
 
 GENERIC_THRESHOLDS = HealthThresholds()

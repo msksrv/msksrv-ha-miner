@@ -28,6 +28,8 @@ class HealthResult:
     seconds_since_share: float | None
     data_coverage: int
     threshold_profile: str | None = None
+    learned_baseline: dict[str, float | str | int | bool | None] | None = None
+    hashrate_reference: str | None = None
 
 
 def _f(value: Any) -> float | None:
@@ -40,16 +42,25 @@ def _f(value: Any) -> float | None:
 
 
 def _score_hashrate(
-    data: dict[str, Any], thresholds: HealthThresholds
+    data: dict[str, Any],
+    thresholds: HealthThresholds,
+    *,
+    hashrate_baseline: dict[str, float] | None = None,
 ) -> tuple[float | None, bool]:
     if not data.get("is_mining"):
         return None, False
     ms = data.get("miner_sensors") or {}
     hr = _f(ms.get("hashrate"))
-    ideal = _f(ms.get("ideal_hashrate"))
-    if hr is None or ideal is None or ideal <= 0:
+    if hr is None:
         return None, False
-    ratio = hr / ideal
+    reference = None
+    if hashrate_baseline and hashrate_baseline.get("hashrate"):
+        reference = hashrate_baseline["hashrate"]
+    else:
+        reference = _f(ms.get("ideal_hashrate"))
+    if reference is None or reference <= 0:
+        return None, False
+    ratio = hr / reference
     low = ratio < thresholds.hashrate_low_ratio
     return max(0.0, min(100.0, ratio * 100.0)), low
 
@@ -194,7 +205,9 @@ def _score_reject(
 
 
 def _score_power(
-    data: dict[str, Any], thresholds: HealthThresholds
+    data: dict[str, Any],
+    thresholds: HealthThresholds,
+    baseline: dict[str, float] | None = None,
 ) -> tuple[float | None, bool]:
     ms = data.get("miner_sensors") or {}
     watts = _f(ms.get("miner_consumption"))
@@ -204,23 +217,38 @@ def _score_power(
         return None, False
     if not mining:
         return None, False
-    anomaly = False
-    if (
-        limit
-        and limit > 0
-        and watts > limit * thresholds.power_over_limit_ratio
-    ):
-        anomaly = True
-    if mining and limit and limit > 0 and watts < limit * 0.05:
-        anomaly = True
-    if limit and limit > 0:
-        ratio = watts / limit
-        if ratio > thresholds.power_over_limit_ratio:
+
+    baseline_power = (baseline or {}).get("power")
+    if baseline_power is not None and baseline_power > 0:
+        low = baseline_power * thresholds.power_low_ratio
+        high = baseline_power * thresholds.power_high_ratio
+        anomaly = watts < low or watts > high
+        if watts >= high:
             return 0.0, True
-        if ratio < 0.05:
+        if watts <= low:
+            return 30.0, True
+        if anomaly:
+            return 50.0, True
+        ratio = watts / baseline_power
+        return max(0.0, min(100.0, 100.0 - abs(1.0 - ratio) * 50.0)), False
+
+    if limit and limit > 0:
+        low = limit * thresholds.power_low_ratio
+        high = limit * thresholds.power_high_ratio
+        anomaly = watts < low or watts > high
+        if watts >= high:
+            return 0.0, True
+        if watts <= low:
+            return 30.0, True
+        if anomaly:
+            return 50.0, True
+        ratio = watts / limit
+        if ratio > thresholds.power_high_ratio:
+            return 0.0, True
+        if ratio < thresholds.power_low_ratio:
             return 30.0, True
         return 100.0, anomaly
-    return 100.0 if not anomaly else 50.0, anomaly
+    return 100.0, False
 
 
 def _score_pool(
@@ -271,19 +299,36 @@ def compute_health(
     thresholds: HealthThresholds | None = None,
     *,
     threshold_profile: str | None = None,
+    power_baseline: dict[str, float] | None = None,
+    hashrate_baseline: dict[str, float] | None = None,
+    learned_baseline: dict[str, float | str | int | bool | None] | None = None,
 ) -> HealthResult:
     """Return health score 0–100, per-component scores, and binary flags."""
     t = thresholds or GENERIC_THRESHOLDS
     parts: list[tuple[str, float, float]] = []
     flags: dict[str, bool] = {}
 
+    hashrate_reference = (
+        "baseline"
+        if hashrate_baseline and hashrate_baseline.get("hashrate")
+        else "ideal"
+    )
+
     scorers = (
-        ("hashrate", WEIGHT_HASHRATE, _score_hashrate),
+        (
+            "hashrate",
+            WEIGHT_HASHRATE,
+            lambda d, th: _score_hashrate(d, th, hashrate_baseline=hashrate_baseline),
+        ),
         ("boards", WEIGHT_BOARDS, _score_boards),
         ("temperature", WEIGHT_TEMPERATURE, _score_temperature),
         ("fans", WEIGHT_FANS, _score_fans),
         ("reject", WEIGHT_REJECT, _score_reject),
-        ("power", WEIGHT_POWER, _score_power),
+        (
+            "power",
+            WEIGHT_POWER,
+            lambda d, th: _score_power(d, th, baseline=power_baseline),
+        ),
         ("pool", WEIGHT_POOL, _score_pool),
         ("shares", WEIGHT_SHARES, _score_shares),
     )
@@ -348,4 +393,6 @@ def compute_health(
         seconds_since_share=secs,
         data_coverage=data_coverage,
         threshold_profile=threshold_profile,
+        learned_baseline=learned_baseline,
+        hashrate_reference=hashrate_reference,
     )

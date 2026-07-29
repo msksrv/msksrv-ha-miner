@@ -36,6 +36,9 @@ from .const import (
     CONF_FARM_POOL_PRESETS,
     CONF_HEALTH_PROFILE,
     CONF_HEALTH_THRESHOLDS,
+    CONF_REPAIR_CONFIRM_DEFAULT,
+    CONF_REPAIR_CONFIRM_OVERRIDES,
+    CONF_REPAIR_RECOVERY,
     CONF_IS_FARM,
     CONF_POWER_SWITCH,
     DOMAIN,
@@ -97,6 +100,19 @@ _HEALTH_THRESHOLD_FIELDS: tuple[tuple[str, float, float], ...] = (
     ("reject_rate_high_pct", 0.1, 10.0),
     ("fan_min_rpm", 100.0, 10000.0),
     ("share_stale_seconds", 60.0, 3600.0),
+    ("power_low_ratio", 0.5, 0.99),
+    ("power_high_ratio", 1.01, 1.5),
+)
+
+_REPAIR_CONFIRM_OVERRIDE_FIELDS: tuple[tuple[str, str, float, float], ...] = (
+    ("repair_confirm_temperature_seconds", "temperature", 60.0, 1800.0),
+    ("repair_confirm_offline_seconds", "offline", 120.0, 3600.0),
+    ("repair_confirm_fan_seconds", "fan", 60.0, 1800.0),
+    ("repair_confirm_hashboard_seconds", "hashboard", 60.0, 3600.0),
+    ("repair_confirm_pool_seconds", "pool", 60.0, 3600.0),
+    ("repair_confirm_reject_seconds", "reject", 60.0, 3600.0),
+    ("repair_confirm_hashrate_seconds", "hashrate", 60.0, 3600.0),
+    ("repair_confirm_power_seconds", "power", 60.0, 3600.0),
 )
 
 
@@ -666,6 +682,19 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         return errors
 
     @staticmethod
+    def _repair_overrides_from_input(flat: dict[str, Any]) -> dict[str, float]:
+        overrides: dict[str, float] = {}
+        for field, rtype, _lo, _hi in _REPAIR_CONFIRM_OVERRIDE_FIELDS:
+            raw = flat.get(field)
+            if raw in (None, ""):
+                continue
+            try:
+                overrides[rtype] = float(raw)
+            except (TypeError, ValueError):
+                continue
+        return overrides
+
+    @staticmethod
     def _health_thresholds_from_input(flat: dict[str, Any]) -> dict[str, float | int]:
         stored = HealthThresholds.from_dict(flat)
         return stored.as_dict()
@@ -747,6 +776,25 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 new_options[CONF_HEALTH_THRESHOLDS] = self._health_thresholds_from_input(
                     user_input
                 )
+
+            flat = user_input
+            try:
+                new_options[CONF_REPAIR_CONFIRM_DEFAULT] = float(
+                    flat.get(CONF_REPAIR_CONFIRM_DEFAULT, 300)
+                )
+            except (TypeError, ValueError):
+                new_options[CONF_REPAIR_CONFIRM_DEFAULT] = 300.0
+            try:
+                new_options[CONF_REPAIR_RECOVERY] = float(
+                    flat.get(CONF_REPAIR_RECOVERY, 240)
+                )
+            except (TypeError, ValueError):
+                new_options[CONF_REPAIR_RECOVERY] = 240.0
+            overrides = self._repair_overrides_from_input(flat)
+            if overrides:
+                new_options[CONF_REPAIR_CONFIRM_OVERRIDES] = overrides
+            else:
+                new_options.pop(CONF_REPAIR_CONFIRM_OVERRIDES, None)
 
             if pool_action != "none" and port_int is not None:
                 entry_id = self.config_entry.entry_id
@@ -833,6 +881,40 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 NumberSelectorConfig(min=lo, max=hi, mode="box", step="any")
             )
 
+        opts = self.config_entry.options
+        stored_overrides = opts.get(CONF_REPAIR_CONFIRM_OVERRIDES) or {}
+        repair_fields: dict[Any, Any] = {
+            vol.Optional(
+                CONF_REPAIR_CONFIRM_DEFAULT,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_REPAIR_CONFIRM_DEFAULT,
+                        opts.get(CONF_REPAIR_CONFIRM_DEFAULT, 300),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=60, max=3600, mode="box", step=1)
+            ),
+            vol.Optional(
+                CONF_REPAIR_RECOVERY,
+                description={
+                    "suggested_value": ui.get(
+                        CONF_REPAIR_RECOVERY,
+                        opts.get(CONF_REPAIR_RECOVERY, 240),
+                    )
+                },
+            ): NumberSelector(
+                NumberSelectorConfig(min=60, max=1800, mode="box", step=1)
+            ),
+        }
+        for field, rtype, lo, hi in _REPAIR_CONFIRM_OVERRIDE_FIELDS:
+            raw = ui.get(field, stored_overrides.get(rtype))
+            repair_fields[
+                vol.Optional(field, description={"suggested_value": raw})
+            ] = NumberSelector(
+                NumberSelectorConfig(min=lo, max=hi, mode="box", step=1)
+            )
+
         return vol.Schema(
             {
                 vol.Required("linked_switch"): section(
@@ -847,6 +929,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 ),
                 vol.Required("health_thresholds"): section(
                     vol.Schema(health_fields),
+                    SectionConfig(collapsed=True),
+                ),
+                vol.Required("repair_timing"): section(
+                    vol.Schema(repair_fields),
                     SectionConfig(collapsed=True),
                 ),
                 vol.Required("stratum_pool"): section(
