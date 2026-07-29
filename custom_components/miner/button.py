@@ -40,6 +40,8 @@ async def async_setup_entry(
             MinerRebootButton(coordinator=coordinator),
             MinerPowerOffButton(coordinator=coordinator),
             MinerPowerOnButton(coordinator=coordinator),
+            MinerBaselineResetButton(coordinator=coordinator),
+            MinerBaselineAcceptButton(coordinator=coordinator),
         ]
     )
 
@@ -64,6 +66,7 @@ class MinerRebootButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle button press."""
+        self.coordinator.baseline.notify_reboot()
         await self.coordinator.miner.reboot()
 
     @property
@@ -156,3 +159,55 @@ class MinerPowerOnButton(_MinerLinkedSwitchButton):
             {"entity_id": eid},
             blocking=False,
         )
+
+
+class MinerBaselineResetButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
+    """Clear learned baseline statistics."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "baseline_reset"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:chart-timeline-variant-shimmer"
+
+    def __init__(self, coordinator: MinerCoordinator) -> None:
+        super().__init__(coordinator=coordinator)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}-baseline-reset"
+
+    @property
+    def device_info(self) -> entity.DeviceInfo:
+        return get_miner_device_info(self.coordinator)
+
+    async def async_press(self) -> None:
+        self.coordinator.baseline.reset_all()
+        await self.coordinator.baseline.async_save(force=True)
+        await self.coordinator.async_request_refresh()
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.available
+
+
+class MinerBaselineAcceptButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
+    """Accept current readings as normal baseline."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "baseline_accept"
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_icon = "mdi:check-decagram"
+
+    def __init__(self, coordinator: MinerCoordinator) -> None:
+        super().__init__(coordinator=coordinator)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}-baseline-accept"
+
+    @property
+    def device_info(self) -> entity.DeviceInfo:
+        return get_miner_device_info(self.coordinator)
+
+    async def async_press(self) -> None:
+        self.coordinator.baseline.accept_current(dict(self.coordinator.data))
+        await self.coordinator.baseline.async_save(force=True)
+        await self.coordinator.async_request_refresh()
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.available and bool(self.coordinator.data.get("is_mining"))

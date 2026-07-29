@@ -1,5 +1,24 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b6 (beta)
+
+Self-learning statistical baseline and explainable anomaly detection.
+
+### Added
+
+- **Baseline learning** per power/preset mode (median + MAD, bounded window, outlier rejection).
+- **Entities:** `sensor.*_anomaly_score`, `sensor.*_baseline_confidence`, `binary_sensor.*_anomaly_detected`.
+- **Rules:** hashrate/power mismatch, efficiency drop, board/fan outliers, reject rate, learned share timeout, post-reboot recovery.
+- **Buttons:** Reset learned baseline, Accept current as normal.
+- Baseline persisted to disk (~every 10 min and on unload).
+
+### Notes
+
+- 15 min warmup after mining start; confidence grows over 1–24 h.
+- No ML dependencies — lightweight statistics only.
+
+---
+
 ## v1.7.0b5 (beta)
 
 Polish from field review of v1.7.0b4.

@@ -21,6 +21,7 @@ from .const import (
     CONF_WEB_USERNAME,
     DOMAIN,
 )
+from .health.baseline import BaselineManager
 from .health.profiles import format_profile_name, resolve_health_thresholds
 from .health.scoring import compute_health
 
@@ -213,6 +214,7 @@ class MinerCoordinator(DataUpdateCoordinator):
         self._failure_count = 0
         self._last_accepted_shares: float | None = None
         self._last_share_at = None
+        self.baseline = BaselineManager(hass, entry.entry_id)
         super().__init__(
             hass=hass,
             logger=_LOGGER,
@@ -495,5 +497,16 @@ class MinerCoordinator(DataUpdateCoordinator):
                 data.get("make"),
                 data.get("model"),
             ),
+        }
+        anomaly = self.baseline.process_update(data)
+        data["anomaly"] = {
+            "score": anomaly.score,
+            "confidence": anomaly.confidence,
+            "detected": anomaly.detected,
+            "severity": anomaly.severity,
+            "reason": anomaly.reason,
+            "message": anomaly.message,
+            "detected_at": anomaly.detected_at,
+            "details": anomaly.details,
         }
         return data

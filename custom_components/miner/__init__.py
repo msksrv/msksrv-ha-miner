@@ -71,6 +71,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
 
     coordinator = MinerCoordinator(hass, config_entry)
     hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
+    await coordinator.baseline.async_load()
 
     try:
         await coordinator.async_config_entry_first_refresh()
@@ -95,6 +96,9 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
         config_entry, platforms
     )
     if unload_ok:
+        coord = hass.data.get(DOMAIN, {}).get(config_entry.entry_id)
+        if coord is not None and hasattr(coord, "baseline"):
+            await coord.baseline.async_save(force=True)
         hass.data[DOMAIN].pop(config_entry.entry_id, None)
 
     return unload_ok

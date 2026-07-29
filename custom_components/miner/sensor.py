@@ -332,7 +332,10 @@ async def async_setup_entry(
 
     sensors.append(MinerHealthScoreSensor(coordinator))
 
+    from .anomaly_sensor import async_setup_anomaly_entities
+
     async_add_entities(sensors)
+    await async_setup_anomaly_entities(hass, config_entry, async_add_entities)
 
 
 class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):

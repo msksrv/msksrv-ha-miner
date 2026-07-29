@@ -364,6 +364,12 @@
       },
       "farm_apply_pool_append": {
         "name": "Применить пресет как резервный пул"
+      },
+      "baseline_reset": {
+        "name": "Сбросить изученные значения"
+      },
+      "baseline_accept": {
+        "name": "Принять текущую работу за норму"
       }
     },
     "switch": {
@@ -461,6 +467,12 @@
       "health_score": {
         "name": "Состояние майнера"
       },
+      "anomaly_score": {
+        "name": "Оценка аномалии"
+      },
+      "baseline_confidence": {
+        "name": "Достоверность baseline"
+      },
       "farm_total_hashrate": {
         "name": "Суммарный хешрейт"
       },
@@ -522,6 +534,9 @@
       },
       "health_maintenance_required": {
         "name": "Требуется внимание"
+      },
+      "anomaly_detected": {
+        "name": "Обнаружена аномалия"
       }
     },
     "select": {

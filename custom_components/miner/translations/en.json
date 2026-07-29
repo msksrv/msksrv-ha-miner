@@ -364,6 +364,12 @@
       },
       "farm_apply_pool_append": {
         "name": "Apply preset as backup pool"
+      },
+      "baseline_reset": {
+        "name": "Reset learned baseline"
+      },
+      "baseline_accept": {
+        "name": "Accept current as normal"
       }
     },
     "switch": {
@@ -461,6 +467,12 @@
       "health_score": {
         "name": "Miner condition"
       },
+      "anomaly_score": {
+        "name": "Anomaly score"
+      },
+      "baseline_confidence": {
+        "name": "Baseline confidence"
+      },
       "farm_total_hashrate": {
         "name": "Total hashrate"
       },
@@ -522,6 +534,9 @@
       },
       "health_maintenance_required": {
         "name": "Attention required"
+      },
+      "anomaly_detected": {
+        "name": "Anomaly detected"
       }
     },
     "select": {
