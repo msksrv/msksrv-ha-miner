@@ -55,5 +55,5 @@
   "requirements": [
     "pyasic>=0.78.9,<0.79"
   ],
-  "version": "1.7.0b4"
+  "version": "1.7.0b5"
 }

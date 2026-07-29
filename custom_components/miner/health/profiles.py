@@ -98,3 +98,45 @@ def health_threshold_defaults_for_ui(
     if opts.get(CONF_HEALTH_PROFILE) == HEALTH_PROFILE_CUSTOM:
         return HealthThresholds.from_dict(opts.get(CONF_HEALTH_THRESHOLDS))
     return resolve_health_thresholds(make, model, opts)[0]
+
+
+_MFG_DISPLAY: dict[str, str] = {
+    "whatsminer": "WhatsMiner",
+    "microbt": "WhatsMiner",
+    "bitmain": "Bitmain",
+    "antminer": "Antminer",
+    "canaan": "Canaan",
+    "avalon": "Avalon",
+    "innosilicon": "Innosilicon",
+    "goldshell": "Goldshell",
+    "iceriver": "IceRiver",
+    "generic": "Generic",
+}
+
+
+def format_profile_name(
+    profile_id: str | None,
+    make: str | None = None,
+    model: str | None = None,
+) -> str | None:
+    """Human-readable health profile label for UI attributes."""
+    if not profile_id:
+        return None
+    if profile_id == HEALTH_PROFILE_CUSTOM:
+        return "Custom thresholds"
+    if profile_id == HEALTH_PROFILE_GENERIC:
+        return "Generic defaults"
+    if profile_id.startswith(f"{HEALTH_PROFILE_AUTO}:"):
+        if make or model:
+            label = " ".join(part for part in (make, model) if part).strip()
+            if label:
+                return label
+        suffix = profile_id.split(":", 1)[1]
+        if suffix == "generic":
+            return "Generic defaults"
+        if ":" in suffix:
+            mfg, mdl = suffix.split(":", 1)
+            mfg_label = _MFG_DISPLAY.get(mfg, mfg.upper())
+            return f"{mfg_label} {mdl.upper()}"
+        return f"{_MFG_DISPLAY.get(suffix, suffix.title())} (manufacturer)"
+    return profile_id

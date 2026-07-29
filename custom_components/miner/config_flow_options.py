@@ -166,7 +166,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                             CONF_FARM_ELEC_TARIFF_MODE,
                             description={"suggested_value": stored_mode},
                         ): SelectSelector(
-                            SelectSelectorConfig(options=FARM_TARIFF_MODE_OPTIONS)
+                            SelectSelectorConfig(
+                                options=FARM_TARIFF_MODE_OPTIONS,
+                                translation_key=CONF_FARM_ELEC_TARIFF_MODE,
+                            )
                         ),
                     }
                 ),
@@ -437,7 +440,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         return vol.Schema(
             {
                 vol.Optional("pool_action", default="none"): SelectSelector(
-                    SelectSelectorConfig(options=_POOL_ACTION_OPTIONS)
+                    SelectSelectorConfig(
+                        options=_POOL_ACTION_OPTIONS,
+                        translation_key="pool_action",
+                    )
                 ),
                 vol.Optional("pool_apply_slot", default="1"): SelectSelector(
                     SelectSelectorConfig(options=apply_opts)
@@ -813,7 +819,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 CONF_HEALTH_PROFILE,
                 description={"suggested_value": profile},
             ): SelectSelector(
-                SelectSelectorConfig(options=list(HEALTH_PROFILE_OPTIONS))
+                SelectSelectorConfig(
+                    options=list(HEALTH_PROFILE_OPTIONS),
+                    translation_key=CONF_HEALTH_PROFILE,
+                )
             ),
         }
         for key, lo, hi in _HEALTH_THRESHOLD_FIELDS:
@@ -847,7 +856,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                                 "pool_action",
                                 description={"suggested_value": ui.get("pool_action", "none")},
                             ): SelectSelector(
-                                SelectSelectorConfig(options=_POOL_ACTION_OPTIONS)
+                                SelectSelectorConfig(
+                                    options=_POOL_ACTION_OPTIONS,
+                                    translation_key="pool_action",
+                                )
                             ),
                             vol.Optional(
                                 "pool_host",

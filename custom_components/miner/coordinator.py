@@ -21,7 +21,7 @@ from .const import (
     CONF_WEB_USERNAME,
     DOMAIN,
 )
-from .health.profiles import resolve_health_thresholds
+from .health.profiles import format_profile_name, resolve_health_thresholds
 from .health.scoring import compute_health
 
 _LOGGER = logging.getLogger(__name__)
@@ -490,5 +490,10 @@ class MinerCoordinator(DataUpdateCoordinator):
             "flags": health.flags,
             "data_coverage": health.data_coverage,
             "threshold_profile": health.threshold_profile,
+            "profile_name": format_profile_name(
+                health.threshold_profile,
+                data.get("make"),
+                data.get("model"),
+            ),
         }
         return data

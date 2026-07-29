@@ -1,4 +1,9 @@
-"""Health scoring thresholds — defaults, storage, and merge."""
+"""Health scoring thresholds — defaults, storage, and merge.
+
+Manufacturer and model profiles are starting recommendations. Firmware,
+sensor placement, and chip/board temperature semantics vary — verify limits
+for your hardware or use Custom thresholds in integration options.
+"""
 
 from __future__ import annotations
 

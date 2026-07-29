@@ -289,7 +289,12 @@ def farm_tariff_schema_fields(
         vol.Optional(
             CONF_FARM_ELEC_TARIFF_MODE,
             description={"suggested_value": sug_mode},
-        ): SelectSelector(SelectSelectorConfig(options=FARM_TARIFF_MODE_OPTIONS))
+        ): SelectSelector(
+            SelectSelectorConfig(
+                options=FARM_TARIFF_MODE_OPTIONS,
+                translation_key=CONF_FARM_ELEC_TARIFF_MODE,
+            )
+        )
     }
 
     stored_z = farm_tou_zones_stored(options)

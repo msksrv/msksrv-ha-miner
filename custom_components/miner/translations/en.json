@@ -129,7 +129,8 @@
             "name": "Power switch"
           },
           "health_thresholds": {
-            "name": "Miner health thresholds"
+            "name": "Miner health thresholds",
+            "description": "Auto profile picks thresholds by manufacturer and model (starting recommendations — verify for your firmware). Number fields below apply only when profile is Custom."
           },
           "stratum_pool": {
             "name": "Stratum pool"
@@ -155,6 +156,16 @@
           "pool_password": "Worker password"
         },
         "data_description": {
+          "health_profile": "Auto uses built-in profiles by make/model. Generic uses universal defaults. Custom uses the numbers below.",
+          "temp_chip_warn_c": "Chip junction temperature: partial score reduction starts here. Meaning varies by firmware and hardware.",
+          "temp_chip_high_c": "Chip temperature critical: triggers High temperature and Attention required.",
+          "temp_board_warn_c": "PCB/board temperature warning — usually lower than chip limits.",
+          "temp_board_high_c": "PCB/board temperature critical.",
+          "hashrate_low_ratio": "Actual hashrate vs ideal from the miner (0.85 = 85%). Evaluated only while mining.",
+          "chip_low_percent": "Minimum effective chips per board (%). Evaluated only while mining.",
+          "reject_rate_high_pct": "Pool reject rate (%) above which scoring penalizes the miner.",
+          "fan_min_rpm": "Minimum fan speed (RPM) while mining.",
+          "share_stale_seconds": "No accepted share for this long while mining reduces the score.",
           "pool_action": "Leave unchanged, replace the primary slot, or add a backup (max 3 pools).",
           "pool_password": "Leave empty if the pool does not require a password."
         }

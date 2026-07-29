@@ -1,5 +1,25 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b5 (beta)
+
+Polish from field review of v1.7.0b4.
+
+### Fixed
+
+- **Health profile selector:** `translation_key` so options show localized labels (Auto / Generic / Custom), not raw keys.
+- Same for **pool action** and **farm tariff** selectors.
+
+### Changed
+
+- **Options → health section:** section description and per-field `data_description` (ideal hashrate ratio, chip vs board temps, mining-only metrics, Custom-only numbers).
+- **`sensor.*_health_score` attributes:** `profile_name` (e.g. `WhatsMiner M21S`), `temperature_level` (`normal` / `elevated` / `critical`), `is_mining`; technical keys kept for automations.
+
+### Notes
+
+- Built-in manufacturer/model profiles remain **starting recommendations** — verify for your firmware or use Custom thresholds.
+
+---
+
 ## v1.7.0b4 (beta)
 
 Configurable health thresholds and model-based defaults.
