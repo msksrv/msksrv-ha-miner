@@ -575,9 +575,17 @@
     }
   },
   "issues": {
-    "miner_hashboard": {
+    "miner_hashboard_chips": {
       "title": "{name}: проблема хэш-платы",
       "description": "Плата №{board} сообщает {chips} из {expected_chips} рабочих чипов."
+    },
+    "miner_hashboard_hashrate": {
+      "title": "{name}: аномальный хешрейт платы",
+      "description": "Хешрейт платы №{board} — {board_hashrate} TH/s ({pct_below}% ниже медианы {median_board_hashrate} TH/s)."
+    },
+    "miner_hashboard_temperature": {
+      "title": "{name}: аномальная температура платы",
+      "description": "Плата №{board} на {temp_delta} °C холоднее остальных ({board_temperature} °C при медиане {median_board_temperature} °C)."
     },
     "miner_hashrate": {
       "title": "{name}: хешрейт ниже нормы",
@@ -585,7 +593,7 @@
     },
     "miner_temperature": {
       "title": "{name}: критическая температура",
-      "description": "Температура достигла {temperature} °C — выше критического порога профиля."
+      "description": "Максимум по чипам {chip_temperature} °C, по платам {board_temperature} °C."
     },
     "miner_fan": {
       "title": "{name}: проблема с вентилятором",
@@ -606,6 +614,30 @@
         "title": "Отключить питание {name}?",
         "description": "Привязанный выключатель будет выключен. Подтверждайте только если нужно обесточить майнер."
       }
+    },
+    "miner_not_loaded": {
+      "title": "Майнер не загружен",
+      "description": "Интеграция майнера недоступна. Повторите после перезагрузки Home Assistant."
+    },
+    "miner_unavailable": {
+      "title": "Майнер недоступен",
+      "description": "Не удалось подключиться к майнеру. Перезагрузка не отправлена."
+    },
+    "reboot_failed": {
+      "title": "Ошибка перезагрузки",
+      "description": "Майнер отклонил команду перезагрузки или соединение прервано."
+    },
+    "no_power_switch": {
+      "title": "Нет выключателя питания",
+      "description": "Привяжите switch в параметрах интеграции для отключения питания из этого repair."
+    },
+    "power_off_failed": {
+      "title": "Не удалось отключить питание",
+      "description": "Не удалось выключить привязанный switch. Проверьте сущность и повторите."
+    },
+    "issue_unsupported": {
+      "title": "Неподдерживаемая проблема",
+      "description": "Эта repair-задача не распознана текущей версией интеграции."
     }
   }
 }

@@ -35,6 +35,16 @@ class RepairLifecycle:
             return False
         return (now - self._recovery_since[key]) >= self._recovery_seconds
 
+    def cancel_recovery(self, key: str) -> None:
+        """Fault returned while issue open — abort pending removal."""
+        self._recovery_since.pop(key, None)
+
+    def active_duration_minutes(self, key: str, now: float) -> str | None:
+        start = self._active_since.get(key)
+        if start is None:
+            return None
+        return str(max(1, int((now - start) // 60)))
+
     def reset_key(self, key: str) -> None:
         self._active_since.pop(key, None)
         self._recovery_since.pop(key, None)

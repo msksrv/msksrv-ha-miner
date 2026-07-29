@@ -1,5 +1,18 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b12 (beta)
+
+### Fixed (Repairs)
+
+- **Lifecycle race:** open issues stay active when fault returns during recovery (raw vs confirmed).
+- **Unload:** issues no longer deleted on reload; only on config entry removal (`async_remove_entry`).
+- **Reboot flow:** abort when miner unavailable; `notify_reboot()` only after successful reboot.
+- **Placeholders:** board/hashrate/fan use matching anomaly finding; three hashboard text variants; chip + board temps; hashrate duration from repair timer.
+- **Power off:** requires `switch.*` entity; errors abort with translation.
+- **Abort reasons:** EN/RU for all repair flow failures.
+
+---
+
 ## v1.7.0b11 (beta)
 
 ### Added

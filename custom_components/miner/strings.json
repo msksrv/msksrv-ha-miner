@@ -575,9 +575,17 @@
     }
   },
   "issues": {
-    "miner_hashboard": {
+    "miner_hashboard_chips": {
       "title": "{name}: hashboard problem",
       "description": "Board {board} reports {chips} of {expected_chips} working chips."
+    },
+    "miner_hashboard_hashrate": {
+      "title": "{name}: board hashrate outlier",
+      "description": "Board {board} hashrate is {board_hashrate} TH/s ({pct_below}% below median {median_board_hashrate} TH/s)."
+    },
+    "miner_hashboard_temperature": {
+      "title": "{name}: board temperature outlier",
+      "description": "Board {board} is {temp_delta} °C colder than others ({board_temperature} °C vs median {median_board_temperature} °C)."
     },
     "miner_hashrate": {
       "title": "{name}: hashrate below normal",
@@ -585,7 +593,7 @@
     },
     "miner_temperature": {
       "title": "{name}: critical temperature",
-      "description": "Temperature reached {temperature} °C above the critical profile limit."
+      "description": "Peak chip temperature {chip_temperature} °C, peak board temperature {board_temperature} °C."
     },
     "miner_fan": {
       "title": "{name}: fan problem",
@@ -606,6 +614,30 @@
         "title": "Turn off power to {name}?",
         "description": "The linked power switch will be turned off. Confirm only if you intend to cut power."
       }
+    },
+    "miner_not_loaded": {
+      "title": "Miner not loaded",
+      "description": "The miner integration is not available. Try again after Home Assistant finishes reloading."
+    },
+    "miner_unavailable": {
+      "title": "Miner unavailable",
+      "description": "Could not connect to the miner. Reboot was not sent."
+    },
+    "reboot_failed": {
+      "title": "Reboot failed",
+      "description": "The miner rejected the reboot command or the connection was lost."
+    },
+    "no_power_switch": {
+      "title": "No power switch",
+      "description": "Link a switch entity in integration options to use power off from this repair."
+    },
+    "power_off_failed": {
+      "title": "Power off failed",
+      "description": "Could not turn off the linked switch. Check the entity and try again."
+    },
+    "issue_unsupported": {
+      "title": "Unsupported repair",
+      "description": "This repair issue is not recognized by the current integration version."
     }
   }
 }

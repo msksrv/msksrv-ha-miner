@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -11,7 +10,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
 from ...const import DOMAIN
-from ..baseline.detector import AnomalyState
+from ..baseline.detector import AnomalyFinding, AnomalyState
 from .definitions import (
     BOARD_ANOMALY_REASONS,
     CONFIRM_FAN_IMBALANCE_SECONDS,
@@ -47,27 +46,22 @@ class RepairManager:
         available: bool,
     ) -> None:
         """Evaluate phase-1 repairs after each coordinator poll."""
-        now = monotonic_now()
         if not available or not data:
             return
 
-        desired: set[str] = set()
+        now = monotonic_now()
         name = self._device_name(data)
-
-        if self._evaluate_hashboard(data, anomaly, now):
-            desired.add(RepairType.HASHBOARD)
-        if self._evaluate_hashrate(data, anomaly, now):
-            desired.add(RepairType.HASHRATE)
-        if self._evaluate_temperature(data, now):
-            desired.add(RepairType.TEMPERATURE)
-        if self._evaluate_fan(data, anomaly, now):
-            desired.add(RepairType.FAN)
-
-        self._sync_open(desired, data, anomaly, name)
+        raw_active = {
+            RepairType.HASHBOARD: self._hashboard_raw(data, anomaly),
+            RepairType.HASHRATE: self._hashrate_raw(data, anomaly),
+            RepairType.TEMPERATURE: self._temperature_raw(data),
+            RepairType.FAN: self._fan_raw(data, anomaly),
+        }
+        self._sync_open(raw_active, now, data, anomaly, name)
 
     @callback
     def async_clear_all(self) -> None:
-        """Remove all issues for this miner (unload / removal)."""
+        """Remove all issues for this miner (config entry removal only)."""
         for rtype in PHASE1_REPAIR_TYPES:
             ir.async_delete_issue(self.hass, DOMAIN, issue_id(self.entry_id, rtype))
         self._open.clear()
@@ -84,28 +78,50 @@ class RepairManager:
 
     def _sync_open(
         self,
-        desired: set[str],
-        data: dict[str, Any] | None = None,
-        anomaly: AnomalyState | None = None,
-        name: str = "Miner",
+        raw_active: dict[str, bool],
+        now: float,
+        data: dict[str, Any],
+        anomaly: AnomalyState,
+        name: str,
     ) -> None:
-        now = monotonic_now()
         for rtype in PHASE1_REPAIR_TYPES:
             key = issue_id(self.entry_id, rtype)
-            want = rtype in desired
-            if want:
-                placeholders = self._placeholders(rtype, data or {}, anomaly, name)
-                self._create_or_update(rtype, placeholders)
+            raw = raw_active.get(rtype, False)
+            confirm = self._confirm_seconds(rtype, data, anomaly)
+
+            if rtype in self._open:
+                if raw:
+                    self._lifecycle.cancel_recovery(key)
+                    t_key = self._translation_key(rtype, data, anomaly)
+                    placeholders = self._placeholders(
+                        rtype, data, anomaly, name, key, now
+                    )
+                    self._create_or_update(rtype, t_key, placeholders)
+                elif self._lifecycle.should_clear(key, False, now):
+                    ir.async_delete_issue(self.hass, DOMAIN, key)
+                    self._open.discard(rtype)
+                    self._lifecycle.reset_key(key)
+            elif self._lifecycle.confirmed(key, raw, now, confirm):
+                t_key = self._translation_key(rtype, data, anomaly)
+                placeholders = self._placeholders(
+                    rtype, data, anomaly, name, key, now
+                )
+                self._create_or_update(rtype, t_key, placeholders)
                 self._open.add(rtype)
-            elif rtype in self._open and self._lifecycle.should_clear(key, False, now):
-                ir.async_delete_issue(self.hass, DOMAIN, key)
-                self._open.discard(rtype)
-                self._lifecycle.reset_key(key)
+
+    def _confirm_seconds(
+        self, rtype: str, data: dict[str, Any], anomaly: AnomalyState
+    ) -> float:
+        if rtype == RepairType.FAN and self._fan_imbalance(anomaly):
+            return CONFIRM_FAN_IMBALANCE_SECONDS
+        return REPAIR_DEFINITIONS[rtype].confirm_seconds
 
     def _create_or_update(
-        self, rtype: str, placeholders: dict[str, str]
+        self,
+        rtype: str,
+        translation_key: str,
+        placeholders: dict[str, str],
     ) -> None:
-        definition = REPAIR_DEFINITIONS[rtype]
         ir.async_create_issue(
             self.hass,
             DOMAIN,
@@ -113,7 +129,7 @@ class RepairManager:
             is_fixable=True,
             is_persistent=False,
             severity=ir.IssueSeverity.ERROR,
-            translation_key=definition.translation_key,
+            translation_key=translation_key,
             translation_placeholders=placeholders,
             learn_more_url=LEARN_MORE_URL,
             data={
@@ -122,73 +138,40 @@ class RepairManager:
             },
         )
 
-    def _evaluate_hashboard(
-        self, data: dict[str, Any], anomaly: AnomalyState, now: float
-    ) -> bool:
-        if not data.get("is_mining"):
-            return False
-        condition = self._hashboard_condition(data, anomaly)
-        key = issue_id(self.entry_id, RepairType.HASHBOARD)
-        confirm = REPAIR_DEFINITIONS[RepairType.HASHBOARD].confirm_seconds
-        return self._lifecycle.confirmed(key, condition, now, confirm)
-
-    def _evaluate_hashrate(
-        self, data: dict[str, Any], anomaly: AnomalyState, now: float
-    ) -> bool:
-        if not data.get("is_mining"):
-            return False
-        condition = self._hashrate_condition(data, anomaly)
-        key = issue_id(self.entry_id, RepairType.HASHRATE)
-        confirm = REPAIR_DEFINITIONS[RepairType.HASHRATE].confirm_seconds
-        return self._lifecycle.confirmed(key, condition, now, confirm)
-
-    def _evaluate_temperature(self, data: dict[str, Any], now: float) -> bool:
-        if not data.get("is_mining"):
-            return False
-        flags = (data.get("health") or {}).get("flags") or {}
-        condition = bool(flags.get("temperature_high"))
-        key = issue_id(self.entry_id, RepairType.TEMPERATURE)
-        confirm = REPAIR_DEFINITIONS[RepairType.TEMPERATURE].confirm_seconds
-        return self._lifecycle.confirmed(key, condition, now, confirm)
-
-    def _evaluate_fan(
-        self, data: dict[str, Any], anomaly: AnomalyState, now: float
-    ) -> bool:
-        if not data.get("is_mining"):
-            return False
-        zero_rpm = self._fan_zero_rpm(data)
-        imbalance = self._fan_imbalance(anomaly)
-        key = issue_id(self.entry_id, RepairType.FAN)
-        condition = zero_rpm or imbalance
-        if not condition:
-            return self._lifecycle.confirmed(key, False, now, 0)
-        confirm = (
-            REPAIR_DEFINITIONS[RepairType.FAN].confirm_seconds
-            if zero_rpm
-            else CONFIRM_FAN_IMBALANCE_SECONDS
-        )
-        return self._lifecycle.confirmed(key, True, now, confirm)
-
     @staticmethod
-    def _hashboard_condition(data: dict[str, Any], anomaly: AnomalyState) -> bool:
+    def _hashboard_raw(data: dict[str, Any], anomaly: AnomalyState) -> bool:
+        if not data.get("is_mining"):
+            return False
         flags = (data.get("health") or {}).get("flags") or {}
         if flags.get("board_problem"):
             return True
         if anomaly.detected and anomaly.confidence >= 20:
             if anomaly.reason in BOARD_ANOMALY_REASONS:
                 return True
-            for finding in anomaly.findings:
-                if finding.reason in BOARD_ANOMALY_REASONS:
-                    return True
+            return any(f.reason in BOARD_ANOMALY_REASONS for f in anomaly.findings)
         return False
 
     @staticmethod
-    def _hashrate_condition(data: dict[str, Any], anomaly: AnomalyState) -> bool:
+    def _hashrate_raw(data: dict[str, Any], anomaly: AnomalyState) -> bool:
+        if not data.get("is_mining"):
+            return False
         if not anomaly.detected or anomaly.confidence < 20:
             return False
         if anomaly.reason in HASHRATE_ANOMALY_REASONS:
             return True
         return any(f.reason in HASHRATE_ANOMALY_REASONS for f in anomaly.findings)
+
+    @staticmethod
+    def _temperature_raw(data: dict[str, Any]) -> bool:
+        if not data.get("is_mining"):
+            return False
+        flags = (data.get("health") or {}).get("flags") or {}
+        return bool(flags.get("temperature_high"))
+
+    def _fan_raw(self, data: dict[str, Any], anomaly: AnomalyState) -> bool:
+        if not data.get("is_mining"):
+            return False
+        return self._fan_zero_rpm(data) or self._fan_imbalance(anomaly)
 
     @staticmethod
     def _fan_zero_rpm(data: dict[str, Any]) -> bool:
@@ -211,24 +194,59 @@ class RepairManager:
             or "Miner"
         )
 
+    def _translation_key(
+        self, rtype: str, data: dict[str, Any], anomaly: AnomalyState
+    ) -> str:
+        if rtype == RepairType.HASHBOARD:
+            if _find_finding(anomaly, {"board_hashrate_outlier"}):
+                return "miner_hashboard_hashrate"
+            if _find_finding(anomaly, {"board_temp_outlier"}):
+                return "miner_hashboard_temperature"
+            return "miner_hashboard_chips"
+        return REPAIR_DEFINITIONS[rtype].translation_key
+
     def _placeholders(
         self,
         rtype: str,
         data: dict[str, Any],
-        anomaly: AnomalyState | None,
+        anomaly: AnomalyState,
         name: str,
+        lifecycle_key: str,
+        now: float,
     ) -> dict[str, str]:
         if rtype == RepairType.HASHBOARD:
-            return self._hashboard_placeholders(data, name)
+            return self._hashboard_placeholders(data, anomaly, name)
         if rtype == RepairType.HASHRATE:
-            return self._hashrate_placeholders(data, anomaly, name)
+            return self._hashrate_placeholders(data, anomaly, name, lifecycle_key, now)
         if rtype == RepairType.TEMPERATURE:
             return self._temperature_placeholders(data, name)
         return self._fan_placeholders(data, anomaly, name)
 
     def _hashboard_placeholders(
-        self, data: dict[str, Any], name: str
+        self, data: dict[str, Any], anomaly: AnomalyState, name: str
     ) -> dict[str, str]:
+        hr_finding = _find_finding(anomaly, {"board_hashrate_outlier"})
+        if hr_finding:
+            d = hr_finding.details
+            return {
+                "name": name,
+                "board": str(d.get("board", "—")),
+                "board_hashrate": _fmt(d.get("board_hashrate"), "—"),
+                "median_board_hashrate": _fmt(d.get("median_board_hashrate"), "—"),
+                "pct_below": _fmt(d.get("pct_below"), "—", decimals=0),
+            }
+        temp_finding = _find_finding(anomaly, {"board_temp_outlier"})
+        if temp_finding:
+            d = temp_finding.details
+            return {
+                "name": name,
+                "board": str(d.get("board", "—")),
+                "board_temperature": _fmt(d.get("board_temperature"), "—", decimals=0),
+                "median_board_temperature": _fmt(
+                    d.get("median_board_temperature"), "—", decimals=0
+                ),
+                "temp_delta": _fmt(d.get("temp_delta"), "—", decimals=0),
+            }
         board, chips, expected = _worst_board_stats(data)
         return {
             "name": name,
@@ -240,22 +258,24 @@ class RepairManager:
     def _hashrate_placeholders(
         self,
         data: dict[str, Any],
-        anomaly: AnomalyState | None,
+        anomaly: AnomalyState,
         name: str,
+        lifecycle_key: str,
+        now: float,
     ) -> dict[str, str]:
         ms = data.get("miner_sensors") or {}
         current = _fmt(_f(ms.get("hashrate")), "—")
         power = _fmt(_f(ms.get("miner_consumption")), "—", decimals=0)
         baseline = "—"
-        duration = "—"
-        if anomaly and anomaly.details:
-            baseline = _fmt(anomaly.details.get("baseline_hashrate"), baseline)
-            if anomaly.details.get("current_hashrate") is not None:
-                current = _fmt(anomaly.details.get("current_hashrate"), current)
-            if anomaly.details.get("current_power") is not None:
-                power = _fmt(anomaly.details.get("current_power"), power, decimals=0)
-        if anomaly and anomaly.detected_at:
-            duration = _format_duration_minutes(anomaly.detected_at)
+        finding = _find_finding(anomaly, HASHRATE_ANOMALY_REASONS)
+        details = finding.details if finding else (anomaly.details or {})
+        if details.get("baseline_hashrate") is not None:
+            baseline = _fmt(details.get("baseline_hashrate"), baseline)
+        if details.get("current_hashrate") is not None:
+            current = _fmt(details.get("current_hashrate"), current)
+        if details.get("current_power") is not None:
+            power = _fmt(details.get("current_power"), power, decimals=0)
+        duration = self._lifecycle.active_duration_minutes(lifecycle_key, now) or "—"
         return {
             "name": name,
             "current_hashrate": current,
@@ -268,28 +288,51 @@ class RepairManager:
         self, data: dict[str, Any], name: str
     ) -> dict[str, str]:
         max_chip, max_board = _max_temps(data)
-        temp = max_chip if max_chip is not None else max_board
         return {
             "name": name,
-            "temperature": _fmt(temp, "—", decimals=0),
+            "chip_temperature": _fmt(max_chip, "—", decimals=0),
+            "board_temperature": _fmt(max_board, "—", decimals=0),
         }
 
     def _fan_placeholders(
         self,
         data: dict[str, Any],
-        anomaly: AnomalyState | None,
+        anomaly: AnomalyState,
         name: str,
     ) -> dict[str, str]:
+        finding = _find_finding(anomaly, FAN_ANOMALY_REASONS)
+        if finding:
+            d = finding.details
+            return {
+                "name": name,
+                "fan": str(d.get("fan", "—")),
+                "fan_speed": _fmt(d.get("fan_speed"), "—", decimals=0),
+                "median_fan_speed": _fmt(d.get("median_fan_speed"), "—", decimals=0),
+                "pct_below": _fmt(d.get("pct_below"), "—", decimals=0),
+            }
         fan_idx, fan_speed = _slowest_fan(data)
-        if anomaly and anomaly.details.get("fan") is not None:
-            fan_idx = str(anomaly.details.get("fan"))
-        if anomaly and anomaly.details.get("fan_speed") is not None:
-            fan_speed = _fmt(anomaly.details.get("fan_speed"), fan_speed, decimals=0)
         return {
             "name": name,
             "fan": fan_idx,
             "fan_speed": fan_speed,
         }
+
+
+def _find_finding(
+    anomaly: AnomalyState | None, reasons: set[str] | frozenset[str]
+) -> AnomalyFinding | None:
+    if anomaly is None:
+        return None
+    if anomaly.reason in reasons:
+        for finding in anomaly.findings:
+            if finding.reason == anomaly.reason:
+                return finding
+        return AnomalyFinding(
+            reason=anomaly.reason or "",
+            severity=anomaly.severity or "warning",
+            details=dict(anomaly.details or {}),
+        )
+    return next((f for f in anomaly.findings if f.reason in reasons), None)
 
 
 def _worst_board_stats(data: dict[str, Any]) -> tuple[str, str, str]:
@@ -352,16 +395,6 @@ def _slowest_fan(data: dict[str, Any]) -> tuple[str, str]:
     return slow_idx, slow_speed
 
 
-def _format_duration_minutes(detected_at: str) -> str:
-    try:
-        started = datetime.fromisoformat(detected_at.replace("Z", "+00:00"))
-        delta = datetime.now(timezone.utc) - started.astimezone(timezone.utc)
-        minutes = max(1, int(delta.total_seconds() // 60))
-        return str(minutes)
-    except (TypeError, ValueError):
-        return "—"
-
-
 def _f(value: Any) -> float | None:
     if value is None:
         return None
@@ -371,9 +404,7 @@ def _f(value: Any) -> float | None:
         return None
 
 
-def _fmt(
-    value: Any, default: str, *, decimals: int = 1
-) -> str:
+def _fmt(value: Any, default: str, *, decimals: int = 1) -> str:
     f = _f(value)
     if f is None:
         return default

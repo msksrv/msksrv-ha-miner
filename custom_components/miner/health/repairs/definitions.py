@@ -51,7 +51,7 @@ class RepairDefinition:
 
 REPAIR_DEFINITIONS: dict[str, RepairDefinition] = {
     RepairType.HASHBOARD: RepairDefinition(
-        RepairType.HASHBOARD, "miner_hashboard", CONFIRM_SECONDS["hashboard"]
+        RepairType.HASHBOARD, "miner_hashboard_chips", CONFIRM_SECONDS["hashboard"]
     ),
     RepairType.HASHRATE: RepairDefinition(
         RepairType.HASHRATE, "miner_hashrate", CONFIRM_SECONDS["hashrate"]

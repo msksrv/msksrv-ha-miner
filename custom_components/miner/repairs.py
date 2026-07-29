@@ -43,6 +43,15 @@ _REPAIR_ACTIONS: dict[str, tuple[str, ...]] = {
 }
 
 
+class UnsupportedRepairFlow(RepairsFlow):
+    """Abort immediately for unrecognized issue ids."""
+
+    async def async_step_init(
+        self, user_input: dict[str, str] | None = None
+    ) -> data_entry_flow.FlowResult:
+        return self.async_abort(reason="issue_unsupported")
+
+
 class MinerRepairFlow(RepairsFlow):
     """Multi-step repair for a single miner issue."""
 
@@ -60,7 +69,6 @@ class MinerRepairFlow(RepairsFlow):
         self._repair_type = parsed[1] if parsed else str(
             self._data.get("repair_type", "")
         )
-        self._pending_action: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
@@ -69,7 +77,6 @@ class MinerRepairFlow(RepairsFlow):
             action = user_input["action"]
             if action == ACTION_CHECKED:
                 return await self._async_dismiss()
-            self._pending_action = action
             if action == ACTION_REBOOT:
                 return await self.async_step_confirm_reboot()
             if action == ACTION_POWER_OFF:
@@ -97,10 +104,11 @@ class MinerRepairFlow(RepairsFlow):
             if coordinator is None:
                 return self.async_abort(reason="miner_not_loaded")
             try:
-                coordinator.baseline.notify_reboot()
                 miner = await coordinator.get_miner()
-                if miner is not None:
-                    await miner.reboot()
+                if miner is None:
+                    return self.async_abort(reason="miner_unavailable")
+                await miner.reboot()
+                coordinator.baseline.notify_reboot()
             except Exception:
                 _LOGGER.exception("Repair reboot failed for %s", self._entry_id)
                 return self.async_abort(reason="reboot_failed")
@@ -116,15 +124,18 @@ class MinerRepairFlow(RepairsFlow):
     ) -> data_entry_flow.FlowResult:
         if user_input is not None:
             switch_id = self._power_switch_entity_id()
-            if not switch_id:
+            if not switch_id or not switch_id.startswith("switch."):
                 return self.async_abort(reason="no_power_switch")
-            domain = switch_id.split(".", 1)[0]
-            await self._hass.services.async_call(
-                domain,
-                "turn_off",
-                {"entity_id": switch_id},
-                blocking=True,
-            )
+            try:
+                await self._hass.services.async_call(
+                    "switch",
+                    "turn_off",
+                    {"entity_id": switch_id},
+                    blocking=True,
+                )
+            except Exception:
+                _LOGGER.exception("Repair power off failed for %s", self._entry_id)
+                return self.async_abort(reason="power_off_failed")
             return await self._async_dismiss()
         return self.async_show_form(
             step_id="confirm_power",
@@ -170,6 +181,8 @@ class MinerRepairFlow(RepairsFlow):
         if not eid:
             return None
         eid = str(eid).strip()
+        if not eid.startswith("switch."):
+            return None
         return eid if self._hass.states.get(eid) is not None else None
 
     def _description_placeholders(self) -> dict[str, str]:
@@ -177,7 +190,11 @@ class MinerRepairFlow(RepairsFlow):
         if issue and issue.translation_placeholders:
             return {k: str(v) for k, v in issue.translation_placeholders.items()}
         coordinator = self._coordinator()
-        name = getattr(coordinator.config_entry, "title", "Miner") if coordinator else "Miner"
+        name = (
+            getattr(coordinator.config_entry, "title", "Miner")
+            if coordinator
+            else "Miner"
+        )
         return {"name": name}
 
     async def _async_dismiss(self) -> data_entry_flow.FlowResult:
@@ -197,4 +214,4 @@ async def async_create_fix_flow(
     """Route fix flow by stable issue id."""
     if parse_issue_id(issue_id):
         return MinerRepairFlow(hass, issue_id, data)
-    return RepairsFlow()
+    return UnsupportedRepairFlow()

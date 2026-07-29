@@ -97,11 +97,20 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     )
     if unload_ok:
         coord = hass.data.get(DOMAIN, {}).get(config_entry.entry_id)
-        if coord is not None:
-            if hasattr(coord, "repairs"):
-                coord.repairs.async_clear_all()
-            if hasattr(coord, "baseline"):
-                await coord.baseline.async_save(force=True)
+        if coord is not None and hasattr(coord, "baseline"):
+            await coord.baseline.async_save(force=True)
         hass.data[DOMAIN].pop(config_entry.entry_id, None)
 
     return unload_ok
+
+
+async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
+    """Remove repair issues only when the config entry is deleted."""
+    if config_entry.data.get(CONF_IS_FARM):
+        return
+    from homeassistant.helpers import issue_registry as ir
+
+    from .health.repairs.definitions import PHASE1_REPAIR_TYPES, issue_id
+
+    for rtype in PHASE1_REPAIR_TYPES:
+        ir.async_delete_issue(hass, DOMAIN, issue_id(config_entry.entry_id, rtype))
