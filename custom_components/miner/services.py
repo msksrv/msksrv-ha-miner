@@ -69,8 +69,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         ]
 
     async def reboot(call: ServiceCall) -> None:
+        from .miner_actions import async_send_reboot_command
+
         targets = await get_targets(call)
-        await asyncio.gather(*(miner.reboot() for _, miner in targets))
+        await asyncio.gather(
+            *(async_send_reboot_command(coordinator) for coordinator, _miner in targets)
+        )
 
     hass.services.async_register(DOMAIN, SERVICE_REBOOT, reboot)
 
@@ -234,6 +238,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 use_ssl=use_ssl,
                 username=username,
                 password=password,
+                preset_label=str(host).strip(),
             )
             if not ok:
                 LOGGER.error(

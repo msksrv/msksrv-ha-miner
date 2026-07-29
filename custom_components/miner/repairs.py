@@ -168,11 +168,9 @@ class MinerRepairFlow(RepairsFlow):
             if coordinator is None:
                 return self.async_abort(reason="miner_not_loaded")
             try:
-                miner = await coordinator.get_miner()
-                if miner is None:
-                    return self.async_abort(reason="miner_unavailable")
-                await miner.reboot()
-                coordinator.baseline.notify_reboot()
+                from .miner_actions import async_send_reboot_command
+
+                await async_send_reboot_command(coordinator)
             except Exception:
                 _LOGGER.exception("Repair reboot failed for %s", self._entry_id)
                 return self.async_abort(reason="reboot_failed")

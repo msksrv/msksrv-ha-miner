@@ -20,6 +20,7 @@ from .const import (
 )
 from .device_resolution import async_get_miner_config_entry_for_device
 from .farm_health import compute_farm_health_metrics
+from .events import FarmEventManager
 from .health.repairs.farm_manager import FarmRepairManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(seconds=15),
             config_entry=entry,
         )
+        self.events = FarmEventManager(hass, entry)
         self.repairs = FarmRepairManager(hass, entry)
 
     def _iter_miner_member_pairs(
@@ -356,6 +358,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             )
         else:
             _LOGGER.info("Emergency stop: turned off %s switch(es)", len(switches))
+            self.events.async_emit_emergency_power_off(len(switches))
 
     def _reported_algorithms_for_device_ids(self, device_ids: list[str]) -> set[str]:
         from .farm_validation import reported_algorithms_for_device_ids
@@ -380,6 +383,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         use_ssl: bool | None = None,
         username: str | None = None,
         password: str | None = None,
+        preset_label: str | None = None,
     ) -> tuple[bool, str | None]:
         """Apply primary or backup stratum to every member (same as per-miner pool tools)."""
         ids = list(device_ids) if device_ids is not None else list(self.device_ids)
@@ -395,6 +399,8 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         append_ssl = bool(use_ssl) if use_ssl is not None else False
         user_template = "" if username is None else str(username)
         failures = 0
+        successes = 0
+        failed_miners: list[str] = []
         member_index = 0
         for entry, coord in pairs:
             per_user = expand_farm_pool_username(
@@ -464,18 +470,38 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
                     await asyncio.sleep(_FARM_STRATUM_RETRY_DELAY_SEC)
             if not success:
                 failures += 1
+                failed_miners.append(entry_title)
                 _LOGGER.error(
                     "Farm stratum: gave up on %s (ip=%s) after %s attempts",
                     entry_title,
                     miner_ip,
                     _FARM_STRATUM_ATTEMPTS,
                 )
+            else:
+                successes += 1
             member_index += 1
             if member_index < len(pairs) and success:
                 await asyncio.sleep(_FARM_STRATUM_MEMBER_GAP_SEC)
 
+        label = preset_label or host
         if failures:
+            if successes > 0:
+                self.events.async_emit_preset_partial_failure(
+                    preset=label,
+                    success_count=successes,
+                    failure_count=failures,
+                    failed_miners=failed_miners,
+                    reason="apply_failed",
+                )
+            else:
+                self.events.async_emit_preset_failed(
+                    preset=label,
+                    failure_count=failures,
+                    failed_miners=failed_miners,
+                    reason="apply_failed",
+                )
             return False, "farm_pool_apply_failed"
+        self.events.async_emit_preset_applied(label, successes)
         return True, None
 
     async def async_apply_saved_preset_slot(
@@ -494,6 +520,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         preset = slots[slot_index]
         if not preset.get("host"):
             return False, "farm_pool_apply_slot_invalid"
+        preset_label = str(preset.get("host") or f"slot_{slot_index + 1}")
         return await self.async_apply_stratum_to_members(
             device_ids=device_ids,
             replace_primary=replace_primary,
@@ -502,4 +529,5 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
             use_ssl=bool(preset.get("use_ssl", False)),
             username=str(preset.get("username") or ""),
             password=str(preset.get("password") or ""),
+            preset_label=preset_label,
         )

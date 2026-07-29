@@ -66,8 +66,9 @@ class MinerRebootButton(CoordinatorEntity["MinerCoordinator"], ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle button press."""
-        self.coordinator.baseline.notify_reboot()
-        await self.coordinator.miner.reboot()
+        from .miner_actions import async_send_reboot_command
+
+        await async_send_reboot_command(self.coordinator)
 
     @property
     def available(self) -> bool:

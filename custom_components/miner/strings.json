@@ -459,6 +459,14 @@
         "name": "Add current to baseline"
       }
     },
+    "event": {
+      "activity": {
+        "name": "Activity"
+      },
+      "farm_activity": {
+        "name": "Activity"
+      }
+    },
     "switch": {
       "mining_active": {
         "name": "Mining"

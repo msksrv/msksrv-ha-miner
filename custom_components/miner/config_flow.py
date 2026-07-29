@@ -830,6 +830,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 description_placeholders={"name": reconfigure_entry.title},
             )
 
+        old_ip = str(entry_data.get(CONF_IP, "")).strip()
         new_data = {
             CONF_IP: host,
             CONF_HOST: host,
@@ -858,6 +859,10 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 str(entry_data.get(CONF_SSH_PASSWORD) or ""),
             ),
         }
+        if host != old_ip:
+            coord = self.hass.data.get(DOMAIN, {}).get(reconfigure_entry.entry_id)
+            if coord is not None and hasattr(coord, "events"):
+                coord.events.async_emit_ip_changed(old_ip, host)
         return self.async_update_reload_and_abort(
             reconfigure_entry,
             data_updates=new_data,

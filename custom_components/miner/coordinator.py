@@ -22,6 +22,7 @@ from .const import (
     DOMAIN,
 )
 from .health.baseline import BaselineManager
+from .events import MinerEventManager
 from .health.profiles import format_profile_name, resolve_health_thresholds
 from .health.repairs import RepairManager
 from .health.scoring import compute_health
@@ -216,7 +217,8 @@ class MinerCoordinator(DataUpdateCoordinator):
         self._last_accepted_shares: float | None = None
         self._last_share_at = None
         self.baseline = BaselineManager(hass, entry.entry_id)
-        self.repairs = RepairManager(hass, entry)
+        self.events = MinerEventManager(hass, entry)
+        self.repairs = RepairManager(hass, entry, self.events)
         super().__init__(
             hass=hass,
             logger=_LOGGER,
@@ -239,7 +241,10 @@ class MinerCoordinator(DataUpdateCoordinator):
     async def async_refresh(self, *args, **kwargs) -> None:
         """Refresh data and evaluate offline repairs when polling fails."""
         await super().async_refresh(*args, **kwargs)
-        if not self.last_update_success:
+        if self.last_update_success:
+            self.events.async_process_poll(self.data, available=True)
+        else:
+            self.events.async_process_poll(self.data, available=False)
             self.repairs.process_update(
                 self.data,
                 self.baseline.anomaly,

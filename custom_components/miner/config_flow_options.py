@@ -612,6 +612,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                             use_ssl=bool(cand.get("use_ssl", False)),
                             username=str(cand.get("username") or ""),
                             password=str(cand.get("password") or ""),
+                            preset_label=str(cand["host"]),
                         )
                         if not ok:
                             errors["base"] = err_key or "farm_pool_apply_failed"

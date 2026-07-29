@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -29,16 +29,25 @@ from .membership import miner_belongs_to_farm
 from .registry_sync import sync_open_from_registry
 from .timing import resolve_confirm_seconds, resolve_recovery_seconds
 
+if TYPE_CHECKING:
+    from ...events.manager import MinerEventManager
+
 _LOGGER = logging.getLogger(__name__)
 
 
 class RepairManager:
     """Maps health/anomaly state to stable HA repair issues."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        events: MinerEventManager | None = None,
+    ) -> None:
         self.hass = hass
         self.entry = entry
         self.entry_id = entry.entry_id
+        self._events = events
         self._lifecycle = RepairLifecycle(
             recovery_seconds=resolve_recovery_seconds(entry)
         )
@@ -51,6 +60,8 @@ class RepairManager:
             self._lifecycle,
             self._open,
         )
+        if self._events is not None:
+            self._events.async_sync_open_problems(self._open)
 
     @callback
     def process_update(
@@ -106,6 +117,8 @@ class RepairManager:
         self._lifecycle.reset_key(key)
         ir.async_delete_issue(self.hass, DOMAIN, key)
         self._open.discard(repair_type)
+        if self._events is not None:
+            self._events.async_emit_problem_acknowledged(repair_type)
 
     def _sync_open(
         self,
@@ -132,6 +145,8 @@ class RepairManager:
                     ir.async_delete_issue(self.hass, DOMAIN, key)
                     self._open.discard(rtype)
                     self._lifecycle.reset_key(key)
+                    if self._events is not None:
+                        self._events.async_emit_problem_cleared(rtype)
             elif self._lifecycle.confirmed(key, raw, now, confirm):
                 t_key = self._translation_key(rtype, data, anomaly)
                 placeholders = self._placeholders(
@@ -139,6 +154,8 @@ class RepairManager:
                 )
                 self._create_or_update(rtype, t_key, placeholders)
                 self._open.add(rtype)
+                if self._events is not None:
+                    self._events.async_emit_problem_detected(rtype, data, anomaly)
 
     def _confirm_seconds(
         self, rtype: str, data: dict[str, Any], anomaly: AnomalyState

@@ -1,5 +1,28 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b17 (beta)
+
+### Added (Events — point 6)
+
+- **Event entities:** `event.<miner>_activity` and `event.<farm>_activity` with native `event.received` triggers.
+- **Integration bus:** `miner_event` for automations across all miners/farms.
+- **Miner events:** offline, online, problem_detected/cleared/acknowledged (from Repairs), pool/work mode changes, reboot_command_sent, ip_changed.
+- **Farm events:** emergency_power_off, preset_applied, preset_partial_failure, preset_failed.
+- **Anti-spam:** seed on first poll, offline after 3 failed polls, stable-read confirmation for pool/mode changes.
+- **Unified reboot helper:** button, service, and repair flow all emit `reboot_command_sent`.
+
+### Fixed (point 6 review)
+
+- **Event entity trigger:** use `_trigger_event()` + `async_write_ha_state()` via public `async_trigger()`.
+- **problem_cleared** only on automatic Repair recovery; user dismiss → `problem_acknowledged`.
+- **Reboot order:** command first, then `notify_reboot()` and event emission.
+- **Farm preset logging** and `preset_failed` when all members fail; neutral `apply_failed` reason.
+- **Initial offline seed** no longer fakes a prior offline event.
+- **problem_detected reason** matched to repair type via `anomaly.findings`.
+- **problem_acknowledged** clears `_open_problems` so a later recurrence is not suppressed.
+
+---
+
 ## v1.7.0b16 (beta)
 
 ### Added (Farm — point 5)

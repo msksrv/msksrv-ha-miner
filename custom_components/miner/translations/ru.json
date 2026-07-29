@@ -459,6 +459,14 @@
         "name": "Добавить текущие значения в эталон"
       }
     },
+    "event": {
+      "activity": {
+        "name": "События"
+      },
+      "farm_activity": {
+        "name": "События"
+      }
+    },
     "switch": {
       "mining_active": {
         "name": "Майнинг"
