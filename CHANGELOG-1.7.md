@@ -1,5 +1,32 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b9 (beta)
+
+Polish after b8 validation.
+
+### Fixed
+
+- **`detected_at`:** preserved from first anomaly until full normalization (primary reason change no longer resets it).
+- **Share interval:** when multiple shares arrive between polls, interval is averaged per share (`interval / share_delta`).
+
+### Changed
+
+- **RU localization:** baseline entity names use «эталон» instead of loanword «baseline».
+
+---
+
+## v1.7.0b8 (beta)
+
+Refinements after b7 field validation.
+
+### Fixed
+
+- **Share interval baseline:** accepted-share tracking runs every poll (~10 s); other metrics still learn once per minute.
+- **Anomaly score:** overlapping rules deduplicated by group (performance, boards, fans, pool, shares, recovery) — only the most severe rule per group counts toward score; all active findings remain in attributes.
+- **Hashrate floor:** critical hashrate/power mismatch uses `<= 20%` of baseline (inclusive boundary).
+
+---
+
 ## v1.7.0b7 (beta)
 
 Fixes critical baseline/anomaly bugs in v1.7.0b6.

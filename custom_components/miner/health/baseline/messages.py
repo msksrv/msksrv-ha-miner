@@ -12,7 +12,7 @@ _TEMPLATES: dict[str, dict[str, str]] = {
         ),
         "ru": (
             "Майнер потребляет {current_power:.0f} W, но выдаёт только {current_hashrate:.1f} TH/s "
-            "(обычно {baseline_hashrate:.1f} TH/s). Возможна неисправность платы или backend."
+            "(обычно {baseline_hashrate:.1f} TH/s). Возможна неисправность платы или бэкенда."
         ),
     },
     "hashrate_efficiency_drop": {

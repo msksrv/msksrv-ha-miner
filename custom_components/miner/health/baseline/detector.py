@@ -14,6 +14,20 @@ RULE_REJECT_DURATION = 300
 RULE_SHARE_STALE_FACTOR = 8
 RULE_REBOOT_RECOVERY_DURATION = 900
 
+RULE_GROUPS: dict[str, str] = {
+    "hashrate_power_mismatch": "performance",
+    "hashrate_efficiency_drop": "performance",
+    "efficiency_degraded": "performance",
+    "board_hashrate_outlier": "boards",
+    "board_temp_outlier": "boards",
+    "fan_imbalance": "fans",
+    "reject_rate_high": "pool",
+    "share_stale": "shares",
+    "post_reboot_slow_recovery": "recovery",
+}
+
+_SEVERITY_RANK = {"critical": 2, "warning": 1}
+
 
 @dataclass
 class AnomalyFinding:
@@ -56,6 +70,21 @@ def _rule_elapsed(timer: dict[str, float], key: str, now: float, duration: float
     return (now - start) >= duration
 
 
+def _finding_rank(finding: AnomalyFinding) -> tuple[int, int]:
+    return (_SEVERITY_RANK.get(finding.severity, 0), len(finding.details))
+
+
+def _dedupe_findings_by_group(findings: list[AnomalyFinding]) -> list[AnomalyFinding]:
+    """Keep only the most severe finding per rule group for scoring."""
+    best: dict[str, AnomalyFinding] = {}
+    for finding in findings:
+        group = RULE_GROUPS.get(finding.reason, finding.reason)
+        prev = best.get(group)
+        if prev is None or _finding_rank(finding) > _finding_rank(prev):
+            best[group] = finding
+    return list(best.values())
+
+
 def detect_anomalies(
     *,
     data: dict[str, Any],
@@ -94,7 +123,7 @@ def detect_anomalies(
     b_share = baselines.get("share_interval")
 
     if hr is not None and power is not None and b_hr and b_pwr:
-        cond = power >= b_pwr * 0.8 and hr < b_hr * 0.2
+        cond = power >= b_pwr * 0.8 and hr <= b_hr * 0.2
         if _rule_active(timers, "hashrate_power", cond, now) and _rule_elapsed(
             timers, "hashrate_power", now, RULE_HASHRATE_POWER_DURATION
         ):
@@ -291,11 +320,9 @@ def detect_anomalies(
             message=None,
         )
 
-    score = min(100, sum(30 if f.severity == "critical" else 18 for f in findings))
-    primary = max(
-        findings,
-        key=lambda f: (1 if f.severity == "critical" else 0, len(f.details)),
-    )
+    scored = _dedupe_findings_by_group(findings)
+    score = min(100, sum(30 if f.severity == "critical" else 18 for f in scored))
+    primary = max(scored, key=_finding_rank)
     merged_details = {**primary.details, "confidence": confidence}
     return AnomalyState(
         score=score,

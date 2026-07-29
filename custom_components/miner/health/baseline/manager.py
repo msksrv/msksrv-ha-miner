@@ -173,13 +173,15 @@ class BaselineManager:
         )
         self._last_anomaly = self._finalize_anomaly(raw_anomaly, lang)
 
-        if (
+        can_learn = (
             not learning
             and not self._in_reboot_warmup(now)
             and self._can_learn(data, self._last_anomaly)
-            and now - self._last_learn_monotonic >= LEARN_INTERVAL_SECONDS
-        ):
-            self._learn_sample(profile, data, now_iso, now)
+        )
+        self._track_share_interval(profile, data, now_iso, now, learn=can_learn)
+
+        if can_learn and now - self._last_learn_monotonic >= LEARN_INTERVAL_SECONDS:
+            self._learn_sample(profile, data, now_iso)
             self._last_learn_monotonic = now
 
         if now - self._last_save_monotonic >= SAVE_INTERVAL_SECONDS:
@@ -191,13 +193,11 @@ class BaselineManager:
             self._clear_anomaly_tracking()
             return state
 
-        reason = state.reason or ""
-        if reason != self._anomaly_active_reason:
-            self._anomaly_active_reason = reason
+        if self._anomaly_detected_at is None:
             self._anomaly_detected_at = _utc_now()
-        elif self._anomaly_detected_at is None:
-            self._anomaly_detected_at = _utc_now()
+        self._anomaly_active_reason = state.reason or ""
 
+        reason = state.reason or ""
         message = format_anomaly_message(reason, state.details, language)
         return AnomalyState(
             score=state.score,
@@ -285,7 +285,6 @@ class BaselineManager:
         profile: dict[str, Any],
         data: dict[str, Any],
         now_iso: str,
-        now_m: float,
     ) -> None:
         for key, val in self._snapshot_values(data).items():
             if val is None:
@@ -297,32 +296,48 @@ class BaselineManager:
             _save_metric_stats(profile, key, stats)
             self._dirty = True
 
+    def _track_share_interval(
+        self,
+        profile: dict[str, Any],
+        data: dict[str, Any],
+        now_iso: str,
+        now_m: float,
+        *,
+        learn: bool,
+    ) -> None:
+        """Track accepted-share deltas every poll; learn interval when clean."""
         accepted_f = _try_float(data.get("accepted_shares"))
-        if accepted_f is not None:
-            if (
-                self._last_accepted_shares is not None
-                and accepted_f < self._last_accepted_shares
-            ):
-                self._last_accepted_shares = accepted_f
-                self._last_share_at_monotonic = now_m
-            elif (
-                self._last_accepted_shares is not None
-                and accepted_f > self._last_accepted_shares
-                and self._last_share_at_monotonic
-            ):
-                interval = now_m - self._last_share_at_monotonic
-                if 5 <= interval <= 600:
+        if accepted_f is None:
+            return
+
+        if (
+            self._last_accepted_shares is not None
+            and accepted_f < self._last_accepted_shares
+        ):
+            self._last_accepted_shares = accepted_f
+            self._last_share_at_monotonic = now_m
+            return
+
+        if (
+            learn
+            and self._last_accepted_shares is not None
+            and accepted_f > self._last_accepted_shares
+            and self._last_share_at_monotonic is not None
+        ):
+            share_delta = accepted_f - self._last_accepted_shares
+            interval = now_m - self._last_share_at_monotonic
+            if share_delta > 0 and interval > 0:
+                interval_per_share = interval / share_delta
+                if 5 <= interval_per_share <= 600:
                     stats = _get_metric_stats(profile, "share_interval")
-                    if not stats.is_outlier(interval):
-                        stats.add(interval, timestamp=now_iso)
+                    if not stats.is_outlier(interval_per_share):
+                        stats.add(interval_per_share, timestamp=now_iso)
                         _save_metric_stats(profile, "share_interval", stats)
                         self._dirty = True
-            if (
-                self._last_accepted_shares is None
-                or accepted_f > self._last_accepted_shares
-            ):
-                self._last_share_at_monotonic = now_m
-            self._last_accepted_shares = accepted_f
+
+        if self._last_accepted_shares is None or accepted_f > self._last_accepted_shares:
+            self._last_share_at_monotonic = now_m
+        self._last_accepted_shares = accepted_f
 
     def _baseline_values(self, profile: dict[str, Any]) -> dict[str, float]:
         out: dict[str, float] = {}
@@ -340,7 +355,6 @@ class BaselineManager:
             "power": _try_float(ms.get("miner_consumption")),
             "efficiency": _try_float(ms.get("efficiency")),
             "reject_rate": _try_float(data.get("reject_rate")),
-            "seconds_since_share": _try_float(data.get("seconds_since_share")),
         }
         for slot, board in (data.get("board_sensors") or {}).items():
             bhr = _try_float(board.get("board_hashrate"))
