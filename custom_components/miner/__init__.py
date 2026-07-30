@@ -57,9 +57,6 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
         await coordinator.async_refresh_emergency_stop_cache()
         await coordinator.energy.async_load()
-        from .farm_cost_migration import async_apply_legacy_farm_cost_registry
-
-        await async_apply_legacy_farm_cost_registry(hass, config_entry)
         await coordinator.async_config_entry_first_refresh()
 
         async def _farm_options_changed(
@@ -74,6 +71,9 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         await hass.config_entries.async_forward_entry_setups(
             config_entry, FARM_PLATFORMS
         )
+        from .farm_cost_migration import async_apply_legacy_farm_cost_registry
+
+        await async_apply_legacy_farm_cost_registry(hass, config_entry)
         return True
 
     from homeassistant.helpers.update_coordinator import UpdateFailed

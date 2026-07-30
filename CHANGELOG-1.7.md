@@ -1,5 +1,13 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b22 (beta)
+
+### Fixed
+
+- **Legacy cost migration:** runs after platform setup so legacy sensors enable immediately when the option is on (no second reload needed).
+
+---
+
 ## v1.7.0b21 (beta)
 
 ### Changed
