@@ -1,5 +1,13 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0b23 (beta)
+
+### Fixed
+
+- **Farm + offline miner:** guard `coord.data is None` in farm health and coordinator aggregation. Farm loads when a linked miner is offline; offline members appear in health metrics and farm offline Repair after grace period.
+
+---
+
 ## v1.7.0b22 (beta)
 
 ### Fixed

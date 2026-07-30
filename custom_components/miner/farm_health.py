@@ -69,7 +69,7 @@ def compute_farm_health_metrics(
     health_scores: list[int] = []
     health_issue_counts: Counter[str] = Counter()
     for entry, coord in member_pairs:
-        if coord is None or not coord.last_update_success:
+        if coord is None or not coord.last_update_success or not coord.data:
             continue
         health = coord.data.get("health") or {}
         member_score = health.get("score")
@@ -97,7 +97,7 @@ def compute_farm_health_metrics(
             expected_unknown += 1
 
     for _entry, coord in member_pairs:
-        if coord is None or not coord.last_update_success:
+        if coord is None or not coord.last_update_success or not coord.data:
             continue
         ms = coord.data.get("miner_sensors") or {}
         w = _try_float(ms.get("miner_consumption"))
@@ -158,7 +158,9 @@ def compute_farm_health_metrics(
 def _classify_member(entry: ConfigEntry, coord) -> MinerMemberSnapshot:
     name = _member_name(entry)
     ip = _member_ip(entry, coord)
-    online = coord is not None and coord.last_update_success
+    online = (
+        coord is not None and coord.last_update_success and bool(coord.data)
+    )
     data = (coord.data or {}) if coord is not None else {}
 
     expected, source = _expected_hashrate(data)
@@ -237,10 +239,10 @@ def _member_name(entry: ConfigEntry) -> str:
 
 
 def _member_ip(entry: ConfigEntry, coord) -> str:
-    if coord is not None:
-        ip = coord.data.get("ip")
-        if ip is not None and str(ip).strip():
-            return str(ip).strip()
+    data = (coord.data or {}) if coord is not None else {}
+    ip = data.get("ip")
+    if ip is not None and str(ip).strip():
+        return str(ip).strip()
     return str(entry.data.get(CONF_IP) or "").strip()
 
 

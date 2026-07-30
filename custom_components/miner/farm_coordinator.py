@@ -34,7 +34,8 @@ _FARM_STRATUM_MEMBER_GAP_SEC = 0.25
 
 def _miner_ip_for_worker_template(coord) -> str:
     """Prefer polled IP; fall back to config entry (avoids empty {ip} on stale data)."""
-    ip = coord.data.get("ip")
+    data = coord.data or {}
+    ip = data.get("ip")
     if ip is not None and str(ip).strip():
         return str(ip).strip()
     return str(coord.config_entry.data.get(CONF_IP) or "").strip()
@@ -190,7 +191,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         algo_counts: Counter[str] = Counter()
 
         for _entry, coord in member_pairs:
-            if coord is None or not coord.last_update_success:
+            if coord is None or not coord.last_update_success or not coord.data:
                 continue
             miners_online += 1
             ms = coord.data.get("miner_sensors") or {}
