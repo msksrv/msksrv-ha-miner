@@ -1,0 +1,49 @@
+blueprint:
+  name: MSKSRV ASIC Miner alerts
+  description: Create Home Assistant notifications for loss of connectivity, overheating, or a recovery lock.
+  domain: automation
+  input:
+    miner_device:
+      name: Miner
+      description: Select an individual miner.
+      selector:
+        device:
+          integration: miner
+
+mode: queued
+
+triggers:
+  - trigger: event
+    event_type: miner_event
+    event_data:
+      scope: miner
+      device_id: !input miner_device
+      type: offline
+    id: offline
+  - trigger: event
+    event_type: miner_event
+    event_data:
+      scope: miner
+      device_id: !input miner_device
+      type: problem_detected
+      problem_type: temperature
+    id: temperature
+  - trigger: event
+    event_type: miner_event
+    event_data:
+      scope: miner
+      device_id: !input miner_device
+      type: recovery_locked
+    id: recovery_locked
+
+actions:
+  - action: persistent_notification.create
+    data:
+      notification_id: "msksrv_miner_{{ trigger.event.data.device_id }}_{{ trigger.id }}"
+      title: "ASIC Miner · {{ trigger.event.data.name }}"
+      message: >-
+        {{ {
+          'offline': 'The miner is unreachable.',
+          'temperature': 'The miner reported a temperature problem.',
+          'recovery_locked': 'Automatic recovery is locked. Check Settings → System → Repairs.'
+        }[trigger.id] }}

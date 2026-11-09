@@ -1,5 +1,13 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.1
+
+- Process connectivity events, Repairs, recovery and energy accounting on the first and scheduled polls.
+- Persist the obligation to restore power before turning a switch off. Resume restoration during a failed first poll and respect the emergency stop latch.
+- Add credential-free miner and farm diagnostics and an automation blueprint for offline, temperature and recovery lock alerts.
+
+---
+
 ## v1.7.0
 
 - Added miner health scores, learned baselines, Repairs, farm health and activity events.

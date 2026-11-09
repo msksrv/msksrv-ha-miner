@@ -216,6 +216,8 @@ class MinerCoordinator(DataUpdateCoordinator):
         """Initialize MinerCoordinator object."""
         self.miner = None
         self._failure_count = 0
+        self.last_poll_error: str | None = None
+        self.last_poll_error_at: str | None = None
         self._last_accepted_shares: float | None = None
         self._last_share_at = None
         self.baseline = BaselineManager(hass, entry.entry_id)
@@ -241,23 +243,6 @@ class MinerCoordinator(DataUpdateCoordinator):
     def available(self):
         """Return if device is available or not."""
         return self.last_update_success
-
-    async def async_refresh(self, *args, **kwargs) -> None:
-        """Refresh data and evaluate offline repairs when polling fails."""
-        await super().async_refresh(*args, **kwargs)
-        if self.last_update_success:
-            self.events.async_process_poll(self.data, available=True)
-        else:
-            self.events.async_process_poll(self.data, available=False)
-            self.repairs.process_update(
-                self.data,
-                self.baseline.anomaly,
-                available=False,
-            )
-            await self.recovery.async_process_update(
-                self.data, self.baseline.anomaly, available=False
-            )
-            await self.energy.async_tick(None, available=False)
 
     async def get_miner(self):
         """Get a valid Miner instance."""
@@ -286,50 +271,31 @@ class MinerCoordinator(DataUpdateCoordinator):
 
         return self.miner
 
-    async def _async_update_data(self):
-        """Fetch sensors from miners."""
+    async def _async_read_miner(self) -> dict:
+        """Read and normalize a single sample from the miner."""
         miner = await self.get_miner()
-
         if miner is None:
-            self._failure_count += 1
-            _LOGGER.warning(
-                "Miner is offline (failure %s) – keeping previous data unavailable",
-                self._failure_count,
-            )
-            raise UpdateFailed("Miner offline")
+            raise UpdateFailed("Miner not detected")
 
-        try:
-            miner_data = await self.miner.get_data(
-                include=[
-                    pyasic.DataOptions.HOSTNAME,
-                    pyasic.DataOptions.MAC,
-                    pyasic.DataOptions.IS_MINING,
-                    pyasic.DataOptions.FW_VERSION,
-                    pyasic.DataOptions.HASHRATE,
-                    pyasic.DataOptions.EXPECTED_HASHRATE,
-                    pyasic.DataOptions.HASHBOARDS,
-                    pyasic.DataOptions.WATTAGE,
-                    pyasic.DataOptions.WATTAGE_LIMIT,
-                    pyasic.DataOptions.FANS,
-                    pyasic.DataOptions.CONFIG,
-                    pyasic.DataOptions.POOLS,
-                    pyasic.DataOptions.UPTIME,
-                    pyasic.DataOptions.ERRORS,
-                    pyasic.DataOptions.FAULT_LIGHT,
-                ]
-            )
-        except Exception as err:
-            self._failure_count += 1
-            _LOGGER.warning(
-                "Error fetching miner data (failure %s): %s",
-                self._failure_count,
-                err,
-            )
-            if self._failure_count >= 2:
-                _LOGGER.debug("Repeated miner poll failure", exc_info=True)
-            raise UpdateFailed from err
-
-        self._failure_count = 0
+        miner_data = await miner.get_data(
+            include=[
+                pyasic.DataOptions.HOSTNAME,
+                pyasic.DataOptions.MAC,
+                pyasic.DataOptions.IS_MINING,
+                pyasic.DataOptions.FW_VERSION,
+                pyasic.DataOptions.HASHRATE,
+                pyasic.DataOptions.EXPECTED_HASHRATE,
+                pyasic.DataOptions.HASHBOARDS,
+                pyasic.DataOptions.WATTAGE,
+                pyasic.DataOptions.WATTAGE_LIMIT,
+                pyasic.DataOptions.FANS,
+                pyasic.DataOptions.CONFIG,
+                pyasic.DataOptions.POOLS,
+                pyasic.DataOptions.UPTIME,
+                pyasic.DataOptions.ERRORS,
+                pyasic.DataOptions.FAULT_LIGHT,
+            ]
+        )
 
         try:
             hashrate = round(float(miner_data.hashrate), 2)
@@ -438,7 +404,7 @@ class MinerCoordinator(DataUpdateCoordinator):
         )
         fault_light = getattr(miner_data, "fault_light", None)
 
-        data = {
+        return {
             "hostname": miner_data.hostname,
             "mac": miner_data.mac,
             "make": miner_data.make,
@@ -503,6 +469,26 @@ class MinerCoordinator(DataUpdateCoordinator):
                 "max": self.config_entry.data.get(CONF_MAX_POWER, 10000),
             },
         }
+
+    async def _async_update_data(self) -> dict:
+        """Process each poll, including first, scheduled and requested refreshes."""
+        try:
+            data = await self._async_read_miner()
+        except Exception as err:
+            self._failure_count += 1
+            self.last_poll_error = type(err).__name__
+            self.last_poll_error_at = dt_util.utcnow().isoformat()
+            self.events.async_process_poll(self.data, available=False)
+            self.repairs.process_update(self.data, self.baseline.anomaly, available=False)
+            await self.recovery.async_process_update(
+                self.data, self.baseline.anomaly, available=False
+            )
+            await self.energy.async_tick(None, available=False)
+            if isinstance(err, UpdateFailed):
+                raise
+            raise UpdateFailed("Miner poll failed") from err
+
+        self._failure_count = 0
         thresholds, profile = resolve_health_thresholds(
             data.get("make"),
             data.get("model"),
@@ -540,9 +526,7 @@ class MinerCoordinator(DataUpdateCoordinator):
             ),
         }
         anomaly = self.baseline.process_update(data)
-        self.repairs.process_update(
-            data, anomaly, available=self.last_update_success
-        )
+        self.repairs.process_update(data, anomaly, available=True)
         await self.recovery.async_process_update(
             data, anomaly, available=True
         )
@@ -557,4 +541,5 @@ class MinerCoordinator(DataUpdateCoordinator):
             "detected_at": anomaly.detected_at,
             "details": anomaly.details,
         }
+        self.events.async_process_poll(data, available=True)
         return data

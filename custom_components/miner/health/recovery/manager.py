@@ -511,7 +511,18 @@ class RecoveryManager:
             )
         )
         self._events.async_emit_recovery_event("power_cycle_started", ctx)
+        settings = recovery_settings(self.entry.options)
+        pause = timedelta(seconds=settings[CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS])
         async with self._power_lock:
+            if self.record is not record:
+                return
+            # Journal the obligation to restore power before sending turn_off.
+            now = _now()
+            record.state = RecoveryState.POWER_OFF_WAIT
+            record.last_action_at = now.isoformat()
+            record.wait_until = (now + pause).isoformat()
+            record.power_on_retries = 0
+            await self.async_save(force=True)
             if self.record is not record:
                 return
             try:
@@ -523,18 +534,12 @@ class RecoveryManager:
             return
         if not ok:
             self._events.async_emit_recovery_event("power_cycle_failed", ctx)
-            await self._lock_exhausted(data)
+            if switch_is_on(self.hass, switch_id):
+                await self._lock_exhausted(data)
+            # If the outcome is unknown, keep the journal and try to restore power.
             return
         self._events.async_emit_recovery_event("power_off_command_sent", ctx)
-        settings = recovery_settings(self.entry.options)
-        now = _now()
-        record.last_action_at = now.isoformat()
-        record.power_on_retries = 0
-        record.state = RecoveryState.POWER_OFF_WAIT
-        record.wait_until = (
-            now + timedelta(seconds=settings[CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS])
-        ).isoformat()
-        self._storage._dirty = True
+        record.wait_until = (_now() + pause).isoformat()
         await self.async_save(force=True)
 
     async def _attempt_power_on(self, data: dict[str, Any]) -> None:
@@ -559,15 +564,17 @@ class RecoveryManager:
         async with self._power_lock:
             if self.record is not record or record.state not in POWER_CRITICAL_STATES:
                 return
+            already_on = switch_is_on(self.hass, switch_id)
             try:
-                ok = await async_power_on(self.hass, switch_id)
+                ok = already_on or await async_power_on(self.hass, switch_id)
             except Exception:
                 _LOGGER.exception("Auto-recovery power on failed for %s", self.entry.title)
                 ok = False
         if self.record is not record:
             return
         if ok:
-            self._events.async_emit_recovery_event("power_on_command_sent", ctx)
+            if not already_on:
+                self._events.async_emit_recovery_event("power_on_command_sent", ctx)
             settings = recovery_settings(self.entry.options)
             now = _now()
             record.power_cycle_attempts += 1

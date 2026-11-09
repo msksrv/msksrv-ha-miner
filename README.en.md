@@ -236,6 +236,8 @@ data:
 
 ### Notify when a miner goes offline
 
+Import the [alerts blueprint](https://github.com/msksrv/msksrv-ha-miner/blob/main/blueprints/automation/msksrv/miner_alerts.yaml) by URL under **Settings → Automations & scenes → Blueprints**. Select a miner when creating the automation. The blueprint creates Home Assistant notifications for loss of connectivity, overheating and recovery locks.
+
 The integration publishes miner and farm activity to the Home Assistant event bus as `miner_event`. The `type` field identifies the event, and `scope` is `miner` or `farm`. This example triggers after three consecutive failed miner polls.
 
 ```yaml
@@ -318,6 +320,7 @@ If logs show **`Requirements for miner not found`**: verify Home Assistant can r
 3. Miner model and firmware  
 4. pyasic version (from setup log)  
 5. Steps to reproduce and a relevant log excerpt. Remove passwords and pool credentials from the log.
+6. From 1.7.1, you can attach the file from **Download diagnostics** in the miner or farm entry menu. It contains a limited set of state and telemetry fields and omits addresses, passwords and pool settings.
 
 ---
 

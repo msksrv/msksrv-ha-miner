@@ -7,6 +7,7 @@ import logging
 import math
 import shutil
 from contextlib import AsyncExitStack
+from datetime import timedelta
 from importlib.metadata import version
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -20,6 +21,7 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry, entity_registry, issue_registry
+from homeassistant.loader import async_get_integration
 from homeassistant.runner import RuntimeConfig
 
 DOMAIN = "miner"
@@ -158,8 +160,20 @@ async def main(source):
             path / "custom_components" / DOMAIN,
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
         )
+        blueprint = Path(__file__).resolve().parents[1] / "blueprints"
+        shutil.copytree(blueprint, path / "blueprints")
         (path / "configuration.yaml").write_text(
-            "homeassistant:\n  time_zone: Europe/Moscow\nrecorder:\nenergy:\n",
+            """homeassistant:
+  time_zone: Europe/Moscow
+recorder:
+energy:
+automation:
+  - id: miner_audit_alerts
+    use_blueprint:
+      path: msksrv/miner_alerts.yaml
+      input:
+        miner_device: blueprint_test
+""",
             encoding="utf-8",
         )
         axe = AxeOS()
@@ -260,9 +274,80 @@ async def main(source):
         await check_energy(hass, miner, farm)
         await check_legacy_cost(hass, farm)
         await check_repair_forms(hass, miner, farm)
-        await check_power_recovery(hass, miner, farm, events)
-        await check_offline(hass, axe, miner, farm)
+        await check_notification_blueprint(hass)
+        await check_power_recovery(hass, axe, miner, farm, events)
+        await check_offline(hass, axe, miner, farm, events, miner_device.id)
+        await check_diagnostics(hass, axe, miner, farm)
         print(f"Completed {manifest['version']}", flush=True)
+
+
+async def check_notification_blueprint(hass):
+    notifications = []
+
+    async def on_service(event):
+        data = event.data
+        if data["domain"] == "persistent_notification" and data["service"] == "create":
+            notifications.append(data["service_data"])
+
+    remove = hass.bus.async_listen("call_service", on_service)
+    payload = {"scope": "miner", "device_id": "blueprint_test", "name": "Audit Miner"}
+    try:
+        for event_type, extra in (
+            ("offline", {}),
+            ("problem_detected", {"problem_type": "temperature"}),
+            ("recovery_locked", {}),
+            ("problem_detected", {"problem_type": "fan"}),
+            ("offline", {"device_id": "other_miner"}),
+        ):
+            hass.bus.async_fire("miner_event", {**payload, "type": event_type, **extra})
+        await hass.async_block_till_done()
+    finally:
+        remove()
+    require(
+        "blueprint notifies for the three matching events only",
+        {note["notification_id"] for note in notifications}
+        == {
+            "msksrv_miner_blueprint_test_offline",
+            "msksrv_miner_blueprint_test_temperature",
+            "msksrv_miner_blueprint_test_recovery_locked",
+        }
+        and len(notifications) == 3,
+        repr(notifications),
+    )
+
+
+async def check_diagnostics(hass, axe, miner, farm):
+    secret = "diagnostics-test-secret"
+    hass.config_entries.async_update_entry(
+        miner,
+        data={**miner.data, "rpc_password": secret, "web_password": secret},
+    )
+    hass.config_entries.async_update_entry(
+        farm,
+        options={**farm.options, "farm_pool_presets": [{"password": secret}]},
+    )
+    await hass.async_block_till_done()
+    integration = await async_get_integration(hass, DOMAIN)
+    platform = await integration.async_get_platform("diagnostics")
+    miner_dump = await platform.async_get_config_entry_diagnostics(hass, miner)
+    farm_dump = await platform.async_get_config_entry_diagnostics(hass, farm)
+    require(
+        "diagnostics reports firmware, health, energy and recovery",
+        miner_dump["miner"]["firmware"] == "v2.9.0"
+        and {"health", "energy", "recovery"}.issubset(miner_dump),
+    )
+    require(
+        "farm diagnostics reports aggregate state",
+        farm_dump["farm"]["miners"] == 1 and farm_dump["farm"]["online"] == 1,
+    )
+    dumps = json.dumps([miner_dump, farm_dump])
+    require(
+        "diagnostics excludes credentials, addresses and workers",
+        all(
+            value not in dumps
+            for value in (secret, axe.ip, axe.mac, "pool.invalid", "worker")
+        ),
+    )
 
 
 async def check_energy(hass, miner, farm):
@@ -467,12 +552,15 @@ class AuditPowerSwitch(SwitchEntity):
 
     def __init__(self):
         self.commands = []
+        self.before_off = None
         self.on_started = asyncio.Event()
         self.off_completed = asyncio.Event()
         self.allow_on = asyncio.Event()
         self.allow_on.set()
 
     async def async_turn_off(self, **kwargs):
+        if self.before_off is not None:
+            await self.before_off()
         self.commands.append("off")
         self._attr_is_on = False
         self.async_write_ha_state()
@@ -486,11 +574,15 @@ class AuditPowerSwitch(SwitchEntity):
         self.async_write_ha_state()
 
 
-async def check_power_recovery(hass, miner, farm, events):
-    from custom_components.miner.health.recovery.definitions import RecoveryState
+async def check_power_recovery(hass, axe, miner, farm, events):
+    from custom_components.miner.health.recovery.definitions import (
+        RecoveryRecord,
+        RecoveryState,
+    )
     from custom_components.miner.health.recovery.emergency import (
         async_entry_emergency_latched,
     )
+    from custom_components.miner.health.recovery.storage import RecoveryStorage
 
     power = AuditPowerSwitch()
     await hass.data[SWITCH_COMPONENT].async_add_entities([power])
@@ -512,7 +604,18 @@ async def check_power_recovery(hass, miner, farm, events):
     recovery.record.state = RecoveryState.WAITING_REBOOT
     recovery.record.wait_until = None
     recovery.record.reboot_attempts = 1
+    saved = RecoveryStorage(hass, miner.entry_id)
+
+    async def check_power_off_journal():
+        await saved.async_load()
+        require(
+            "power-off intent is persisted before turn_off",
+            saved.record.state == RecoveryState.POWER_OFF_WAIT,
+        )
+
+    power.before_off = check_power_off_journal
     await recovery.async_process_update(None, None, available=False)
+    power.before_off = None
     require(
         "recovery can cut simulated power after reboot timeout",
         power.commands == ["off"]
@@ -527,6 +630,7 @@ async def check_power_recovery(hass, miner, farm, events):
 
     recovery.record.state = RecoveryState.POWER_OFF_WAIT
     recovery.record.wait_until = None
+    await power.async_turn_off()
     power.on_started.clear()
     power.off_completed.clear()
     power.allow_on.clear()
@@ -603,6 +707,23 @@ async def check_power_recovery(hass, miner, farm, events):
         "clearing the latch does not energize the switch",
         hass.states.get(power.entity_id).state == "off",
     )
+    require(
+        "unload before simulating a restart mid-cycle",
+        await hass.config_entries.async_unload(miner.entry_id),
+    )
+    saved.replace(RecoveryRecord(state=RecoveryState.POWER_OFF_WAIT))
+    await saved.async_save(force=True)
+    await axe.stop()
+    await hass.config_entries.async_setup(miner.entry_id)
+    require(
+        "first failed poll resumes pending power restoration",
+        miner.state is ConfigEntryState.SETUP_RETRY and power.is_on,
+    )
+    await axe.start()
+    require(
+        "miner loads after recovering power",
+        await hass.config_entries.async_reload(miner.entry_id),
+    )
     hass.config_entries.async_update_entry(
         miner, options={**miner.options, "auto_recovery_enabled": False}
     )
@@ -627,7 +748,7 @@ def state_is_live(state):
     )
 
 
-async def check_offline(hass, axe, miner, farm):
+async def check_offline(hass, axe, miner, farm, events, device_id):
     from custom_components.miner.health.repairs.definitions import farm_issue_id
 
     hass.config_entries.async_update_entry(
@@ -639,10 +760,33 @@ async def check_offline(hass, axe, miner, farm):
         },
     )
     await hass.async_block_till_done()
-    await axe.stop()
     coord = hass.data[DOMAIN][miner.entry_id]
     farm_coord = hass.data[DOMAIN][farm.entry_id]
+    coord.update_interval = timedelta(seconds=2)
     await coord.async_refresh()
+    await axe.stop()
+    require(
+        "four scheduled polls fail without manual refresh",
+        await wait_for(lambda: coord._failure_count >= 4, timeout=14),
+    )
+    await hass.async_block_till_done()
+    require(
+        "scheduled polling publishes exactly one offline event",
+        sum(
+            event.get("type") == "offline" and event.get("device_id") == device_id
+            for event in events
+        )
+        == 1,
+    )
+    platform = await (await async_get_integration(hass, DOMAIN)).async_get_platform(
+        "diagnostics"
+    )
+    diagnostics = await platform.async_get_config_entry_diagnostics(hass, miner)
+    require(
+        "failed polls are visible in diagnostics",
+        bool(diagnostics["last_poll_error"]["type"])
+        and bool(diagnostics["last_poll_error"]["at"]),
+    )
     await farm_coord.async_refresh()
     require(
         "connection loss makes telemetry unavailable", not coord.last_update_success
@@ -668,6 +812,14 @@ async def check_offline(hass, axe, miner, farm):
             lambda: coord.last_update_success and farm_coord.data["miners_online"] == 1,
             timeout=38,
         ),
+    )
+    require(
+        "scheduled polling publishes exactly one online event",
+        sum(
+            event.get("type") == "online" and event.get("device_id") == device_id
+            for event in events
+        )
+        == 1,
     )
     await axe.stop()
     await hass.config_entries.async_reload(miner.entry_id)
