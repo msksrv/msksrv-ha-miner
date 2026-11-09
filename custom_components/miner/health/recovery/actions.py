@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
     from ...coordinator import MinerCoordinator
-    from ...events.manager import MinerEventManager
 
 _LOGGER = logging.getLogger(__name__)
 

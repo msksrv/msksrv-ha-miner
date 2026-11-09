@@ -309,9 +309,7 @@ class BaselineManager:
         if data.get("errors"):
             return False
         flags = (data.get("health") or {}).get("flags") or {}
-        if flags.get("temperature_high") or flags.get("maintenance_required"):
-            return False
-        return True
+        return not (flags.get("temperature_high") or flags.get("maintenance_required"))
 
     def _learn_sample(
         self,

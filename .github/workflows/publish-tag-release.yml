@@ -13,7 +13,13 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+
   create_release:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the repository
@@ -35,6 +41,10 @@ jobs:
           fi
           echo "prerelease=${PRERELEASE}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          NOTES="RELEASE-$TAG.md"
+          if [[ -f "$NOTES" ]]; then
+            echo "notes_path=$NOTES" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Verify manifest version matches tag
         shell: bash
@@ -74,6 +84,8 @@ jobs:
           draft: ${{ steps.classify.outputs.prerelease == 'true' }}
           prerelease: ${{ steps.classify.outputs.prerelease == 'true' }}
           generate_release_notes: true
+          body_path: ${{ steps.classify.outputs.notes_path }}
+          fail_on_unmatched_files: true
           files: ${{ github.workspace }}/custom_components/miner/miner.zip
 
       - name: Publish draft pre-release

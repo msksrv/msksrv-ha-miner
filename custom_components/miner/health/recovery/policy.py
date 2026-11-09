@@ -49,7 +49,6 @@ def hashrate_metrics(
     ms = data.get("miner_sensors") or {}
     current = _f(ms.get("hashrate"))
     health = data.get("health") or {}
-    learned = health.get("learned_baseline") or {}
     baseline_medians = coordinator.baseline.baseline_medians(data)
     reference = None
     if health.get("hashrate_reference") == "baseline" and baseline_medians.get("hashrate"):
@@ -118,12 +117,7 @@ def blocking_fault_active(
 
 
 def in_cooldown(record: RecoveryRecord) -> bool:
-    if record.state == RecoveryState.LOCKED and record.locked_reason:
-        if record.cooldown_until and not _after(record.cooldown_until):
-            return True
-    if record.cooldown_until and not _after(record.cooldown_until):
-        return True
-    return False
+    return bool(record.cooldown_until and not _after(record.cooldown_until))
 
 
 def in_config_block(record: RecoveryRecord) -> bool:
@@ -150,9 +144,7 @@ def pool_or_mode_changing(
         return True
     if events._pool_candidate is not None and events._pool_stable_count < 2:
         return True
-    if events._work_mode_candidate is not None and events._work_mode_stable_count < 2:
-        return True
-    return False
+    return events._work_mode_candidate is not None and events._work_mode_stable_count < 2
 
 
 def can_start_recovery(

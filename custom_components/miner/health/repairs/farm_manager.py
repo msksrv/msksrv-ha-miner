@@ -8,8 +8,8 @@ from homeassistant.helpers import issue_registry as ir
 
 from ...const import DOMAIN
 from .definitions import (
-    FARM_REPAIR_TYPES,
     FARM_REPAIR_DEFINITIONS,
+    FARM_REPAIR_TYPES,
     LEARN_MORE_URL,
     FarmRepairType,
     farm_issue_id,

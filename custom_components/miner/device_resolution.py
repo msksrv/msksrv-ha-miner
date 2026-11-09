@@ -4,7 +4,7 @@ from __future__ import annotations
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, format_mac
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
 
 from .const import CONF_IP, CONF_IS_FARM, DOMAIN
 
@@ -59,19 +59,6 @@ def is_miner_already_configured(
                 return True
 
     dev_reg = dr.async_get(hass)
-    if mac_norm and len(mac_norm) == 12:
-        formatted = format_mac(mac_norm)
-        if (device := dev_reg.async_get_device(
-            connections={(CONNECTION_NETWORK_MAC, formatted)}
-        )) and async_get_miner_config_entry_for_device(hass, device) is not None:
-            return True
-
-    if (
-        ip_s
-        and (device := dev_reg.async_get_device(connections={("ip", ip_s)}))
-        and async_get_miner_config_entry_for_device(hass, device) is not None
-    ):
-        return True
 
     for entry in _iter_miner_config_entries(hass):
         for device in dr.async_entries_for_config_entry(dev_reg, entry.entry_id):
@@ -96,49 +83,41 @@ def is_miner_already_configured(
     return False
 
 
+def _device_config_entry_ids(device: dr.DeviceEntry) -> tuple[str, ...]:
+    entry_id = getattr(device, "config_entry_id", None)
+    if entry_id:
+        return (entry_id,)
+    # Older supported cores can associate one device with multiple config entries.
+    primary = device.primary_config_entry
+    if primary:
+        return tuple(dict.fromkeys((primary, *device.config_entries)))
+    return tuple(device.config_entries)
+
+
 def async_get_farm_config_entry_for_device(
     hass: HomeAssistant,
     device: dr.DeviceEntry,
 ) -> ConfigEntry | None:
-    """Config entry when this device is a farm aggregate (not a single miner)."""
-    mgr = hass.config_entries
-    ordered_ids: list[str] = []
-    if device.primary_config_entry:
-        ordered_ids.append(device.primary_config_entry)
-    ordered_ids.extend(device.config_entries)
-    seen: set[str] = set()
-    for eid in ordered_ids:
-        if not eid or eid in seen:
-            continue
-        seen.add(eid)
-        ce = mgr.async_get_entry(eid)
-        if ce and ce.domain == DOMAIN and ce.data.get(CONF_IS_FARM):
-            return ce
+    """Config entry when this device is a farm aggregate."""
+    for entry_id in _device_config_entry_ids(device):
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if entry and entry.domain == DOMAIN and entry.data.get(CONF_IS_FARM):
+            return entry
     return None
-
-
-def _is_miner_config_entry(entry: ConfigEntry | None) -> bool:
-    return bool(
-        entry
-        and entry.domain == DOMAIN
-        and not entry.data.get(CONF_IS_FARM)
-        and entry.data.get(CONF_IP)
-    )
 
 
 def async_get_miner_config_entry_for_device(
     hass: HomeAssistant,
     device: dr.DeviceEntry,
 ) -> ConfigEntry | None:
-    """Config entry for this device when it is a single miner (not a farm)."""
-    mgr = hass.config_entries
-    primary = device.primary_config_entry
-    if primary:
-        ce = mgr.async_get_entry(primary)
-        if _is_miner_config_entry(ce):
-            return ce
-    for eid in device.config_entries:
-        ce = mgr.async_get_entry(eid)
-        if _is_miner_config_entry(ce):
-            return ce
+    """Config entry for this device when it is a single miner."""
+    for entry_id in _device_config_entry_ids(device):
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if (
+            entry
+            and entry.domain == DOMAIN
+            and not entry.data.get(CONF_IS_FARM)
+            and entry.data.get(CONF_IP)
+        ):
+            return entry
     return None

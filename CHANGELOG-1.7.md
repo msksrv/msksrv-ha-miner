@@ -1,5 +1,17 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.0
+
+- Added miner health scores, learned baselines, Repairs, farm health and activity events.
+- Added opt-in hashrate recovery, power cycling and a persistent farm emergency stop.
+- Added energy and electricity cost accounting for miners and farms.
+- Fixed sensor loading and device lookup on Home Assistant Core 2026.11.
+- Fixed event delivery after miner commands and kept the emergency stop authoritative over a pending recovery power-on.
+- Fixed monetary sensor state classes and enabled opted-in legacy cost sensors on the first reload while preserving user-disabled entities.
+- Added release checks that boot Home Assistant Core with a local Bitaxe emulator and a simulated power switch.
+
+---
+
 ## v1.7.0b23 (beta)
 
 ### Fixed
@@ -459,9 +471,3 @@ Missing data for a component is excluded from the weighted average (not penalize
 
 - Configurable thresholds (options flow)
 - Per-model threshold profiles
-
----
-
-## Planned for 1.7.0 (stable)
-
-After additional beta cycles for **other** 1.7 features, merge and release stable **v1.7.0**.

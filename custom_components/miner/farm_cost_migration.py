@@ -23,11 +23,8 @@ def _iter_legacy_farm_cost_entities(
 ) -> list[er.RegistryEntry]:
     prefix = _legacy_cost_unique_id_prefix(entry_id)
     found: list[er.RegistryEntry] = []
-    for entity in registry.entities.values():
-        if entity.config_entry_id != entry_id or entity.platform != DOMAIN:
-            continue
-        uid = entity.unique_id or ""
-        if uid.startswith(prefix):
+    for entity in er.async_entries_for_config_entry(registry, entry_id):
+        if entity.platform == DOMAIN and entity.unique_id.startswith(prefix):
             found.append(entity)
     return found
 

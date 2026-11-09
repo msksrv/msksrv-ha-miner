@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-
 from conftest import load_miner_module
 
 definitions = load_miner_module("energy/definitions.py", "custom_components.miner.energy.definitions")

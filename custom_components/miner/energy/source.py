@@ -285,6 +285,4 @@ def _valid_power_entity(hass: HomeAssistant, entity_id: str) -> bool:
     if state is None:
         return False
     unit = str(state.attributes.get("unit_of_measurement") or "").strip()
-    if unit and unit not in _POWER_TO_W:
-        return False
-    return True
+    return not unit or unit in _POWER_TO_W

@@ -52,6 +52,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
     """Set up Miner from a config entry."""
     if config_entry.data.get(CONF_IS_FARM):
         from .farm_coordinator import MinerFarmCoordinator
+        from .farm_cost_migration import async_apply_legacy_farm_cost_registry
 
         coordinator = MinerFarmCoordinator(hass, config_entry)
         hass.data.setdefault(DOMAIN, {})[config_entry.entry_id] = coordinator
@@ -68,12 +69,10 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
             config_entry.add_update_listener(_farm_options_changed)
         )
 
+        await async_apply_legacy_farm_cost_registry(hass, config_entry)
         await hass.config_entries.async_forward_entry_setups(
             config_entry, FARM_PLATFORMS
         )
-        from .farm_cost_migration import async_apply_legacy_farm_cost_registry
-
-        await async_apply_legacy_farm_cost_registry(hass, config_entry)
         return True
 
     from homeassistant.helpers.update_coordinator import UpdateFailed
@@ -163,13 +162,12 @@ async def async_remove_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
             hass, DOMAIN, miner_issue_id(config_entry.entry_id, rtype)
         )
 
+    from .const import CONF_POWER_SWITCH
+    from .energy.storage import EnergyStorage
     from .health.baseline.manager import BaselineManager
     from .health.recovery.actions import async_power_on
     from .health.recovery.definitions import POWER_CRITICAL_STATES
     from .health.recovery.storage import RecoveryStorage
-    from .const import CONF_POWER_SWITCH
-
-    from .energy.storage import EnergyStorage
 
     storage = RecoveryStorage(hass, config_entry.entry_id)
     await storage.async_load()

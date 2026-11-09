@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -22,7 +23,11 @@ from ...const import (
     CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS,
     DOMAIN,
 )
-from ...events.definitions import pool_signature, work_mode_signature, sanitize_event_data
+from ...events.definitions import (
+    pool_signature,
+    sanitize_event_data,
+    work_mode_signature,
+)
 from ...health.repairs.membership import farm_entry_ids_for_miner
 from .actions import async_power_off, async_power_on, async_send_recovery_reboot
 from .definitions import (
@@ -31,12 +36,13 @@ from .definitions import (
     POWER_CRITICAL_STATES,
     POWER_ON_RETRY_SECONDS,
     REBOOT_RETRY_SECONDS,
-    LockReason,
     RECOVERY_REASON_HASHRATE_LOW,
+    LockReason,
     RecoveryRecord,
     RecoveryState,
     recovery_settings,
 )
+from .emergency import latched_record
 from .policy import (
     action_event_context,
     apply_config_block,
@@ -106,6 +112,7 @@ class RecoveryManager:
         self._events = events
         self._repairs = repairs
         self._storage = RecoveryStorage(hass, entry.entry_id)
+        self._power_lock = asyncio.Lock()
         self._last_pool: tuple[str | None, str | None, str | None] | None = None
         self._last_mode: str | None = None
         self._farm_claimed = False
@@ -152,17 +159,19 @@ class RecoveryManager:
         """Release farm mutex when this miner entry unloads."""
         self._release_farm_slot()
 
-    async def async_sync_emergency_latch(self) -> None:
-        """Reload latched state from Store after farm emergency stop."""
-        await self._storage.async_load()
+    async def async_latch_emergency_stop(self) -> None:
+        """Block new recovery actions and wait for an in-flight power command."""
+        self._storage.replace(latched_record(self.record))
         self._release_farm_slot()
+        # The farm must issue its final turn_off after any pending turn_on.
+        async with self._power_lock:
+            await self.async_save(force=True)
 
     async def async_clear_emergency_latch(self) -> None:
         """Clear farm emergency stop latch for this miner."""
-        from .emergency import async_clear_emergency_latch
-
-        await async_clear_emergency_latch(self.hass, self.entry.entry_id)
-        await self._storage.async_load()
+        if self.record.emergency_stop_latched:
+            self._storage.update(emergency_stop_latched=False, cooldown_until=None)
+            await self.async_save(force=True)
 
     def reload_options(self) -> None:
         settings = recovery_settings(self.entry.options)
@@ -502,11 +511,16 @@ class RecoveryManager:
             )
         )
         self._events.async_emit_recovery_event("power_cycle_started", ctx)
-        try:
-            ok = await async_power_off(self.hass, switch_id)
-        except Exception:
-            _LOGGER.exception("Auto-recovery power off failed for %s", self.entry.title)
-            ok = False
+        async with self._power_lock:
+            if self.record is not record:
+                return
+            try:
+                ok = await async_power_off(self.hass, switch_id)
+            except Exception:
+                _LOGGER.exception("Auto-recovery power off failed for %s", self.entry.title)
+                ok = False
+        if self.record is not record:
+            return
         if not ok:
             self._events.async_emit_recovery_event("power_cycle_failed", ctx)
             await self._lock_exhausted(data)
@@ -542,11 +556,16 @@ class RecoveryManager:
             self._events.async_emit_recovery_event("power_cycle_failed", ctx)
             await self._lock_power_restore_failed(data)
             return
-        try:
-            ok = await async_power_on(self.hass, switch_id)
-        except Exception:
-            _LOGGER.exception("Auto-recovery power on failed for %s", self.entry.title)
-            ok = False
+        async with self._power_lock:
+            if self.record is not record or record.state not in POWER_CRITICAL_STATES:
+                return
+            try:
+                ok = await async_power_on(self.hass, switch_id)
+            except Exception:
+                _LOGGER.exception("Auto-recovery power on failed for %s", self.entry.title)
+                ok = False
+        if self.record is not record:
+            return
         if ok:
             self._events.async_emit_recovery_event("power_on_command_sent", ctx)
             settings = recovery_settings(self.entry.options)

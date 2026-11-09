@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from ...const import (
+    CONF_AUTO_RECOVERY_CONFIG_BLOCK_SECONDS,
     CONF_AUTO_RECOVERY_COOLDOWN_SECONDS,
     CONF_AUTO_RECOVERY_ENABLED,
     CONF_AUTO_RECOVERY_MAX_POWER_CYCLES,
@@ -15,7 +16,6 @@ from ...const import (
     CONF_AUTO_RECOVERY_POWER_CYCLE_ENABLED,
     CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS,
     CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS,
-    CONF_AUTO_RECOVERY_CONFIG_BLOCK_SECONDS,
 )
 
 STORAGE_VERSION = 1

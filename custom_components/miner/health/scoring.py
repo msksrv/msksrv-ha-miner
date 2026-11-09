@@ -174,9 +174,6 @@ def _score_fans(
     if not speeds:
         return None, False
     mining = bool(data.get("is_mining"))
-    problem = mining and any(
-        s <= 0 or s < thresholds.fan_min_rpm for s in speeds
-    )
     if not mining:
         return None, False
     min_speed = min(speeds)

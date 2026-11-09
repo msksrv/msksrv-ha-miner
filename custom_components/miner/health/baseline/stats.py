@@ -10,7 +10,7 @@ from typing import Any
 class RollingStats:
     """Bounded-window median and MAD (median absolute deviation)."""
 
-    __slots__ = ("max_samples", "_samples", "sample_count", "first_at", "last_at")
+    __slots__ = ("_samples", "first_at", "last_at", "max_samples", "sample_count")
 
     def __init__(self, max_samples: int = 360) -> None:
         self.max_samples = max_samples

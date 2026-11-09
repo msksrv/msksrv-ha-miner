@@ -1,6 +1,6 @@
 """Self-learning statistical baseline for miner anomaly detection."""
 
-from .manager import BaselineManager
 from .detector import AnomalyFinding, AnomalyState
+from .manager import BaselineManager
 
-__all__ = ["BaselineManager", "AnomalyFinding", "AnomalyState"]
+__all__ = ["AnomalyFinding", "AnomalyState", "BaselineManager"]

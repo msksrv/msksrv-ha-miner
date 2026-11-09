@@ -45,8 +45,7 @@ def stitch_physical_reading(record: EnergyRecord, raw_kwh: float) -> float:
 
     record.last_physical_raw_kwh = raw_kwh
     total = record.physical_offset_kwh + raw_kwh
-    if total > record.total_kwh:
-        record.total_kwh = total
+    record.total_kwh = max(record.total_kwh, total)
     return record.total_kwh
 
 

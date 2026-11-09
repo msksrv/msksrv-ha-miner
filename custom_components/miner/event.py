@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from homeassistant.components.event import EventEntity
 from homeassistant.config_entries import ConfigEntry
@@ -12,7 +12,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_IS_FARM, DOMAIN
 from .events.definitions import FARM_EVENT_TYPES, MINER_EVENT_TYPES
-from .events.manager import FarmEventManager, MinerEventManager
 from .farm_coordinator import MinerFarmCoordinator
 from .miner_device_info import get_miner_device_info
 
@@ -50,7 +49,7 @@ class MinerActivityEventEntity(_ActivityEventMixin, EventEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "activity"
-    _attr_event_types = list(MINER_EVENT_TYPES)
+    _attr_event_types: ClassVar[list[str]] = list(MINER_EVENT_TYPES)
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         self._coordinator = coordinator
@@ -67,7 +66,7 @@ class FarmActivityEventEntity(_ActivityEventMixin, EventEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "farm_activity"
-    _attr_event_types = list(FARM_EVENT_TYPES)
+    _attr_event_types: ClassVar[list[str]] = list(FARM_EVENT_TYPES)
 
     def __init__(self, coordinator: MinerFarmCoordinator) -> None:
         self._coordinator = coordinator

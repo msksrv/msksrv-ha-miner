@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
-
-from homeassistant.util import dt as dt_util
+from typing import TYPE_CHECKING
 
 from ..const import FARM_ELEC_TARIFF_FLAT
 from ..farm_elec_tou import (

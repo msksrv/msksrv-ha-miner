@@ -10,13 +10,18 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EntityCategory, PERCENTAGE
+from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FARM_AMBIENT_TEMP_ENTITIES, DOMAIN, JOULES_PER_TERA_HASH, TERA_HASH_PER_SECOND
+from .const import (
+    CONF_FARM_AMBIENT_TEMP_ENTITIES,
+    DOMAIN,
+    JOULES_PER_TERA_HASH,
+    TERA_HASH_PER_SECOND,
+)
 from .farm_coordinator import MinerFarmCoordinator
 from .farm_cost_sensors import setup_farm_cost_sensors
 

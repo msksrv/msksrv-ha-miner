@@ -19,9 +19,9 @@ from .const import (
     DOMAIN,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
-from .farm_health import compute_farm_health_metrics
-from .events import FarmEventManager
 from .energy import FarmEnergyManager
+from .events import FarmEventManager
+from .farm_health import compute_farm_health_metrics
 from .health.repairs.farm_manager import FarmRepairManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
         self.repairs = FarmRepairManager(hass, entry)
         self.energy = FarmEnergyManager(hass, entry)
         self._recovery_active_miner: str | None = None
+        self._emergency_lock = asyncio.Lock()
         self._emergency_stop_active = False
         self._emergency_clear_armed_until: float | None = None
 
@@ -379,77 +380,84 @@ class MinerFarmCoordinator(DataUpdateCoordinator):
 
     async def async_clear_emergency_stop(self) -> None:
         """Clear emergency stop latch on all farm members (explicit confirm)."""
-        from .health.recovery.emergency import async_clear_emergency_latch
+        async with self._emergency_lock:
+            from .health.recovery.emergency import async_clear_emergency_latch
 
-        pairs = list(self._iter_miner_member_pairs(self.device_ids))
-        for entry, member in pairs:
-            await async_clear_emergency_latch(self.hass, entry.entry_id)
-            if member is not None and hasattr(member, "recovery"):
-                await member.recovery.async_clear_emergency_latch()
-        self._emergency_stop_active = False
-        self._emergency_clear_armed_until = None
-        self.events.async_emit_emergency_stop_cleared(len(pairs))
-        await self.async_request_refresh()
+            pairs = list(self._iter_miner_member_pairs(self.device_ids))
+            for entry, member in pairs:
+                if member is not None:
+                    await member.recovery.async_clear_emergency_latch()
+                else:
+                    await async_clear_emergency_latch(self.hass, entry.entry_id)
+            self._emergency_stop_active = False
+            self._emergency_clear_armed_until = None
+            self.events.async_emit_emergency_stop_cleared(len(pairs))
+            await self.async_request_refresh()
 
     async def async_emergency_power_off(self) -> None:
         """Latch recovery on all members, then turn off linked switches."""
-        from .health.recovery.actions import async_power_off
-        from .health.recovery.emergency import async_latch_emergency_stop
+        async with self._emergency_lock:
+            from .health.recovery.actions import async_power_off
+            from .health.recovery.emergency import async_latch_emergency_stop
 
-        pairs = list(self._iter_miner_member_pairs(self.device_ids))
-        for entry, member in pairs:
-            await async_latch_emergency_stop(self.hass, entry.entry_id)
-            if member is not None and hasattr(member, "recovery"):
-                await member.recovery.async_sync_emergency_latch()
+            pairs = list(self._iter_miner_member_pairs(self.device_ids))
+            await asyncio.gather(
+                *(
+                    member.recovery.async_latch_emergency_stop()
+                    if member is not None
+                    else async_latch_emergency_stop(self.hass, entry.entry_id)
+                    for entry, member in pairs
+                )
+            )
 
-        self._recovery_active_miner = None
-        self._emergency_stop_active = True
-        self._emergency_clear_armed_until = None
+            self._recovery_active_miner = None
+            self._emergency_stop_active = True
+            self._emergency_clear_armed_until = None
 
-        switches = [
-            eid
-            for eid in self.linked_power_switches()
-            if self.hass.states.get(eid) is not None
-        ]
-        if not switches:
-            _LOGGER.warning("Emergency stop: no linked switches available")
-            self.events.async_emit_emergency_power_off_failed(reason="no_switches")
-            await self.async_request_refresh()
-            return
+            switches = [
+                eid
+                for eid in self.linked_power_switches()
+                if self.hass.states.get(eid) is not None
+            ]
+            if not switches:
+                _LOGGER.warning("Emergency stop: no linked switches available")
+                self.events.async_emit_emergency_power_off_failed(reason="no_switches")
+                await self.async_request_refresh()
+                return
 
-        async def _turn_off(entity_id: str) -> tuple[str, bool]:
-            ok = await async_power_off(self.hass, entity_id)
-            return entity_id, ok
+            async def _turn_off(entity_id: str) -> tuple[str, bool]:
+                ok = await async_power_off(self.hass, entity_id)
+                return entity_id, ok
 
-        results = await asyncio.gather(*(_turn_off(eid) for eid in switches))
-        failed_switches: list[str] = []
-        successes = 0
-        for eid, ok in results:
-            if ok:
-                successes += 1
+            results = await asyncio.gather(*(_turn_off(eid) for eid in switches))
+            failed_switches: list[str] = []
+            successes = 0
+            for eid, ok in results:
+                if ok:
+                    successes += 1
+                else:
+                    failed_switches.append(eid)
+                    _LOGGER.error("Emergency stop failed for %s", eid)
+
+            failures = len(failed_switches)
+            if failures == 0:
+                _LOGGER.info("Emergency stop: turned off %s switch(es)", successes)
+                self.events.async_emit_emergency_power_off(successes)
+            elif successes == 0:
+                _LOGGER.error("Emergency stop: all %s switch(es) failed", len(switches))
+                self.events.async_emit_emergency_power_off_failed(failed_switches)
             else:
-                failed_switches.append(eid)
-                _LOGGER.error("Emergency stop failed for %s", eid)
-
-        failures = len(failed_switches)
-        if failures == 0:
-            _LOGGER.info("Emergency stop: turned off %s switch(es)", successes)
-            self.events.async_emit_emergency_power_off(successes)
-        elif successes == 0:
-            _LOGGER.error("Emergency stop: all %s switch(es) failed", len(switches))
-            self.events.async_emit_emergency_power_off_failed(failed_switches)
-        else:
-            _LOGGER.error(
-                "Emergency stop: %s of %s switch(es) failed",
-                failures,
-                len(switches),
-            )
-            self.events.async_emit_emergency_power_off_partial_failure(
-                success_count=successes,
-                failure_count=failures,
-                failed_switches=failed_switches,
-            )
-        await self.async_request_refresh()
+                _LOGGER.error(
+                    "Emergency stop: %s of %s switch(es) failed",
+                    failures,
+                    len(switches),
+                )
+                self.events.async_emit_emergency_power_off_partial_failure(
+                    success_count=successes,
+                    failure_count=failures,
+                    failed_switches=failed_switches,
+                )
+            await self.async_request_refresh()
 
     def _reported_algorithms_for_device_ids(self, device_ids: list[str]) -> set[str]:
         from .farm_validation import reported_algorithms_for_device_ids

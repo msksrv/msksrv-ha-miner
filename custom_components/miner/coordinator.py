@@ -21,9 +21,9 @@ from .const import (
     CONF_WEB_USERNAME,
     DOMAIN,
 )
-from .health.baseline import BaselineManager
 from .energy import MinerEnergyManager
 from .events import MinerEventManager
+from .health.baseline import BaselineManager
 from .health.profiles import format_profile_name, resolve_health_thresholds
 from .health.recovery import RecoveryManager
 from .health.repairs import RepairManager

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
@@ -15,6 +16,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from ..const import DOMAIN, JOULES_PER_TERA_HASH
 from ..miner_device_info import get_miner_device_info
@@ -30,8 +32,6 @@ def setup_miner_energy_sensors(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    from ..coordinator import MinerCoordinator
-
     coordinator: MinerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     async_add_entities(
         [
@@ -57,8 +57,6 @@ def setup_farm_energy_sensors(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    from ..farm_coordinator import MinerFarmCoordinator
-
     coordinator: MinerFarmCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     entities: list[SensorEntity] = [
         FarmEnergyTotalSensor(coordinator),
@@ -128,12 +126,6 @@ class _MinerEnergySensorBase(CoordinatorEntity["MinerCoordinator"], SensorEntity
     def available(self) -> bool:
         src = self.coordinator.energy.record.active_source
         return src is not None and src != RESOLVED_UNAVAILABLE
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        self.async_on_remove(
-            self.coordinator.async_add_listener(self._handle_coordinator_update)
-        )
 
     @callback
     def _handle_coordinator_update(self) -> None:
@@ -421,12 +413,6 @@ class _FarmEnergySensorBase(CoordinatorEntity["MinerFarmCoordinator"], SensorEnt
             model="Farm",
         )
 
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        self.async_on_remove(
-            self.coordinator.async_add_listener(self._handle_coordinator_update)
-        )
-
     @callback
     def _handle_coordinator_update(self) -> None:
         self.async_write_ha_state()
@@ -625,6 +611,7 @@ class FarmEnergyIdleSavedTodaySensor(_FarmEnergySensorBase):
 
 
 class _FarmEnergyMonetarySensorBase(_FarmEnergySensorBase):
+    _attr_state_class = SensorStateClass.TOTAL
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_suggested_display_precision = 2
 
@@ -637,8 +624,6 @@ class _FarmEnergyMonetarySensorBase(_FarmEnergySensorBase):
 
 
 class FarmEnergyCostTodaySensor(_FarmEnergyMonetarySensorBase):
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
     def __init__(self, coordinator: MinerFarmCoordinator) -> None:
         super().__init__(
             coordinator,
@@ -647,13 +632,18 @@ class FarmEnergyCostTodaySensor(_FarmEnergyMonetarySensorBase):
         )
 
     @property
+    def last_reset(self) -> datetime | None:
+        key = self.coordinator.energy.record.day_key
+        if key is None:
+            return None
+        return datetime.fromisoformat(key).replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+
+    @property
     def native_value(self) -> float | None:
         return round(self.coordinator.energy.period.day_cost, 2)
 
 
 class FarmEnergyCostMonthSensor(_FarmEnergyMonetarySensorBase):
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
     def __init__(self, coordinator: MinerFarmCoordinator) -> None:
         super().__init__(
             coordinator,
@@ -662,13 +652,18 @@ class FarmEnergyCostMonthSensor(_FarmEnergyMonetarySensorBase):
         )
 
     @property
+    def last_reset(self) -> datetime | None:
+        key = self.coordinator.energy.record.month_key
+        if key is None:
+            return None
+        return datetime.fromisoformat(f"{key}-01").replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+
+    @property
     def native_value(self) -> float | None:
         return round(self.coordinator.energy.period.month_cost, 2)
 
 
 class FarmEnergyCostTotalSensor(_FarmEnergyMonetarySensorBase):
-    _attr_state_class = SensorStateClass.TOTAL_INCREASING
-
     def __init__(self, coordinator: MinerFarmCoordinator) -> None:
         super().__init__(
             coordinator,
@@ -682,8 +677,6 @@ class FarmEnergyCostTotalSensor(_FarmEnergyMonetarySensorBase):
 
 
 class FarmEnergyCostPrevMonthSensor(_FarmEnergyMonetarySensorBase):
-    _attr_state_class = SensorStateClass.TOTAL
-
     def __init__(self, coordinator: MinerFarmCoordinator) -> None:
         super().__init__(
             coordinator,

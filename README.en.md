@@ -22,6 +22,7 @@ Each miner gets its own device (Antminer, WhatsMiner, Avalon, Innosilicon, Golds
 - [Farm](#farm)
 - [Miner entities](#miner-entities)
 - [Farm entities](#farm-entities)
+- [Health, recovery, and energy](#health-recovery-and-energy)
 - [Automations](#automations)
 - [Services](#services)
 - [Discovery](#discovery)
@@ -50,7 +51,9 @@ Poll interval: **10 seconds**. Unreachable miners show entities as **unavailable
 
 ## Installation
 
-### HACS
+### Marketplace and HACS
+
+On Home Assistant 2026.11 or later, open **Settings → Marketplace**. On earlier versions, use HACS.
 
 1. **HACS → Integrations → Custom repositories** (if needed):  
    `https://github.com/msksrv/msksrv-ha-miner`, category **Integration**.
@@ -106,11 +109,11 @@ A **farm** groups existing miner devices into one virtual device.
 
 Configure a **power switch** on each member (**Configure** on that miner’s entry) for emergency stop to work.
 
-**Emergency stop** turns off linked power switches **one after another**. A failure on one switch does not stop the rest from being processed.
+**Emergency stop** persists a recovery lock for members before turning off linked power switches in parallel. A switch failure does not interrupt the other requests.
 
 **Bulk pool apply** is blocked when members report **different algorithms**. The operation is **not transactional**: if one miner is offline or rejects the change, others may already have been updated.
 
-Tariffs provide an **estimate** from current power draw, not meter billing (see [Limitations](#limitations)).
+The integration estimates **electricity cost** using the configured tariff and measured or calculated energy.
 
 After you save farm options, the entry **reloads automatically**.
 
@@ -140,11 +143,20 @@ Preset pool passwords are not shown again in forms; an empty password field keep
 | **sensor** | Algorithms | Summary from online members; empty if none report an algorithm |
 | **sensor** | Effective chips, % | Across online members |
 | **sensor** | Room temperature | Linked ambient sensors |
-| **sensor** | Electricity cost | When a tariff is configured (hour, day, month, lifetime, at current draw) |
+| **sensor** | Electricity cost | When a tariff is configured (day, current and previous month, lifetime, and hourly cost at current draw) |
 | **select** | Pool preset | Slot used by apply buttons |
 | **button** | Apply primary pool | Preset → primary stratum on all members |
 | **button** | Append backup pool | Preset → backup slot |
-| **button** | Emergency stop | Sequential power-off |
+| **button** | Emergency stop | Locks automatic recovery and turns off linked switches |
+
+---
+
+## Health, recovery, and energy
+
+- **Health.** Miners and farms report health scores and diagnostics. Miner options include threshold profiles and timing for Home Assistant Repairs.
+- **Automatic recovery.** Off by default. It can reboot a miner after sustained low hashrate. Power cycling requires a linked HA switch and separate opt-in. The farm emergency stop lock survives reloads. Press the clear button twice within 30 seconds to unlock recovery. Clearing the lock does not energize the switch.
+- **Energy.** Miner options support a physical meter or integration from power readings. A farm can sum its members or use a shared meter. In the Energy Dashboard, choose the cumulative kWh sensor for the farm or individual miners. Counting both inflates the reported total.
+- **Upgrading.** Electricity cost sensors use the energy accounting totals. The update disables old cost sensors by default. Farm energy options can re-enable them for existing automations.
 
 ---
 
@@ -260,7 +272,7 @@ If logs show **`Requirements for miner not found`**: verify Home Assistant can r
 ## Limitations
 
 - Entities and controls depend on **pyasic** and firmware for your model.
-- **Cost sensors** approximate spend from polled power draw; they do not replace utility metering. Missed polls and offline periods are not backfilled.
+- **Costs** are estimates based on the tariff and recorded energy. Polling gaps can reduce the energy counted when estimating from power.
 - Power off/on drives a linked HA `switch` only, not miner-side shutdown APIs.
 
 Supported hardware: [pyasic docs](https://pyasic.readthedocs.io/en/latest/miners/supported_types/).

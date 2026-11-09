@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from homeassistant.components.sensor import (
@@ -52,7 +53,6 @@ class FarmCostSensorBase(
 
     _attr_has_entity_name = True
     _attr_should_poll = False
-    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,
@@ -78,11 +78,7 @@ class FarmCostSensorBase(
             translation_key=translation_key,
             device_class=SensorDeviceClass.MONETARY,
             native_unit_of_measurement=currency,
-            state_class=(
-                SensorStateClass.TOTAL_INCREASING
-                if period == "all"
-                else SensorStateClass.TOTAL
-            ),
+            state_class=SensorStateClass.TOTAL,
             suggested_display_precision=2,
             entity_category=EntityCategory.DIAGNOSTIC,
         )
@@ -190,12 +186,17 @@ class FarmCostSensorBase(
         self._attr_native_value = round(self._accumulated, 4)
 
     @property
+    def last_reset(self) -> datetime | None:
+        key = self._period_key_active
+        if key is None:
+            return None
+        if self._period == "month":
+            key += "-01"
+        return datetime.fromisoformat(key).replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
+
+    @property
     def extra_state_attributes(self) -> dict[str, str]:
-        attrs: dict[str, str] = {}
-        pk = _period_key_local(self._period, dt_util.utcnow())
-        if pk is not None:
-            attrs["period_key"] = pk
-        return attrs
+        return {"period_key": self._period_key_active} if self._period_key_active else {}
 
 
 class FarmCostAtCurrentPowerSensor(CoordinatorEntity[MinerFarmCoordinator], SensorEntity):
@@ -203,7 +204,6 @@ class FarmCostAtCurrentPowerSensor(CoordinatorEntity[MinerFarmCoordinator], Sens
 
     _attr_has_entity_name = True
     _attr_should_poll = False
-    _attr_entity_registry_enabled_default = False
 
     def __init__(
         self,

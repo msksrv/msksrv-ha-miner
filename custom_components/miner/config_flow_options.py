@@ -36,25 +36,25 @@ from .const import (
     CONF_AUTO_RECOVERY_POWER_CYCLE_ENABLED,
     CONF_AUTO_RECOVERY_POWER_OFF_PAUSE_SECONDS,
     CONF_AUTO_RECOVERY_PRE_ACTION_SECONDS,
-    CONF_FARM_AMBIENT_TEMP_ENTITIES,
-    CONF_FARM_DEVICE_IDS,
-    CONF_FARM_ENERGY_PHYSICAL_SENSOR,
-    CONF_FARM_LEGACY_COST_SENSORS,
-    CONF_FARM_ELEC_TARIFF_MODE,
-    CONF_FARM_ELEC_TOU_CURRENCY,
-    CONF_FARM_ELEC_ZONES,
-    CONF_FARM_ENERGY_RATES,
-    CONF_FARM_POOL_PRESETS,
-    CONF_HEALTH_PROFILE,
-    CONF_HEALTH_THRESHOLDS,
-    CONF_REPAIR_CONFIRM_DEFAULT,
-    CONF_REPAIR_CONFIRM_OVERRIDES,
-    CONF_REPAIR_RECOVERY,
-    CONF_IS_FARM,
-    CONF_POWER_SWITCH,
     CONF_ENERGY_PHYSICAL_SENSOR,
     CONF_ENERGY_POWER_SENSOR,
     CONF_ENERGY_SOURCE_MODE,
+    CONF_FARM_AMBIENT_TEMP_ENTITIES,
+    CONF_FARM_DEVICE_IDS,
+    CONF_FARM_ELEC_TARIFF_MODE,
+    CONF_FARM_ELEC_TOU_CURRENCY,
+    CONF_FARM_ELEC_ZONES,
+    CONF_FARM_ENERGY_PHYSICAL_SENSOR,
+    CONF_FARM_ENERGY_RATES,
+    CONF_FARM_LEGACY_COST_SENSORS,
+    CONF_FARM_POOL_PRESETS,
+    CONF_HEALTH_PROFILE,
+    CONF_HEALTH_THRESHOLDS,
+    CONF_IS_FARM,
+    CONF_POWER_SWITCH,
+    CONF_REPAIR_CONFIRM_DEFAULT,
+    CONF_REPAIR_CONFIRM_OVERRIDES,
+    CONF_REPAIR_RECOVERY,
     DOMAIN,
     ENERGY_SOURCE_AUTO,
     ENERGY_SOURCE_MINER_POWER,
@@ -68,13 +68,9 @@ from .const import (
     HEALTH_PROFILE_OPTIONS,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
-from .health.profiles import health_threshold_defaults_for_ui
-from .health.recovery.definitions import DEFAULTS as AUTO_RECOVERY_DEFAULTS
-from .health.thresholds import HealthThresholds
 from .farm_elec_tou import (
     FARM_TARIFF_MODE_OPTIONS,
     farm_tariff_mode,
-    farm_tou_zones_stored,
     tou_zones_from_user_input,
     validate_tou_submission,
 )
@@ -88,6 +84,9 @@ from .farm_pool_presets import (
     farm_pool_slots_from_user_input,
     strip_legacy_farm_pool_keys,
 )
+from .health.profiles import health_threshold_defaults_for_ui
+from .health.recovery.definitions import DEFAULTS as AUTO_RECOVERY_DEFAULTS
+from .health.thresholds import HealthThresholds
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -816,9 +815,8 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                 )
                 if owner:
                     errors[CONF_ENERGY_PHYSICAL_SENSOR] = "energy_physical_in_use"
-        if power:
-            if err := self._validate_power_entity(power):
-                errors[CONF_ENERGY_POWER_SENSOR] = err
+        if power and (err := self._validate_power_entity(power)):
+            errors[CONF_ENERGY_POWER_SENSOR] = err
         if mode == ENERGY_SOURCE_SWITCH_POWER and not power:
             errors[CONF_ENERGY_POWER_SENSOR] = "energy_power_required"
         return errors

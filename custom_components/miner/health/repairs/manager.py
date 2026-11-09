@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -12,11 +12,11 @@ from homeassistant.helpers import issue_registry as ir
 from ...const import CONF_IP, CONF_POWER_SWITCH, DOMAIN
 from ..baseline.detector import AnomalyFinding, AnomalyState
 from .definitions import (
+    ALL_MINER_REPAIR_TYPES,
     BOARD_ANOMALY_REASONS,
     FAN_ANOMALY_REASONS,
     HASHRATE_ANOMALY_REASONS,
     LEARN_MORE_URL,
-    ALL_MINER_REPAIR_TYPES,
     MINER_REPAIR_TYPES,
     POOL_ANOMALY_REASONS,
     RECOVERY_ANOMALY_REASONS,
@@ -685,5 +685,5 @@ def _fmt(value: Any, default: str, *, decimals: int = 1) -> str:
     if f is None:
         return default
     if decimals == 0:
-        return str(int(round(f)))
+        return str(round(f))
     return f"{f:.{decimals}f}"

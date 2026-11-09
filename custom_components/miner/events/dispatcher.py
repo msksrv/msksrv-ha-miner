@@ -15,13 +15,11 @@ if TYPE_CHECKING:
 
 
 def _device_id_for_entry(hass: HomeAssistant, entry: ConfigEntry) -> str | None:
-    dev_reg = dr.async_get(hass)
+    devices = dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
     if entry.data.get(CONF_IS_FARM):
-        device = dev_reg.async_get_device(identifiers={(DOMAIN, f"farm_{entry.entry_id}")})
-    else:
-        device = dev_reg.async_get_devices_for_config_entry(entry.entry_id)
-        device = device[0] if device else None
-    return device.id if device else None
+        identifier = (DOMAIN, f"farm_{entry.entry_id}")
+        return next((device.id for device in devices if identifier in device.identifiers), None)
+    return devices[0].id if devices else None
 
 
 class EventDispatcher:
