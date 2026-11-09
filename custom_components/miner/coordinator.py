@@ -63,35 +63,6 @@ async def async_get_miner_from_config_entry(
 REQUEST_REFRESH_DEFAULT_COOLDOWN = 5
 
 
-def _format_uptime(value) -> str | None:
-    """Format uptime seconds to a human-readable string.
-
-    Seconds are omitted once uptime reaches one minute so the entity state
-    does not change on every coordinator poll (avoids logbook/activity spam).
-    """
-    try:
-        total_seconds = int(value)
-    except (TypeError, ValueError):
-        return None
-
-    if total_seconds < 60:
-        return f"{total_seconds}s"
-
-    days, remainder = divmod(total_seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, _seconds = divmod(remainder, 60)
-
-    parts = []
-    if days:
-        parts.append(f"{days}d")
-    if hours:
-        parts.append(f"{hours}h")
-    if minutes or not (days or hours):
-        parts.append(f"{minutes}m")
-
-    return " ".join(parts) if parts else "0m"
-
-
 def _primary_pool_metrics(pools):
     """Prefer the pool marked active; otherwise the first slot (miner order)."""
     if not pools:
@@ -182,7 +153,6 @@ DEFAULT_DATA = {
     "is_mining": False,
     "fw_ver": None,
     "uptime": None,
-    "uptime_formatted": None,
     "boards_count": 0,
     "pool": None,
     "pool_host": None,
@@ -314,8 +284,6 @@ class MinerCoordinator(DataUpdateCoordinator):
         except AttributeError:
             uptime = None
 
-        uptime_formatted = _format_uptime(uptime)
-
         try:
             boards_count = len(miner_data.hashboards)
         except Exception:
@@ -413,7 +381,6 @@ class MinerCoordinator(DataUpdateCoordinator):
             "is_mining": miner_data.is_mining,
             "fw_ver": miner_data.fw_ver,
             "uptime": uptime,
-            "uptime_formatted": uptime_formatted,
             "boards_count": boards_count,
             "algorithm": algorithm,
             "pool": pool,

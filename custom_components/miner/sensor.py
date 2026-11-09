@@ -16,6 +16,7 @@ from homeassistant.const import (
     EntityCategory,
     UnitOfPower,
     UnitOfTemperature,
+    UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity
@@ -167,9 +168,12 @@ ENTITY_DESCRIPTION_KEY_MAP: dict[str, SensorEntityDescription] = {
         icon="mdi:memory",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
+    # Keep the original key so existing registry entries retain their identity.
     "uptime_formatted": _sensor_desc(
         "uptime_formatted",
         translation_key="uptime",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:clock-time-eight-outline",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -367,6 +371,13 @@ class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     @property
     def _sensor_data(self):
         """Return sensor data."""
+        if self._sensor == "uptime_formatted":
+            try:
+                uptime = int(self.coordinator.data.get("uptime"))
+            except (TypeError, ValueError, OverflowError):
+                return None
+            return uptime if uptime >= 0 else None
+
         try:
             if self._sensor in self.coordinator.data["miner_sensors"]:
                 return self.coordinator.data["miner_sensors"][self._sensor]
@@ -389,13 +400,8 @@ class MinerSensor(CoordinatorEntity["MinerCoordinator"], SensorEntity):
     def extra_state_attributes(self) -> dict | None:
         if self._sensor != "uptime_formatted":
             return None
-        raw = self.coordinator.data.get("uptime")
-        if raw is None:
-            return None
-        try:
-            return {"uptime_seconds": int(raw)}
-        except (TypeError, ValueError):
-            return None
+        uptime = self._sensor_data
+        return {"uptime_seconds": uptime} if uptime is not None else None
 
     @property
     def available(self) -> bool:

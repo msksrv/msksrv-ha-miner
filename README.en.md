@@ -141,6 +141,8 @@ Preset pool passwords are not shown again in forms; an empty password field keep
 | **select** | Power mode; pool priority (≥ 2 pools) |
 | **button** | Reboot, linked power switch control, learned baseline controls, and recovery lock reset |
 
+Starting with 1.7.2, the Uptime sensor is displayed as a duration and its updates are excluded from Activity. In templates, its state contains seconds instead of a string such as `1h 36m`; the `uptime_seconds` attribute remains available.
+
 ---
 
 ## Farm entities

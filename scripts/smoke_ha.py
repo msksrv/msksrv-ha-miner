@@ -14,6 +14,8 @@ from tempfile import TemporaryDirectory
 
 from aiohttp import web
 from homeassistant.bootstrap import async_setup_hass
+from homeassistant.components.logbook.processor import EventProcessor
+from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import async_list_statistic_ids
 from homeassistant.components.switch import DATA_COMPONENT as SWITCH_COMPONENT
 from homeassistant.components.switch import SwitchEntity
@@ -23,6 +25,7 @@ from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import device_registry, entity_registry, issue_registry
 from homeassistant.loader import async_get_integration
 from homeassistant.runner import RuntimeConfig
+from homeassistant.util import dt as dt_util
 
 DOMAIN = "miner"
 IP = "127.0.0.31"
@@ -37,6 +40,7 @@ class AxeOS:
         self.mac = mac
         self.runner = None
         self.polls = 0
+        self.uptime = 3600
         self.commands = []
 
     async def start(self):
@@ -67,7 +71,7 @@ class AxeOS:
                 "version": "v2.9.0",
                 "hashRate": 1200.0,
                 "power": 23.0,
-                "uptimeSeconds": 3600,
+                "uptimeSeconds": self.uptime,
                 "temp": 50.0,
                 "vrTemp": 42.0,
                 "voltage": 5000.0,
@@ -166,6 +170,7 @@ async def main(source):
             """homeassistant:
   time_zone: Europe/Moscow
 recorder:
+logbook:
 energy:
 automation:
   - id: miner_audit_alerts
@@ -210,6 +215,8 @@ automation:
             and coord.data["miner_sensors"]["miner_consumption"] == 23,
             str(coord.data["miner_sensors"]),
         )
+
+        await check_uptime(hass, axe, miner, coord)
 
         farm = await add_farm(hass, miner_device.id)
         await hass.async_block_till_done()
@@ -279,6 +286,44 @@ automation:
         await check_offline(hass, axe, miner, farm, events, miner_device.id)
         await check_diagnostics(hass, axe, miner, farm)
         print(f"Completed {manifest['version']}", flush=True)
+
+
+async def check_uptime(hass, axe, miner, coord):
+    unique_id = f"{miner.entry_id}-uptime_formatted"
+    uptime = state_for(hass, unique_id)
+    require(
+        "existing uptime entity exposes a duration in seconds",
+        uptime.state == "3600"
+        and uptime.attributes.get("device_class") == "duration"
+        and uptime.attributes.get("unit_of_measurement") == "s"
+        and uptime.attributes.get("uptime_seconds") == 3600,
+    )
+
+    started = dt_util.utcnow()
+    control_id = "sensor.uptime_logbook_control"
+    hass.states.async_set(control_id, "1h")
+    for value, control in ((3660, "1h 1m"), (3720, "1h 2m")):
+        axe.uptime = value
+        await coord.async_refresh()
+        hass.states.async_set(control_id, control)
+    require(
+        "uptime continues updating on the original entity",
+        (updated := state_for(hass, unique_id)).entity_id == uptime.entity_id
+        and updated.state == "3720"
+        and updated.attributes.get("uptime_seconds") == 3720,
+    )
+
+    await get_instance(hass).async_block_till_done()
+    processor = EventProcessor(hass, [], entity_ids=[uptime.entity_id, control_id])
+    activity = await hass.async_add_executor_job(
+        processor.get_events, started, dt_util.utcnow()
+    )
+    require(
+        "Activity excludes uptime changes and still shows ordinary text sensors",
+        any(row.get("entity_id") == control_id for row in activity)
+        and not any(row.get("entity_id") == uptime.entity_id for row in activity),
+        str(activity),
+    )
 
 
 async def check_notification_blueprint(hass):

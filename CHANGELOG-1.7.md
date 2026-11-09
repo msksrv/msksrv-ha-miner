@@ -1,5 +1,13 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.2
+
+- Report miner uptime as a duration so periodic updates no longer appear in Home Assistant Activity.
+- Preserve the uptime entity ID and the `uptime_seconds` attribute. The raw state now contains seconds.
+- Verify the Activity filter with a simulated Bitaxe on Home Assistant Core 2026.3.0 and 2026.11.0.
+
+---
+
 ## v1.7.1
 
 - Process connectivity events, Repairs, recovery and energy accounting on the first and scheduled polls.
