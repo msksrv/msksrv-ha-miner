@@ -1,5 +1,15 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.5
+
+- Add **New price from a date** alongside the three tariff types. The form takes the date and prices for the active tariff without asking again for its currency or zone hours.
+
+- Schedule a farm electricity tariff from a local calendar date. A past date recalculates the farm's cost totals from Recorder meter history or consecutive hourly statistics.
+- Add a Home Assistant blueprint that reports the farm's previous-month energy use and estimated cost.
+- Show only individual miners in the farm member picker when creating or editing a farm.
+
+---
+
 ## v1.7.3
 
 - Show a specific name in the Home Assistant event card for each of the ten miner problem types.

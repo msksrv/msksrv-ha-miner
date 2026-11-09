@@ -1,0 +1,56 @@
+blueprint:
+  name: MSKSRV ASIC Miner farm monthly summary
+  description: Show the previous month's electricity use and estimated cost in a Home Assistant notification.
+  domain: automation
+  input:
+    energy:
+      name: Energy last month
+      description: Select the farm's energy sensor for the previous month.
+      selector:
+        entity:
+          filter:
+            integration: miner
+            domain: sensor
+            device_class: energy
+    cost:
+      name: Cost last month
+      description: Select the same farm's cost sensor for the previous month.
+      selector:
+        entity:
+          filter:
+            integration: miner
+            domain: sensor
+            device_class: monetary
+    report_time:
+      name: Report time
+      default: "00:10:00"
+      selector:
+        time:
+
+mode: single
+triggers:
+  - trigger: time
+    at: !input report_time
+  - trigger: homeassistant
+    event: start
+conditions:
+  - condition: template
+    value_template: "{{ now().day == 1 }}"
+actions:
+  - variables:
+      energy_entity: !input energy
+      cost_entity: !input cost
+      report_month: "{{ (now().replace(day=1) - timedelta(days=1)).strftime('%Y-%m') }}"
+  - wait_template: >-
+      {{ state_attr(energy_entity, 'period') == report_month
+         and state_attr(cost_entity, 'period') == report_month
+         and is_number(states(energy_entity)) and is_number(states(cost_entity)) }}
+    timeout: "00:05:00"
+    continue_on_timeout: false
+  - action: persistent_notification.create
+    data:
+      notification_id: "msksrv_miner_monthly_{{ energy_entity | replace('.', '_') }}_{{ report_month }}"
+      title: "ASIC Miner · {{ report_month }}"
+      message: >-
+        {{ states(energy_entity) | float | round(3) }} {{ state_attr(energy_entity, 'unit_of_measurement') }},
+        {{ states(cost_entity) | float | round(2) }} {{ state_attr(cost_entity, 'unit_of_measurement') }}.

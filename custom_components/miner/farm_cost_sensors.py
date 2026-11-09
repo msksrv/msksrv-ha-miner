@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, FARM_ELEC_TARIFF_DUAL, FARM_ELEC_TARIFF_FLAT
+from .energy.tariff import TARIFF_SCHEDULE, cost_for_interval, current_price
 from .farm_coordinator import MinerFarmCoordinator
 from .farm_elec_tou import (
     farm_tariff_mode,
@@ -165,7 +166,10 @@ class FarmCostSensorBase(
             self._update_native_from_accum()
             return
 
-        if self._tou_zones:
+        options = self.coordinator.config_entry.options
+        if TARIFF_SCHEDULE in options:
+            d_cost = cost_for_interval(self.hass, options, kw * dt_h, t0, now)
+        elif self._tou_zones:
             d_cost = integrate_tou_energy_cost(
                 self.hass, kw, t0, now, self._tou_zones
             )
@@ -254,6 +258,10 @@ class FarmCostAtCurrentPowerSensor(CoordinatorEntity[MinerFarmCoordinator], Sens
             kw = float(data.get("total_power_kw") or 0.0)
         except (TypeError, ValueError):
             return None
+        options = self.coordinator.config_entry.options
+        if TARIFF_SCHEDULE in options:
+            price = current_price(options, dt_util.utcnow())
+            return round(kw * price, 4) if price is not None else None
         if self._tou_zones:
             loc = dt_util.as_local(dt_util.utcnow())
             p = price_at_local_dt(loc, self._tou_zones)

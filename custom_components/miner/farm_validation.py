@@ -2,11 +2,53 @@
 
 from __future__ import annotations
 
+import voluptuous as vol
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
-from .const import DOMAIN
+from .const import CONF_FARM_DEVICE_IDS, DOMAIN
 from .device_resolution import async_get_miner_config_entry_for_device
+
+
+def farm_member_field(
+    hass: HomeAssistant, suggested: str | list[str] | None
+) -> dict[vol.Required, SelectSelector]:
+    """Offer only devices backed by a single-miner config entry."""
+    options: list[SelectOptionDict] = []
+    for device in dr.async_get(hass).devices.values():
+        entry = async_get_miner_config_entry_for_device(hass, device)
+        if entry is not None:
+            options.append(
+                {
+                    "value": device.id,
+                    "label": device.name_by_user or device.name or entry.title,
+                }
+            )
+    options.sort(key=lambda option: (option["label"].casefold(), option["value"]))
+
+    allowed = {option["value"] for option in options}
+    selected = [suggested] if isinstance(suggested, str) else suggested or []
+    field = vol.Required(
+        CONF_FARM_DEVICE_IDS,
+        description={
+            "suggested_value": [
+                device_id for device_id in selected if device_id in allowed
+            ]
+        },
+    )
+    return {
+        field: SelectSelector(
+            SelectSelectorConfig(
+                options=options, multiple=True, mode=SelectSelectorMode.DROPDOWN
+            )
+        )
+    }
 
 
 def _algorithms_for_member_entries(

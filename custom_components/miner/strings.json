@@ -360,6 +360,20 @@
           "farm_legacy_cost_sensors_enabled": "Legacy power-based cost sensors (deprecated)"
         }
       },
+      "farm_tariff_price": {
+        "title": "New price from a date",
+        "description": "Enter the date and price per kWh. Currency {currency}. {zones}",
+        "data": {
+          "farm_tariff_effective_date": "Tariff effective date",
+          "price_flat": "Price per kWh",
+          "price_zone_1": "Zone 1 price per kWh",
+          "price_zone_2": "Zone 2 price per kWh",
+          "price_zone_3": "Zone 3 price per kWh"
+        },
+        "data_description": {
+          "farm_tariff_effective_date": "Starts at local midnight. A past date recalculates cost."
+        }
+      },
       "farm_tariff_flat": {
         "title": "Flat electricity tariff",
         "description": "One currency and fixed price per kWh for farm energy cost.",
@@ -445,6 +459,14 @@
       "farm_pool_apply_failed": "Pool change failed on one or more miners (offline, rejected, or backup limit).",
       "farm_pool_apply_slot_invalid": "Choose a slot number that has a saved host and port.",
       "farm_not_loaded": "Farm is not loaded; try again later.",
+      "farm_tariff_configure_first": "Configure the active tariff first.",
+      "farm_tariff_different_layout": "This date uses a different tariff type, currency or time zone schedule. Choose a date with the same tariff settings.",
+      "farm_tariff_invalid_date": "Enter a valid tariff start date.",
+      "farm_tariff_currency_change": "Use the same currency when scheduling or correcting a tariff.",
+      "farm_tariff_rate_required": "Set a valid rate and currency for the selected start date.",
+      "farm_tariff_history_unavailable": "Recorder does not have a usable farm meter history for this date. Choose a later date or check the history of the farm's total energy sensor.",
+      "farm_tariff_options_changed": "Farm settings changed while the tariff was being recalculated. Try saving again.",
+      "farm_tariff_farm_unavailable": "The farm is unavailable. Reload the integration before changing its tariff.",
       "farm_tou_currency_required": "Choose a currency for time-of-use tariffs.",
       "farm_tou_zones_dual": "Two-zone mode needs two zones with a positive price per kWh each.",
       "farm_tou_zones_triple": "Three-zone mode needs three zones with a positive price per kWh each.",
@@ -1054,7 +1076,8 @@
     },
     "farm_elec_tariff_mode": {
       "options": {
-        "flat": "Flat (up to 3 currencies)",
+        "new_price": "New price from a date",
+        "flat": "Flat rate",
         "dual": "Two zones (by local time)",
         "triple": "Three zones (by local time)"
       }

@@ -13,8 +13,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
     BooleanSelector,
-    DeviceSelector,
-    DeviceSelectorConfig,
+    DateSelector,
     EntitySelector,
     EntitySelectorConfig,
     NumberSelector,
@@ -25,6 +24,7 @@ from homeassistant.helpers.selector import (
     TextSelectorConfig,
     TextSelectorType,
 )
+from homeassistant.util import dt as dt_util
 
 from .const import (
     CONF_AUTO_RECOVERY_COOLDOWN_SECONDS,
@@ -68,15 +68,18 @@ from .const import (
     HEALTH_PROFILE_OPTIONS,
 )
 from .device_resolution import async_get_miner_config_entry_for_device
+from .energy.tariff import EFFECTIVE_DATE, local_midnight, tariff_at, tariff_currency
 from .farm_elec_tou import (
     FARM_TARIFF_MODE_OPTIONS,
     farm_tariff_mode,
+    farm_tou_zones_stored,
     tou_zones_from_user_input,
     validate_tou_submission,
 )
 from .farm_energy_rates import (
     farm_electricity_schema_fields,
     farm_energy_rates_from_user_input,
+    farm_primary_energy_rate,
 )
 from .farm_pool_presets import (
     FARM_POOL_SLOT_COUNT,
@@ -84,11 +87,14 @@ from .farm_pool_presets import (
     farm_pool_slots_from_user_input,
     strip_legacy_farm_pool_keys,
 )
+from .farm_validation import farm_member_field, validate_farm_device_algorithms
 from .health.profiles import health_threshold_defaults_for_ui
 from .health.recovery.definitions import DEFAULTS as AUTO_RECOVERY_DEFAULTS
 from .health.thresholds import HealthThresholds
 
 _LOGGER = logging.getLogger(__name__)
+
+_FARM_TARIFF_NEW_PRICE = "new_price"
 
 _FARM_MENU = (
     "farm_members",
@@ -157,6 +163,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
     def __init__(self) -> None:
         self._pending_pool_apply: dict[str, Any] | None = None
         self._pending_farm_apply: dict[str, Any] | None = None
+        self._tariff_mode: str | None = None
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -194,10 +201,16 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
     async def async_step_farm_tariff(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.FlowResult:
-        opts = self.config_entry.options
-        stored_mode = farm_tariff_mode(opts)
+        active = tariff_at(self.config_entry.options, dt_util.utcnow())
+        stored_mode = farm_tariff_mode(active)
+        mode = (user_input or {}).get(CONF_FARM_ELEC_TARIFF_MODE)
+        errors = {}
+        if mode == _FARM_TARIFF_NEW_PRICE:
+            if tariff_currency(active) is not None:
+                return await self.async_step_farm_tariff_price()
+            errors["base"] = "farm_tariff_configure_first"
 
-        if user_input is None:
+        if user_input is None or errors:
             return self.async_show_form(
                 step_id="farm_tariff",
                 data_schema=vol.Schema(
@@ -207,18 +220,19 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                             description={"suggested_value": stored_mode},
                         ): SelectSelector(
                             SelectSelectorConfig(
-                                options=FARM_TARIFF_MODE_OPTIONS,
+                                options=[*FARM_TARIFF_MODE_OPTIONS, _FARM_TARIFF_NEW_PRICE],
                                 translation_key=CONF_FARM_ELEC_TARIFF_MODE,
                             )
                         ),
                     }
                 ),
+                errors=errors,
             )
 
-        mode = str(user_input.get(CONF_FARM_ELEC_TARIFF_MODE) or FARM_ELEC_TARIFF_FLAT)
         if mode not in FARM_TARIFF_MODE_OPTIONS:
             mode = FARM_ELEC_TARIFF_FLAT
 
+        self._tariff_mode = mode
         if mode == FARM_ELEC_TARIFF_FLAT:
             return await self.async_step_farm_tariff_flat(
                 {CONF_FARM_ELEC_TARIFF_MODE: mode}
@@ -243,12 +257,16 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
             tc = str(flat.get(CONF_FARM_ELEC_TOU_CURRENCY) or "").strip().upper()
             if tc:
                 new_options[CONF_FARM_ELEC_TOU_CURRENCY] = tc
-            self.hass.config_entries.async_update_entry(
-                self.config_entry, options=new_options
+            new_options, error = await self._async_set_farm_tariff(
+                new_options, None
             )
-            return self.async_create_entry(title="", data=new_options)
+            if not error:
+                return self.async_create_entry(title="", data=new_options)
+            errors["base"] = error
 
-        fields = farm_electricity_schema_fields(opts, ui.get("farm_tariff_flat") or {})
+        fields = farm_electricity_schema_fields(
+            tariff_at(opts, dt_util.utcnow()), ui.get("farm_tariff_flat") or {}
+        )
         schema = vol.Schema(
             {
                 vol.Required("farm_tariff_flat"): section(
@@ -268,8 +286,7 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         opts = self.config_entry.options
         ui = user_input or {}
         mode = str(
-            ui.get(CONF_FARM_ELEC_TARIFF_MODE)
-            or farm_tariff_mode(opts)
+            self._tariff_mode or farm_tariff_mode(opts)
         )
         if mode not in (FARM_ELEC_TARIFF_DUAL, FARM_ELEC_TARIFF_TRIPLE):
             return await self.async_step_farm_tariff()
@@ -290,15 +307,17 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                     new_options[CONF_FARM_ENERGY_RATES] = []
                     new_options[CONF_FARM_ELEC_TOU_CURRENCY] = tc
                     new_options[CONF_FARM_ELEC_ZONES] = zones
-                    self.hass.config_entries.async_update_entry(
-                        self.config_entry, options=new_options
+                    new_options, error = await self._async_set_farm_tariff(
+                        new_options, None
                     )
-                    return self.async_create_entry(title="", data=new_options)
+                    if not error:
+                        return self.async_create_entry(title="", data=new_options)
+                    errors["base"] = error
 
         from .farm_elec_tou import farm_tou_zone_schema_fields
 
         tou_ui = ui.get("farm_tariff_tou") or ui
-        inner = farm_tou_zone_schema_fields(mode, opts, tou_ui)
+        inner = farm_tou_zone_schema_fields(mode, tariff_at(opts, dt_util.utcnow()), tou_ui)
 
         schema = vol.Schema(
             {
@@ -311,6 +330,91 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
         return self.async_show_form(
             step_id="farm_tariff_tou", data_schema=schema, errors=errors
         )
+
+    async def async_step_farm_tariff_price(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.FlowResult:
+        """Change only prices for the configured tariff."""
+        options = self.config_entry.options
+        active = tariff_at(options, dt_util.utcnow())
+        currency = tariff_currency(active)
+        if currency is None:
+            return await self.async_step_farm_tariff(
+                {CONF_FARM_ELEC_TARIFF_MODE: _FARM_TARIFF_NEW_PRICE}
+            )
+
+        mode = farm_tariff_mode(active)
+        zones = farm_tou_zones_stored(active) if mode != FARM_ELEC_TARIFF_FLAT else []
+        rate = farm_primary_energy_rate(active) if not zones else None
+        prices = [zone["price_kwh"] for zone in zones] if zones else [rate[1] if rate else 0.0]
+        price_fields = (
+            [f"price_zone_{index}" for index in range(1, len(zones) + 1)]
+            if zones
+            else ["price_flat"]
+        )
+        errors = {}
+        ui = user_input or {}
+        if user_input is not None:
+            effective = user_input[EFFECTIVE_DATE]
+            try:
+                target = tariff_at(options, local_midnight(effective))
+            except (TypeError, ValueError):
+                errors["base"] = "farm_tariff_invalid_date"
+            else:
+                target_zones = (
+                    farm_tou_zones_stored(target) if mode != FARM_ELEC_TARIFF_FLAT else []
+                )
+                if (
+                    tariff_currency(target) != currency
+                    or farm_tariff_mode(target) != mode
+                    or [(zone["start"], zone["end"]) for zone in target_zones]
+                    != [(zone["start"], zone["end"]) for zone in zones]
+                ):
+                    errors["base"] = "farm_tariff_different_layout"
+                else:
+                    new_options = {**target, CONF_FARM_ELEC_TARIFF_MODE: mode}
+                    if zones:
+                        new_options[CONF_FARM_ELEC_ZONES] = [
+                            {**zone, "price_kwh": round(user_input[field], 6)}
+                            for zone, field in zip(target_zones, price_fields, strict=True)
+                        ]
+                    else:
+                        new_options[CONF_FARM_ENERGY_RATES] = [
+                            {"currency": currency, "price_kwh": round(user_input["price_flat"], 6)}
+                        ]
+                    updated, error = await self._async_set_farm_tariff(new_options, effective)
+                    if error is None:
+                        return self.async_create_entry(title="", data=updated)
+                    errors["base"] = error
+
+        fields = {
+            vol.Required(
+                EFFECTIVE_DATE, description={"suggested_value": ui.get(EFFECTIVE_DATE)}
+            ): DateSelector(),
+            **{
+                vol.Required(key, description={"suggested_value": ui.get(key, price)}):
+                NumberSelector(NumberSelectorConfig(min=0.000001, max=9999, step="any", mode="box"))
+                for key, price in zip(price_fields, prices, strict=True)
+            },
+        }
+        zone_hours = ", ".join(
+            f'{index}: {zone["start"]}–{zone["end"]}'
+            for index, zone in enumerate(zones, 1)
+        )
+        return self.async_show_form(
+            step_id="farm_tariff_price",
+            data_schema=vol.Schema(fields),
+            description_placeholders={"currency": currency, "zones": zone_hours},
+            errors=errors,
+        )
+
+    async def _async_set_farm_tariff(
+        self, options: dict[str, Any], effective_date: str | None
+    ) -> tuple[dict[str, Any], str | None]:
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self.config_entry.entry_id)
+        if coordinator is None:
+            return self.config_entry.options, "farm_tariff_farm_unavailable"
+        return await coordinator.energy.async_set_tariff(options, effective_date)
 
     async def async_step_farm_actions(
         self, user_input: dict[str, Any] | None = None
@@ -400,20 +504,10 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
 
     def _farm_devices_schema(self, user_input: dict[str, Any] | None = None) -> vol.Schema:
         ui = user_input or {}
-        stored = self.config_entry.data.get(CONF_FARM_DEVICE_IDS) or []
-        if isinstance(stored, str):
-            stored = [stored]
-        suggested = ui.get(CONF_FARM_DEVICE_IDS, stored)
-        return vol.Schema(
-            {
-                vol.Required(
-                    CONF_FARM_DEVICE_IDS,
-                    description={"suggested_value": suggested},
-                ): DeviceSelector(
-                    DeviceSelectorConfig(integration=DOMAIN, multiple=True)
-                ),
-            }
+        suggested = ui.get(
+            CONF_FARM_DEVICE_IDS, self.config_entry.data.get(CONF_FARM_DEVICE_IDS)
         )
+        return vol.Schema(farm_member_field(self.hass, suggested))
 
     def _farm_ambient_schema(self, user_input: dict[str, Any] | None = None) -> vol.Schema:
         ui = user_input or {}
@@ -511,8 +605,6 @@ class MinerOptionsFlow(config_entries.OptionsFlow):
                         errors["base"] = "farm_only_miner_devices"
                         break
             if not errors:
-                from .farm_validation import validate_farm_device_algorithms
-
                 algo_error = validate_farm_device_algorithms(self.hass, devices)
                 if algo_error:
                     errors["base"] = algo_error

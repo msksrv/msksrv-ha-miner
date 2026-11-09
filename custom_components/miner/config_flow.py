@@ -15,8 +15,6 @@ from homeassistant.core import callback
 from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.selector import (
-    DeviceSelector,
-    DeviceSelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     SelectSelector,
@@ -59,6 +57,7 @@ from .discovery import (
     get_stable_identifier,
     normalize_model_name,
 )
+from .farm_validation import farm_member_field, validate_farm_device_algorithms
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -406,14 +405,7 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_TITLE,
                     description={"suggested_value": user_input.get(CONF_TITLE, "")},
                 ): TextSelector(TextSelectorConfig()),
-                vol.Required(
-                    CONF_FARM_DEVICE_IDS,
-                    description={
-                        "suggested_value": user_input.get(CONF_FARM_DEVICE_IDS)
-                    },
-                ): DeviceSelector(
-                    DeviceSelectorConfig(integration=DOMAIN, multiple=True),
-                ),
+                **farm_member_field(self.hass, user_input.get(CONF_FARM_DEVICE_IDS)),
             }
         )
 
@@ -450,8 +442,6 @@ class MinerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     break
 
         if not errors:
-            from .farm_validation import validate_farm_device_algorithms
-
             algo_error = validate_farm_device_algorithms(self.hass, devices)
             if algo_error:
                 errors["base"] = algo_error

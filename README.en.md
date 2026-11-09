@@ -187,6 +187,16 @@ In **Auto** mode, the integration prefers a physical energy meter, then power fr
 
 A farm can sum its members or use a shared meter under **Farm energy meter**. Add a cumulative kWh sensor to **Individual devices** in the Energy Dashboard. If you display the farm and its miners together, set the farm as the upstream device for its miners in the dashboard to avoid double counting. [Home Assistant energy documentation](https://www.home-assistant.io/docs/energy/individual-devices/)
 
+### Date-effective tariffs and monthly summaries
+
+In the farm options, open **Electricity tariff → New price from a date**. Enter the date and prices for the active tariff. The date starts at local midnight in Home Assistant. To apply settings immediately or change the tariff type, choose one of the three types in the menu. Saving a new rate for an existing date replaces that revision. Other dated rates remain in effect at their scheduled times.
+
+A past date reprices the farm's cumulative meter history. The integration uses detailed records when available and falls back to consecutive hourly statistics. Consumption is prorated by time when a rate or zone changes between readings. The form rejects a correction when the history does not cover the date or the historical meter goes backwards. Dated changes use one currency. Before the first tariff revision, the calculation uses the rate that was configured when the schedule was created.
+
+The adjustment updates the farm's cost sensors for today, this month, last month, and all time. The kWh values and previously recorded Home Assistant history are preserved.
+
+Import the [monthly summary blueprint](https://github.com/msksrv/msksrv-ha-miner/blob/main/blueprints/automation/msksrv/farm_monthly_summary.yaml) to receive a notification on the first day of each month. Select the **Energy last month** and **Cost last month** sensors of the same farm. The notification is generated when both sensors contain data for the month that ended.
+
 ### Electricity cost sensors when upgrading to 1.7
 
 Costs are calculated from recorded energy and the farm tariff. The upgrade disables existing legacy cost sensors by default. If your automations or dashboards use them, switch to the new entities or enable legacy sensors under **Farm energy meter**. Entities you disabled manually stay disabled.

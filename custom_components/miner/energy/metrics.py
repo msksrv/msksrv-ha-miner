@@ -5,16 +5,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from ..const import FARM_ELEC_TARIFF_FLAT
-from ..farm_elec_tou import (
-    farm_tariff_mode,
-    farm_tou_currency,
-    farm_tou_zones_stored,
-    integrate_tou_energy_cost,
-)
-from ..farm_energy_rates import farm_energy_rates_list
+from homeassistant.util import dt as dt_util
+
 from ..health.repairs.membership import farm_entry_ids_for_miner
 from .definitions import EnergyRecord, FarmPeriodSnapshot
+from .tariff import cost_for_interval, tariff_at, tariff_currency
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -134,23 +129,11 @@ def delta_cost_for_kwh(
     t1: datetime,
 ) -> tuple[float, str | None]:
     """Return incremental cost and currency for an energy delta using farm tariff."""
-    if delta_kwh <= 0:
-        return 0.0, None
-    opts = farm_entry.options
-    mode = farm_tariff_mode(opts)
-    if mode == FARM_ELEC_TARIFF_FLAT:
-        rates = farm_energy_rates_list(opts)
-        if not rates:
-            return 0.0, None
-        currency, price = rates[0]
-        return delta_kwh * float(price), currency
-    zones = farm_tou_zones_stored(opts)
-    currency = farm_tou_currency(opts)
-    if not zones or not currency:
-        return 0.0, None
-    kw = delta_kwh / max((t1 - t0).total_seconds() / 3600.0, 1e-9)
-    cost = integrate_tou_energy_cost(hass, kw, t0, t1, zones)
-    return cost, currency
+    options = farm_entry.options
+    return (
+        cost_for_interval(hass, options, delta_kwh, t0, t1),
+        tariff_currency(tariff_at(options, t1)),
+    )
 
 
 def compute_delta_cost(
@@ -179,9 +162,4 @@ def farm_entry_for_miner(hass: HomeAssistant, miner_entry_id: str) -> ConfigEntr
 
 
 def farm_tariff_currency(hass: HomeAssistant, farm_entry: ConfigEntry) -> str | None:
-    opts = farm_entry.options
-    if farm_tariff_mode(opts) == FARM_ELEC_TARIFF_FLAT:
-        rates = farm_energy_rates_list(opts)
-        if rates:
-            return rates[0][0]
-    return farm_tou_currency(opts)
+    return tariff_currency(tariff_at(farm_entry.options, dt_util.utcnow()))

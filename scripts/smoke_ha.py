@@ -149,6 +149,40 @@ async def add_farm(hass, device_id):
     return step["result"]
 
 
+async def check_farm_member_picker(hass, farm, miner_device_id):
+    config_flows = hass.config_entries.flow
+    options_flows = hass.config_entries.options
+    setup = await config_flows.async_init(DOMAIN, context={"source": "user"})
+    options = await options_flows.async_init(farm.entry_id)
+    try:
+        for flows, menu, next_step in (
+            (config_flows, setup, "farm"),
+            (options_flows, options, "farm_members"),
+        ):
+            form = await flows.async_configure(
+                menu["flow_id"], {"next_step_id": next_step}
+            )
+            field, selector = next(
+                (field, selector)
+                for field, selector in form["data_schema"].schema.items()
+                if field.schema == "farm_device_ids"
+            )
+            config = selector.serialize()["selector"]["select"]
+            require(
+                f"{next_step} offers only the individual miner, excluding the farm",
+                config["multiple"]
+                and [option["value"] for option in config["options"]] == [miner_device_id],
+            )
+            if next_step == "farm_members":
+                require(
+                    "editing the farm keeps its saved miner selected",
+                    field.description["suggested_value"] == [miner_device_id],
+                )
+    finally:
+        config_flows.async_abort(setup["flow_id"])
+        options_flows.async_abort(options["flow_id"])
+
+
 async def main(source):
     manifest = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
     print(
@@ -178,6 +212,13 @@ automation:
       path: msksrv/miner_alerts.yaml
       input:
         miner_device: blueprint_test
+  - id: miner_audit_monthly
+    alias: Miner Audit Monthly
+    use_blueprint:
+      path: msksrv/farm_monthly_summary.yaml
+      input:
+        energy: sensor.audit_monthly_energy
+        cost: sensor.audit_monthly_cost
 """,
             encoding="utf-8",
         )
@@ -221,6 +262,7 @@ automation:
         farm = await add_farm(hass, miner_device.id)
         await hass.async_block_till_done()
         require("farm loaded", farm.state is ConfigEntryState.LOADED, str(farm.state))
+        await check_farm_member_picker(hass, farm, miner_device.id)
         farm_coord = hass.data[DOMAIN][farm.entry_id]
         require(
             "farm aggregate",
@@ -286,7 +328,278 @@ automation:
         await check_power_recovery(hass, axe, miner, farm, events)
         await check_offline(hass, axe, miner, farm, events, miner_device.id)
         await check_diagnostics(hass, axe, miner, farm)
+        await check_dated_tariff(hass, farm)
+        await check_hourly_tariff_history(hass, farm)
+        await check_monthly_summary(hass)
         print(f"Completed {manifest['version']}", flush=True)
+
+
+async def check_dated_tariff(hass, farm):
+    from custom_components.miner.energy.tariff import (
+        COST_ADJUSTMENTS,
+        EFFECTIVE_DATE,
+        cost_for_interval,
+        current_price,
+        local_midnight,
+    )
+
+    async def open_tariff(choice):
+        flows = hass.config_entries.options
+        menu = await flows.async_init(farm.entry_id)
+        flow_id = menu["flow_id"]
+        selector = await flows.async_configure(flow_id, {"next_step_id": "farm_tariff"})
+        tariff_choices = next(iter(selector["data_schema"].schema.values())).config["options"]
+        require(
+            "tariff menu offers three tariff types plus a separate price change",
+            tariff_choices == ["flat", "dual", "triple", "new_price"],
+        )
+        form = await flows.async_configure(flow_id, {"farm_elec_tariff_mode": choice})
+        return flows, flow_id, form
+
+    async def submit(fields, effective_date):
+        flows, flow_id, form = await open_tariff("new_price")
+        require(
+            "price change opens directly with date and prices",
+            form["step_id"] == "farm_tariff_price"
+            and {str(key) for key in form["data_schema"].schema}
+            == {EFFECTIVE_DATE, *fields},
+        )
+        result = await flows.async_configure(
+            flow_id, {**fields, EFFECTIVE_DATE: effective_date}
+        )
+        if result["type"] == FlowResultType.FORM:
+            flows.async_abort(flow_id)
+        await hass.async_block_till_done()
+        return result
+
+    today = dt_util.now().date()
+    tomorrow = (today + timedelta(days=1)).isoformat()
+    flows, flow_id, flat_form = await open_tariff("flat")
+    require(
+        "the ordinary flat tariff form no longer asks for a date",
+        flat_form["step_id"] == "farm_tariff_flat"
+        and EFFECTIVE_DATE not in flat_form["data_schema"].schema,
+    )
+    flows.async_abort(flow_id)
+    result = await submit({"price_flat": 8}, tomorrow)
+    require("future price saves through the new form", result["type"] == FlowResultType.CREATE_ENTRY, str(result.get("errors")))
+    midnight = local_midnight(tomorrow)
+    hour = timedelta(hours=1)
+    require(
+        "future price keeps the active rate and splits a reading across midnight",
+        current_price(farm.options, midnight - hour) == 6
+        and current_price(farm.options, midnight + hour) == 8
+        and cost_for_interval(hass, farm.options, 2, midnight - hour, midnight + hour) == 14,
+    )
+
+    retro_date = (today - timedelta(days=1)).isoformat()
+    cutoff = local_midnight(retro_date)
+    total = state_for(hass, f"farm-{farm.entry_id}-energy-total")
+    # Seed the real Recorder before the cutoff with a monotonic meter reading.
+    hass.states.async_set(
+        total.entity_id, "0", dict(total.attributes), force_update=True,
+        timestamp=(cutoff - hour).timestamp(),
+    )
+    hass.states.async_set(
+        total.entity_id, "0", dict(total.attributes), force_update=True,
+        timestamp=(cutoff + hour).timestamp(),
+    )
+    await get_instance(hass).async_block_till_done()
+    energy = hass.data[DOMAIN][farm.entry_id].energy
+    energy.record.total_kwh = 12
+    energy.record.total_cost = 72
+    energy.record.last_ts = dt_util.utcnow().isoformat()
+    flat = {"price_flat": 5}
+    result = await submit(flat, retro_date)
+    require("past tariff is recalculated from Recorder on save", result["type"] == FlowResultType.CREATE_ENTRY, str(result.get("errors")))
+    energy = hass.data[DOMAIN][farm.entry_id].energy
+    require(
+        "recalculation preserves kWh, lowers cost, and retains the future revision",
+        math.isclose(energy.record.total_kwh, 12, abs_tol=0.005)
+        and math.isclose(energy.total_cost, 60, abs_tol=0.02)
+        and current_price(farm.options, midnight + hour) == 8,
+        str(farm.options.get(COST_ADJUSTMENTS)),
+    )
+
+    adjustment = farm.options[COST_ADJUSTMENTS]
+    result = await submit(flat, retro_date)
+    require(
+        "saving the same date and rate again does not repeat the correction",
+        result["type"] == FlowResultType.CREATE_ENTRY
+        and farm.options[COST_ADJUSTMENTS] == adjustment,
+    )
+    require("reload keeps the tariff and adjustment", await hass.config_entries.async_reload(farm.entry_id))
+    energy = hass.data[DOMAIN][farm.entry_id].energy
+    require("reload retains corrected cost", math.isclose(energy.total_cost, 60, abs_tol=0.02))
+    previous_options = dict(farm.options)
+    result = await submit(flat, (today - timedelta(days=90)).isoformat())
+    require(
+        "missing Recorder history leaves the saved tariff and costs intact",
+        result.get("errors") == {"base": "farm_tariff_history_unavailable"}
+        and farm.options == previous_options,
+        str(result.get("errors")),
+    )
+
+    flows, flow_id, zone_form = await open_tariff("dual")
+    require(
+        "the ordinary zoned tariff form edits configuration without a date",
+        zone_form["step_id"] == "farm_tariff_tou"
+        and EFFECTIVE_DATE not in zone_form["data_schema"].schema,
+    )
+    result = await flows.async_configure(
+        flow_id,
+        {"farm_tariff_tou": {
+            "farm_elec_tou_currency": "RUB",
+            "farm_elec_z1_start": "00:00:00",
+            "farm_elec_z1_end": "06:00:00",
+            "farm_elec_z1_price": 5,
+            "farm_elec_z2_start": "06:00:00",
+            "farm_elec_z2_end": "00:00:00",
+            "farm_elec_z2_price": 7,
+        }},
+    )
+    require(
+        "zoned configuration applies immediately",
+        result["type"] == FlowResultType.CREATE_ENTRY,
+        str(result.get("errors")),
+    )
+    await hass.async_block_till_done()
+    result = await submit({"price_zone_1": 8, "price_zone_2": 10}, tomorrow)
+    require(
+        "a price-only change cannot replace a different scheduled tariff type",
+        result.get("errors") == {"base": "farm_tariff_different_layout"},
+        str(result.get("errors")),
+    )
+    # Remove the scheduled flat revision from the isolated test fixture.
+    from custom_components.miner.energy.tariff import TARIFF_SCHEDULE, tariff_at
+    active = tariff_at(farm.options, dt_util.utcnow())
+    options = {**farm.options, **active}
+    options.pop(TARIFF_SCHEDULE)
+    hass.config_entries.async_update_entry(farm, options=options)
+    await hass.async_block_till_done()
+    result = await submit({"price_zone_1": 8, "price_zone_2": 10}, tomorrow)
+    require(
+        "zoned price change preserves the existing hours and currency",
+        result["type"] == FlowResultType.CREATE_ENTRY
+        and cost_for_interval(hass, farm.options, 2, midnight + 5 * hour, midnight + 7 * hour) == 18,
+        str(result.get("errors")),
+    )
+
+
+async def check_hourly_tariff_history(hass, farm):
+    from homeassistant.components.recorder.models.statistics import StatisticMeanType
+    from homeassistant.components.recorder.statistics import async_import_statistics
+
+    from custom_components.miner.energy.tariff import (
+        COST_ADJUSTMENTS,
+        TariffHistoryError,
+        corrected_cost,
+        local_midnight,
+        with_history_adjustment,
+        with_revision,
+    )
+    from custom_components.miner.energy.tariff_history import async_farm_meter_history
+
+    entry = entity_registry.async_get(hass).async_get_or_create(
+        "sensor", DOMAIN, "farm-hourly-audit-energy-total", config_entry=farm,
+        suggested_object_id="audit_hourly_farm_energy",
+    )
+    now = dt_util.utcnow()
+    hour = timedelta(hours=1)
+    handoff = now.replace(minute=0, second=0, microsecond=0) - hour
+    effective = handoff - 2 * hour
+    async_import_statistics(
+        hass,
+        {
+            "statistic_id": entry.entity_id,
+            "source": "recorder",
+            "name": None,
+            "mean_type": StatisticMeanType.NONE,
+            "has_sum": True,
+            "unit_of_measurement": "kWh",
+            "unit_class": "energy",
+        },
+        [
+            {"start": effective - hour, "state": 100, "sum": 0},
+            {"start": effective, "state": 102, "sum": 2},
+            {"start": effective + hour, "state": 105, "sum": 5},
+        ],
+    )
+    hass.states.async_set(
+        entry.entity_id, "106", timestamp=(handoff + timedelta(minutes=10)).timestamp()
+    )
+    await get_instance(hass).async_block_till_done()
+    readings = await async_farm_meter_history(hass, "hourly-audit", effective, now, 108)
+    require(
+        "older tariff corrections join real hourly statistics with recent readings",
+        [value for _, value in readings] == [100, 102, 105, 106, 108],
+        str(readings),
+    )
+    previous = {"farm_energy_rates": [{"currency": "RUB", "price_kwh": 6}]}
+    next_rate = {"farm_energy_rates": [{"currency": "RUB", "price_kwh": 5}]}
+    updated = with_revision(previous, next_rate, effective)
+    correction = with_history_adjustment(hass, previous, updated, effective, readings)
+    require(
+        "hourly correction charges the 8 kWh difference exactly once",
+        math.isclose(correction[COST_ADJUSTMENTS]["total"], -8, abs_tol=1e-6),
+    )
+    october = local_midnight("2026-10-31")
+    november = local_midnight("2026-11-01")
+    monthly = with_history_adjustment(
+        hass,
+        previous,
+        with_revision(previous, next_rate, october),
+        october,
+        [(october, 100), (october + hour, 103), (november + hour, 105)],
+    )
+    require(
+        "retroactive tariff adjusts both calendar months and the lifetime total",
+        math.isclose(corrected_cost(monthly, 18, "months", "2026-10"), 15)
+        and math.isclose(corrected_cost(monthly, 12, "months", "2026-11"), 10)
+        and math.isclose(corrected_cost(monthly, 30, "total"), 25),
+    )
+    try:
+        await async_farm_meter_history(hass, "hourly-audit", effective - hour, now, 108)
+    except TariffHistoryError:
+        print("PASS hourly gaps reject a partial recalculation", flush=True)
+    else:
+        raise AssertionError("An hourly gap must reject the correction")
+
+
+async def check_monthly_summary(hass):
+    now = dt_util.now()
+    period = (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    hass.states.async_set(
+        "sensor.audit_monthly_energy", "420", {"period": period, "unit_of_measurement": "kWh"}
+    )
+    hass.states.async_set(
+        "sensor.audit_monthly_cost", "2520", {"period": period, "unit_of_measurement": "RUB"}
+    )
+    notifications = []
+
+    async def collect(event):
+        if event.data["domain"] == "persistent_notification":
+            notifications.append(event.data["service_data"])
+
+    remove = hass.bus.async_listen("call_service", collect)
+    try:
+        await hass.services.async_call(
+            "automation", "trigger", {"entity_id": "automation.miner_audit_monthly"},
+            blocking=True,
+        )
+        await hass.async_block_till_done()
+        require(
+            "monthly summary renders last month's energy and cost in a notification",
+            any(
+                period in notification.get("title", "")
+                and "420.0 kWh" in notification.get("message", "")
+                and "2520.0 RUB" in notification.get("message", "")
+                for notification in notifications
+            ),
+            str(notifications),
+        )
+    finally:
+        remove()
 
 
 async def check_activity(hass, miner, coord, events):

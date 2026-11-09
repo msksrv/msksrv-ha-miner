@@ -21,6 +21,7 @@ from homeassistant.util import dt as dt_util
 from ..const import DOMAIN, JOULES_PER_TERA_HASH
 from ..miner_device_info import get_miner_device_info
 from .definitions import RESOLVED_UNAVAILABLE, SOURCE_LABEL_KEYS
+from .tariff import current_price, tariff_currencies
 
 if TYPE_CHECKING:
     from ..coordinator import MinerCoordinator
@@ -84,22 +85,7 @@ def setup_farm_energy_sensors(
 
 
 def _farm_tariff_configured(config_entry: ConfigEntry) -> bool:
-    from ..const import FARM_ELEC_TARIFF_DUAL, FARM_ELEC_TARIFF_FLAT
-    from ..farm_elec_tou import (
-        farm_tariff_mode,
-        farm_tou_currency,
-        farm_tou_zones_stored,
-    )
-    from ..farm_energy_rates import farm_energy_rates_list
-
-    opts = config_entry.options
-    mode = farm_tariff_mode(opts)
-    if mode == FARM_ELEC_TARIFF_FLAT:
-        return bool(farm_energy_rates_list(opts))
-    cur = farm_tou_currency(opts)
-    zones = farm_tou_zones_stored(opts)
-    need = 2 if mode == FARM_ELEC_TARIFF_DUAL else 3
-    return bool(cur and len(zones) == need)
+    return bool(tariff_currencies(config_entry.options))
 
 
 class _MinerEnergySensorBase(CoordinatorEntity["MinerCoordinator"], SensorEntity):
@@ -495,6 +481,10 @@ class FarmEnergyPrevMonthSensor(_FarmEnergySensorBase):
     def native_value(self) -> float | None:
         return self.coordinator.energy.period.prev_month_kwh
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"period": self.coordinator.energy.record.prev_month_key}
+
 
 class FarmEnergyEfficiencyTodaySensor(_FarmEnergySensorBase):
     _attr_native_unit_of_measurement = JOULES_PER_TERA_HASH
@@ -673,7 +663,7 @@ class FarmEnergyCostTotalSensor(_FarmEnergyMonetarySensorBase):
 
     @property
     def native_value(self) -> float | None:
-        return round(self.coordinator.energy.record.total_cost, 2)
+        return round(self.coordinator.energy.total_cost, 2)
 
 
 class FarmEnergyCostPrevMonthSensor(_FarmEnergyMonetarySensorBase):
@@ -686,7 +676,11 @@ class FarmEnergyCostPrevMonthSensor(_FarmEnergyMonetarySensorBase):
 
     @property
     def native_value(self) -> float | None:
-        return round(self.coordinator.energy.record.prev_month_cost, 2)
+        return round(self.coordinator.energy.previous_month_cost, 2)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"period": self.coordinator.energy.record.prev_month_key}
 
 
 class FarmEnergyCostAtPowerSensor(_FarmEnergySensorBase):
@@ -712,16 +706,6 @@ class FarmEnergyCostAtPowerSensor(_FarmEnergySensorBase):
 
     @property
     def native_value(self) -> float | None:
-        from homeassistant.util import dt as dt_util
-
-        from ..const import FARM_ELEC_TARIFF_FLAT
-        from ..farm_elec_tou import (
-            farm_tariff_mode,
-            farm_tou_zones_stored,
-            price_at_local_dt,
-        )
-        from ..farm_energy_rates import farm_energy_rates_list
-
         data = self.coordinator.data
         if not data:
             return None
@@ -729,15 +713,5 @@ class FarmEnergyCostAtPowerSensor(_FarmEnergySensorBase):
             kw = float(data.get("total_power_kw") or 0.0)
         except (TypeError, ValueError):
             return None
-        opts = self.coordinator.config_entry.options
-        if farm_tariff_mode(opts) == FARM_ELEC_TARIFF_FLAT:
-            rates = farm_energy_rates_list(opts)
-            if not rates:
-                return None
-            price = float(rates[0][1])
-        else:
-            zones = farm_tou_zones_stored(opts)
-            if not zones:
-                return None
-            price = price_at_local_dt(dt_util.as_local(dt_util.utcnow()), zones)
-        return round(kw * price, 2)
+        price = current_price(self.coordinator.config_entry.options, dt_util.utcnow())
+        return round(kw * price, 2) if price is not None else None

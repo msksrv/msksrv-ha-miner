@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from homeassistant.util import dt as dt_util
 
-from ..const import CONF_FARM_ENERGY_PHYSICAL_SENSOR
+from ..const import CONF_FARM_ENERGY_PHYSICAL_SENSOR, DOMAIN
 from .accumulator import (
     begin_quality_interval,
     data_quality_pct,
@@ -36,8 +38,24 @@ from .registry import (
 )
 from .source import read_energy_kwh
 from .storage import EnergyStorage
+from .tariff import (
+    EFFECTIVE_DATE,
+    TARIFF_SCHEDULE,
+    TariffHistoryError,
+    corrected_cost,
+    local_midnight,
+    same_tariff,
+    tariff_at,
+    tariff_currencies,
+    tariff_currency,
+    with_history_adjustment,
+    with_revision,
+)
+from .tariff_history import async_farm_meter_history
 
 if TYPE_CHECKING:
+    from typing import Any
+
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
@@ -59,6 +77,7 @@ class FarmEnergyManager:
         self._storage = EnergyStorage(hass, f"farm_{entry.entry_id}")
         self._snapshot = FarmEnergySnapshot(total_kwh=0.0, source=FARM_SOURCE_SUMMED)
         self._period = FarmPeriodSnapshot()
+        self._tariff_lock = asyncio.Lock()
 
     @property
     def record(self):
@@ -158,7 +177,78 @@ class FarmEnergyManager:
             record.total_kwh += total_delta
         return total_delta
 
+    @property
+    def total_cost(self) -> float:
+        return corrected_cost(self.entry.options, self.record.total_cost, "total")
+
+    @property
+    def previous_month_cost(self) -> float:
+        record = self.record
+        return corrected_cost(
+            self.entry.options, record.prev_month_cost, "months", record.prev_month_key
+        )
+
+    async def async_set_tariff(
+        self, submitted: dict[str, Any], effective_date: str | None
+    ) -> tuple[dict[str, Any], str | None]:
+        """Commit the tariff and its historical correction in one entry update."""
+        async with self._tariff_lock:
+            previous = self.entry.options
+            now = dt_util.utcnow()
+            try:
+                effective = local_midnight(effective_date) if effective_date else now
+            except (TypeError, ValueError):
+                return previous, "farm_tariff_invalid_date"
+
+            if not effective_date and same_tariff(tariff_at(previous, now), submitted):
+                return previous, None
+            if effective_date and not tariff_currency(submitted):
+                return previous, "farm_tariff_rate_required"
+            proposed = with_revision(previous, submitted, effective)
+            if len(tariff_currencies(proposed)) > 1:
+                if effective_date or previous.get(TARIFF_SCHEDULE):
+                    return previous, "farm_tariff_currency_change"
+                # Preserve the legacy immediate currency change for unscheduled tariffs.
+                proposed = submitted
+            if effective_date:
+                proposed[EFFECTIVE_DATE] = effective_date
+            else:
+                proposed.pop(EFFECTIVE_DATE, None)
+            if proposed == previous:
+                return previous, None
+
+            if (
+                effective_date
+                and effective < now
+                and proposed.get(TARIFF_SCHEDULE) != previous.get(TARIFF_SCHEDULE)
+            ):
+                record = self.record
+                end = dt_util.parse_datetime(record.last_ts) if record.last_ts else None
+                if end is None:
+                    return previous, "farm_tariff_history_unavailable"
+                if effective < end:
+                    try:
+                        readings = await async_farm_meter_history(
+                            self.hass, self.entry.entry_id, effective, end, record.total_kwh
+                        )
+                        proposed = with_history_adjustment(
+                            self.hass, previous, proposed, effective, readings
+                        )
+                    except TariffHistoryError:
+                        return previous, "farm_tariff_history_unavailable"
+                await self.async_save(force=True)
+
+            coordinator = self.hass.data.get(DOMAIN, {}).get(self.entry.entry_id)
+            if self.entry.options != previous or getattr(coordinator, "energy", None) is not self:
+                return self.entry.options, "farm_tariff_options_changed"
+            self.hass.config_entries.async_update_entry(self.entry, options=proposed)
+            return proposed, None
+
     async def async_tick(self, coordinator: MinerFarmCoordinator) -> None:
+        async with self._tariff_lock:
+            await self._async_tick(coordinator)
+
+    async def _async_tick(self, coordinator: MinerFarmCoordinator) -> None:
         now = dt_util.utcnow()
         record = self._storage.record
         reset_periods_if_needed(record, now)
@@ -215,8 +305,6 @@ class FarmEnergyManager:
                     dt_s=period_dt_s,
                 )
 
-            energy_period = farm_period_from_record(record, currency)
-            self._period = _merge_hash_into_period(energy_period, hash_period)
             self._snapshot = FarmEnergySnapshot(
                 total_kwh=round(record.total_kwh, 3),
                 source=FARM_SOURCE_PHYSICAL,
@@ -264,11 +352,15 @@ class FarmEnergyManager:
             record.last_ts = dt_util.as_utc(now).isoformat()
 
             self._snapshot = self._build_summed_snapshot(coordinator, record)
-            energy_period = farm_period_from_record(
-                record, farm_tariff_currency(self.hass, self.entry)
-            )
-            self._period = _merge_hash_into_period(energy_period, hash_period)
 
+        options = self.entry.options
+        period = farm_period_from_record(record, tariff_currency(tariff_at(options, now)))
+        period = replace(
+            period,
+            day_cost=corrected_cost(options, record.day_cost, "days", record.day_key),
+            month_cost=corrected_cost(options, record.month_cost, "months", record.month_key),
+        )
+        self._period = _merge_hash_into_period(period, hash_period)
         self._storage.mark_dirty()
         await self.async_save()
 
