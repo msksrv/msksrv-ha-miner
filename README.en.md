@@ -240,7 +240,7 @@ data:
 
 Import the [alerts blueprint](https://github.com/msksrv/msksrv-ha-miner/blob/main/blueprints/automation/msksrv/miner_alerts.yaml) by URL under **Settings → Automations & scenes → Blueprints**. Select a miner when creating the automation. The blueprint creates Home Assistant notifications for loss of connectivity, overheating and recovery locks.
 
-The integration publishes miner and farm activity to the Home Assistant event bus as `miner_event`. The `type` field identifies the event, and `scope` is `miner` or `farm`. This example triggers after three consecutive failed miner polls.
+The integration publishes miner and farm activity to the Home Assistant event bus as `miner_event`. The `type` field identifies the event, and `scope` is `miner` or `farm`. The event card shows the specific problem, such as overheating. The `event.*` entity uses an `event_type` such as `problem_detected_temperature` for a new problem. The bus still uses `type: problem_detected` with `problem_type`. This example triggers after three consecutive failed miner polls.
 
 ```yaml
 alias: Miner offline
@@ -257,6 +257,24 @@ actions:
       title: Miner offline
       message: Check the miner's power and network connection.
 ```
+
+### Miner problem events
+
+The event card names the problem. Open it for readings captured when the problem was reported, where available.
+
+| Event | Meaning and details |
+|---|---|
+| Miner disconnected | Several consecutive polls failed. The details show how many. |
+| Hashboard problem | A board is missing, has no hashrate, has too few working chips, or differs from the other boards in hashrate or temperature. The details show the slot and the relevant readings. |
+| Low hashrate | Hashrate is below the expected level or dropped while power draw stayed high. The details show the reading and its reference or threshold, where available. |
+| Overheating | A chip or board temperature reached its limit. The details show the readings and their limits. |
+| Fan problem | A fan is below the speed limit or runs substantially slower than its peers. The details show its index, speed and limit or median. |
+| Mining pool problem | The pool is unavailable, work requests fail, stale shares accumulate, or no share has been accepted recently. The details show pool status, failures and available share readings. |
+| High share rejection rate | The rejection rate exceeded its threshold or rose above its baseline. The details show the rate and available counters. |
+| Unusual power draw | Power draw left the range based on the learned baseline or the miner's power limit. The details show the reading and range. |
+| Slow recovery after reboot | Hashrate did not return to its baseline in time. The details show current and baseline hashrate and the recovery percentage. |
+| Automatic recovery failed | The configured attempts were exhausted. The details show reboot and power cycle counts and available hashrate readings. |
+| Power could not be restored | The integration could not confirm that the linked switch turned back on. The details show the switch and failed attempt count. |
 
 ---
 

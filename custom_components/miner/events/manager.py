@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 
+from ..health.profiles import resolve_health_thresholds
 from ..health.repairs.definitions import RepairType
 from .definitions import (
     OFFLINE_FAILURE_THRESHOLD,
@@ -17,6 +18,7 @@ from .definitions import (
     work_mode_signature,
 )
 from .dispatcher import EventDispatcher
+from .problem_metrics import problem_metrics
 
 if TYPE_CHECKING:
     from ..health.baseline.detector import AnomalyState
@@ -81,7 +83,7 @@ class MinerEventManager:
             self._failure_streak >= OFFLINE_FAILURE_THRESHOLD
             and not self._offline_event_sent
         ):
-            self._dispatcher.async_emit("offline", {})
+            self._dispatcher.async_emit("offline", {"failed_polls": self._failure_streak})
             self._offline_event_sent = True
 
     @callback
@@ -90,10 +92,22 @@ class MinerEventManager:
         problem_type: str,
         data: dict[str, Any],
         anomaly: AnomalyState,
+        *,
+        recovery_details: dict[str, Any] | None = None,
     ) -> None:
         if problem_type == RepairType.OFFLINE or problem_type in self._open_problems:
             return
         payload = build_problem_payload(problem_type, data, anomaly)
+        thresholds, _ = resolve_health_thresholds(
+            data.get("make"), data.get("model"), self._dispatcher.entry.options
+        )
+        # A finding may identify a different board or fan than the health flag.
+        if payload.get("reason") not in {
+            "board_hashrate_outlier", "board_temp_outlier", "fan_imbalance",
+        }:
+            metrics = problem_metrics(problem_type, data, thresholds)
+            payload = {**sanitize_event_data(metrics), **payload}
+        payload.update(sanitize_event_data(recovery_details or {}))
         self._dispatcher.async_emit("problem_detected", payload)
         self._open_problems.add(problem_type)
 

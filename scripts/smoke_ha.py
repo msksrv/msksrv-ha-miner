@@ -278,6 +278,7 @@ automation:
             ),
         )
 
+        await check_activity(hass, miner, coord, events)
         await check_energy(hass, miner, farm)
         await check_legacy_cost(hass, farm)
         await check_repair_forms(hass, miner, farm)
@@ -286,6 +287,135 @@ automation:
         await check_offline(hass, axe, miner, farm, events, miner_device.id)
         await check_diagnostics(hass, axe, miner, farm)
         print(f"Completed {manifest['version']}", flush=True)
+
+
+async def check_activity(hass, miner, coord, events):
+    from homeassistant.helpers.translation import async_get_translations
+
+    coord.events.async_emit_problem_detected(
+        "temperature",
+        {
+            "make": "WhatsMiner",
+            "model": "M21S",
+            "health": {"flags": {"temperature_high": True}},
+            "board_sensors": {
+                0: {"chip_temperature": 93, "board_temperature": 72},
+                1: {"chip_temperature": 98, "board_temperature": 75},
+            },
+        },
+        coord.baseline.anomaly,
+    )
+    await hass.async_block_till_done()
+    activity = state_for(hass, f"{miner.entry_id}-activity", platform="event")
+    require(
+        "overheating card uses its own event type and records readings and limits",
+        all(
+            activity.attributes.get(key) == value
+            for key, value in {
+                "event_type": "problem_detected_temperature",
+                "reason": "temperature_high",
+                "max_chip_temperature_c": 98,
+                "chip_temperature_limit_c": 95,
+                "max_board_temperature_c": 75,
+                "board_temperature_limit_c": 85,
+            }.items()
+        ),
+        str(activity.attributes),
+    )
+    require(
+        "temperature automations still receive the generic bus event",
+        any(
+            event.get("type") == "problem_detected"
+            and event.get("event_type") == "problem_detected"
+            and event.get("problem_type") == "temperature"
+            and event.get("max_chip_temperature_c") == 98
+            for event in events
+        ),
+    )
+    key = "component.miner.entity.event.activity.state_attributes.event_type.state"
+    for language, expected in (("en", "Overheating"), ("ru", "Перегрев")):
+        translations = await async_get_translations(hass, language, "entity", [DOMAIN])
+        require(
+            f"HA translates the overheating card in {language}",
+            translations.get(f"{key}.{activity.attributes['event_type']}") == expected,
+        )
+
+    coord.events.async_emit_problem_cleared("temperature")
+    cases = {
+        "hashboard": (
+            {"board_sensors": {2: {"board_chips": 0, "board_expected_chips": 96}}},
+            {"board": "2", "working_chips": 0, "expected_chips": 96},
+        ),
+        "hashrate": (
+            {
+                "miner_sensors": {"hashrate": 60, "ideal_hashrate": 100},
+                "health": {"flags": {"hashrate_low": True}},
+            },
+            {"current_hashrate": 60, "expected_hashrate": 100, "hashrate_limit": 85},
+        ),
+        "fan": (
+            {"fan_sensors": {0: {"fan_speed": 2000}, 1: {"fan_speed": 0}}},
+            {"fan": "1", "fan_speed": 0, "fan_speed_limit_rpm": 1000},
+        ),
+        "pool": (
+            {"pool_health": {"alive": False, "get_failures": 14}},
+            {"pool_alive": False, "pool_get_failures": 14},
+        ),
+        "reject": (
+            {
+                "reject_rate": 7,
+                "accepted_shares": 93,
+                "rejected_shares": 7,
+                "health": {"flags": {"reject_rate_high": True}},
+            },
+            {"current_reject_rate": 7, "rejected_shares": 7, "reject_rate_limit_percent": 2},
+        ),
+        "power": (
+            {"miner_sensors": {"miner_consumption": 1200, "power_limit": 1000}},
+            {"current_power": 1200, "power_lower_bound_w": 800, "power_upper_bound_w": 1100},
+        ),
+        "recovery": (
+            {"miner_sensors": {"hashrate": 8, "ideal_hashrate": 20}},
+            {"current_hashrate": 8, "expected_hashrate": 20},
+        ),
+    }
+    for problem, (data, expected) in cases.items():
+        coord.events.async_emit_problem_detected(problem, data, None)
+        activity = state_for(hass, f"{miner.entry_id}-activity", platform="event")
+        require(
+            f"{problem} uses a specific card label with the corresponding readings",
+            activity.attributes.get("event_type") == f"problem_detected_{problem}"
+            and "max_chip_temperature_c" not in activity.attributes
+            and all(activity.attributes.get(k) == v for k, v in expected.items()),
+        )
+        coord.events.async_emit_problem_cleared(problem)
+
+    from custom_components.miner.health.recovery.definitions import RecoveryRecord
+
+    record = RecoveryRecord(
+        reboot_attempts=2, power_cycle_attempts=1, power_on_retries=3,
+        expected_hashrate=52,
+    )
+    coord.repairs.open_recovery_failed({"miner_sensors": {"hashrate": 8}}, record)
+    activity = state_for(hass, f"{miner.entry_id}-activity", platform="event")
+    require(
+        "recovery failure shows actual attempts and the expected hashrate",
+        activity.attributes.get("event_type") == "problem_detected_recovery_failed"
+        and activity.attributes.get("reboot_attempts") == 2
+        and activity.attributes.get("power_cycle_attempts") == 1
+        and activity.attributes.get("expected_hashrate") == 52,
+    )
+    coord.repairs.clear_recovery_failed()
+    coord.repairs.open_power_restore_failed({}, record)
+    activity = state_for(hass, f"{miner.entry_id}-activity", platform="event")
+    require(
+        "power restore failure shows the number of failed power-on attempts",
+        activity.attributes.get("event_type") == "problem_detected_power_restore_failed"
+        and activity.attributes.get("reason") == "power_restore_failed"
+        and activity.attributes.get("power_on_retries") == 3,
+    )
+    coord.repairs.clear_power_restore_failed()
+
 
 
 async def check_uptime(hass, axe, miner, coord):

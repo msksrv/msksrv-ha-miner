@@ -100,7 +100,8 @@ def _score_boards(
     return max(0.0, min(100.0, avg)), board_problem
 
 
-def _max_temps(data: dict[str, Any]) -> tuple[float | None, float | None]:
+def max_temperatures(data: dict[str, Any]) -> tuple[float | None, float | None]:
+    """Return the highest chip and board readings used for health checks."""
     ms = data.get("miner_sensors") or {}
     avg = _f(ms.get("temperature"))
     max_chip: float | None = None
@@ -135,7 +136,7 @@ def _temperature_status(
 def _score_temperature(
     data: dict[str, Any], thresholds: HealthThresholds
 ) -> tuple[float | None, bool]:
-    max_chip, max_board = _max_temps(data)
+    max_chip, max_board = max_temperatures(data)
     if max_chip is None and max_board is None:
         return None, False
     _warning, critical = _temperature_status(max_chip, max_board, thresholds)
@@ -348,7 +349,7 @@ def compute_health(
         if comp_score is not None:
             parts.append((key, comp_score, weight))
 
-    max_chip, max_board = _max_temps(data)
+    max_chip, max_board = max_temperatures(data)
     temp_warning, _temp_critical = _temperature_status(max_chip, max_board, t)
     flags["temperature_warning"] = temp_warning
 

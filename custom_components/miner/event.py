@@ -11,7 +11,7 @@ from homeassistant.helpers import entity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import CONF_IS_FARM, DOMAIN
-from .events.definitions import FARM_EVENT_TYPES, MINER_EVENT_TYPES
+from .events.definitions import FARM_EVENT_TYPES, MINER_EVENT_TYPES, PROBLEM_TYPES
 from .farm_coordinator import MinerFarmCoordinator
 from .miner_device_info import get_miner_device_info
 
@@ -49,12 +49,25 @@ class MinerActivityEventEntity(_ActivityEventMixin, EventEntity):
 
     _attr_has_entity_name = True
     _attr_translation_key = "activity"
-    _attr_event_types: ClassVar[list[str]] = list(MINER_EVENT_TYPES)
+    _attr_event_types: ClassVar[list[str]] = [
+        *MINER_EVENT_TYPES,
+        *(f"problem_detected_{problem}" for problem in sorted(PROBLEM_TYPES)),
+    ]
 
     def __init__(self, coordinator: MinerCoordinator) -> None:
         self._coordinator = coordinator
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}-activity"
         coordinator.events.bind_entity(self)
+
+    @callback
+    def async_trigger(self, event_type: str, data: dict) -> None:
+        """Give the card a specific problem label while keeping the bus type."""
+        problem = data.get("problem_type")
+        if event_type == "problem_detected" and problem in PROBLEM_TYPES:
+            subtype = f"problem_detected_{problem}"
+            super().async_trigger(subtype, {**data, "event_type": subtype})
+        else:
+            super().async_trigger(event_type, data)
 
     @property
     def device_info(self) -> entity.DeviceInfo:

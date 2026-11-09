@@ -125,7 +125,7 @@ def build_problem_payload(
         RepairType.HASHRATE: ("hashrate_low",),
         RepairType.HASHBOARD: ("board_problem",),
         RepairType.FAN: ("fan_problem",),
-        RepairType.POOL: ("pool_problem",),
+        RepairType.POOL: ("pool_problem", "share_stale"),
         RepairType.REJECT: ("reject_rate_high",),
         "recovery_failed": ("hashrate_low",),
     }
@@ -156,6 +156,11 @@ def build_problem_payload(
                 reason = flag
                 break
 
+    if not reason:
+        reason = {
+            RepairType.RECOVERY_FAILED: "max_recovery_attempts",
+            RepairType.POWER_RESTORE_FAILED: "power_restore_failed",
+        }.get(problem_type)
     if reason:
         payload["reason"] = reason
     for key, value in details.items():

@@ -143,7 +143,14 @@ class RepairManager:
                 reason=None,
                 message=None,
             )
-            self._events.async_emit_problem_detected(rtype, data, empty)
+            self._events.async_emit_problem_detected(
+                rtype, data, empty,
+                recovery_details={
+                    "expected_hashrate": _f(getattr(record, "expected_hashrate", None)),
+                    "reboot_attempts": record.reboot_attempts,
+                    "power_cycle_attempts": record.power_cycle_attempts,
+                },
+            )
 
     def open_power_restore_failed(
         self, data: dict[str, Any], record: Any
@@ -171,7 +178,13 @@ class RepairManager:
                 reason=None,
                 message=None,
             )
-            self._events.async_emit_problem_detected(rtype, data or {}, empty)
+            self._events.async_emit_problem_detected(
+                rtype, data or {}, empty,
+                recovery_details={
+                    "power_switch": self.entry.options.get(CONF_POWER_SWITCH),
+                    "power_on_retries": record.power_on_retries,
+                },
+            )
 
     def clear_recovery_failed(self) -> None:
         """Close recovery-failed repair after manual reset."""

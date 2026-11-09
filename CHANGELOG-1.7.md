@@ -1,5 +1,13 @@
 # MSKSRV ASIC Miner 1.7 — changelog
 
+## v1.7.3
+
+- Show a specific name in the Home Assistant event card for each of the ten miner problem types.
+- Capture available readings, thresholds, and recovery attempt counts when a problem is reported. Disconnect events include the number of failed polls.
+- Preserve the `miner_event` bus contract. Entity attribute filters can use the new `problem_detected_<problem_type>` values.
+
+---
+
 ## v1.7.2
 
 - Report miner uptime as a duration so periodic updates no longer appear in Home Assistant Activity.

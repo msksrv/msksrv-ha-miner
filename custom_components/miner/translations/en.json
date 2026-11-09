@@ -510,10 +510,254 @@
     },
     "event": {
       "activity": {
-        "name": "Activity"
+        "name": "Activity",
+        "state_attributes": {
+          "event_type": {
+            "name": "Event",
+            "state": {
+              "offline": "Miner disconnected",
+              "online": "Miner connection restored",
+              "problem_detected": "Problem detected",
+              "problem_cleared": "Problem resolved",
+              "problem_acknowledged": "Problem acknowledged",
+              "pool_changed": "Mining pool changed",
+              "work_mode_changed": "Mining mode changed",
+              "reboot_command_sent": "Reboot command sent",
+              "recovery_reboot_command_sent": "Recovery reboot command sent",
+              "ip_changed": "IP address changed",
+              "recovery_started": "Automatic recovery started",
+              "recovery_cancelled": "Automatic recovery cancelled",
+              "reboot_recovery_succeeded": "Mining recovered after reboot",
+              "reboot_recovery_failed": "Mining did not recover after reboot",
+              "power_cycle_started": "Power cycle started",
+              "power_off_command_sent": "Power-off command sent",
+              "power_on_command_sent": "Power-on command sent",
+              "power_cycle_succeeded": "Mining recovered after power cycle",
+              "power_cycle_failed": "Power cycle failed",
+              "recovery_locked": "Automatic recovery locked",
+              "recovery_manually_reset": "Recovery lock cleared manually",
+              "problem_detected_hashboard": "Hashboard problem",
+              "problem_detected_hashrate": "Low hashrate",
+              "problem_detected_temperature": "Overheating",
+              "problem_detected_fan": "Fan problem",
+              "problem_detected_pool": "Mining pool problem",
+              "problem_detected_reject": "High share rejection rate",
+              "problem_detected_power": "Unusual power draw",
+              "problem_detected_recovery": "Slow recovery after reboot",
+              "problem_detected_recovery_failed": "Automatic recovery failed",
+              "problem_detected_power_restore_failed": "Power could not be restored"
+            }
+          },
+          "problem_type": {
+            "name": "Problem",
+            "state": {
+              "hashboard": "Hashboards",
+              "hashrate": "Low hashrate",
+              "temperature": "High temperature",
+              "fan": "Fan problem",
+              "pool": "Mining pool problem",
+              "reject": "High share rejection rate",
+              "power": "Unusual power draw",
+              "recovery": "Slow recovery after reboot",
+              "recovery_failed": "Automatic recovery failed",
+              "power_restore_failed": "Power could not be restored"
+            }
+          },
+          "reason": {
+            "name": "Reason",
+            "state": {
+              "temperature_high": "Temperature exceeded the configured limit",
+              "power_anomaly": "Power draw differs from expected",
+              "hashrate_low": "Hashrate fell below the expected range",
+              "board_problem": "A hashboard is missing or underperforming",
+              "fan_problem": "Fan speed is below the expected range",
+              "pool_problem": "Pool connection or work problem",
+              "reject_rate_high": "Too many shares were rejected",
+              "hashrate_power_mismatch": "Hashrate is low for the current power draw",
+              "hashrate_efficiency_drop": "Mining efficiency decreased",
+              "board_hashrate_outlier": "Hashboard hashrate differs from the other boards",
+              "board_temp_outlier": "Hashboard temperature differs from the other boards",
+              "fan_imbalance": "Fan speeds differ more than expected",
+              "post_reboot_slow_recovery": "Hashrate is slow to recover after reboot",
+              "share_stale": "No recent accepted shares",
+              "max_recovery_attempts": "Automatic recovery attempts exhausted",
+              "power_restore_failed": "The linked switch did not restore power"
+            }
+          },
+          "severity": {
+            "name": "Severity",
+            "state": {
+              "info": "Information",
+              "warning": "Warning",
+              "error": "Error",
+              "critical": "Critical"
+            }
+          },
+          "max_chip_temperature_c": {
+            "name": "Highest chip temperature reading (°C)"
+          },
+          "chip_temperature_limit_c": {
+            "name": "Chip temperature limit (°C)"
+          },
+          "max_board_temperature_c": {
+            "name": "Highest board temperature (°C)"
+          },
+          "board_temperature_limit_c": {
+            "name": "Board temperature limit (°C)"
+          },
+          "failed_polls": {
+            "name": "Consecutive failed polls"
+          },
+          "board": {
+            "name": "Hashboard slot"
+          },
+          "board_missing": {
+            "name": "Hashboard missing"
+          },
+          "board_hashrate": {
+            "name": "Hashboard hashrate (TH/s)"
+          },
+          "median_board_hashrate": {
+            "name": "Median hashboard hashrate (TH/s)"
+          },
+          "board_temperature": {
+            "name": "Hashboard reading (°C)"
+          },
+          "median_board_temperature": {
+            "name": "Median hashboard reading (°C)"
+          },
+          "temp_delta": {
+            "name": "Temperature difference (°C)"
+          },
+          "working_chips": {
+            "name": "Detected chips"
+          },
+          "expected_chips": {
+            "name": "Expected chips"
+          },
+          "current_hashrate": {
+            "name": "Current hashrate (TH/s)"
+          },
+          "expected_hashrate": {
+            "name": "Expected hashrate (TH/s)"
+          },
+          "baseline_hashrate": {
+            "name": "Learned hashrate (TH/s)"
+          },
+          "hashrate_limit": {
+            "name": "Low hashrate threshold (TH/s)"
+          },
+          "hashrate_drop_pct": {
+            "name": "Hashrate drop (%)"
+          },
+          "pct_below": {
+            "name": "Below median (%)"
+          },
+          "fan": {
+            "name": "Fan index"
+          },
+          "fan_speed": {
+            "name": "Fan speed (RPM)"
+          },
+          "fan_speed_limit_rpm": {
+            "name": "Minimum fan speed (RPM)"
+          },
+          "median_fan_speed": {
+            "name": "Median fan speed (RPM)"
+          },
+          "pool_active": {
+            "name": "Pool active"
+          },
+          "pool_alive": {
+            "name": "Pool reachable"
+          },
+          "pool_get_failures": {
+            "name": "Failed pool work requests"
+          },
+          "pool_stale_percent": {
+            "name": "Stale shares (%)"
+          },
+          "pool_stale_limit_percent": {
+            "name": "Stale share threshold (%)"
+          },
+          "seconds_since_share": {
+            "name": "Time since last accepted share (s)"
+          },
+          "share_stale_limit_seconds": {
+            "name": "Accepted share timeout (s)"
+          },
+          "baseline_share_interval": {
+            "name": "Learned share interval (s)"
+          },
+          "current_reject_rate": {
+            "name": "Rejected shares (%)"
+          },
+          "baseline_reject_rate": {
+            "name": "Learned rejection rate (%)"
+          },
+          "reject_rate_limit_percent": {
+            "name": "Rejection threshold (%)"
+          },
+          "accepted_shares": {
+            "name": "Accepted share count"
+          },
+          "rejected_shares": {
+            "name": "Rejected share count"
+          },
+          "total_shares": {
+            "name": "Total shares"
+          },
+          "current_power": {
+            "name": "Current power draw (W)"
+          },
+          "baseline_power": {
+            "name": "Learned power draw (W)"
+          },
+          "configured_power_limit_w": {
+            "name": "Miner power limit (W)"
+          },
+          "power_lower_bound_w": {
+            "name": "Lower power threshold (W)"
+          },
+          "power_upper_bound_w": {
+            "name": "Upper power threshold (W)"
+          },
+          "power_change_pct": {
+            "name": "Power change (%)"
+          },
+          "recovery_pct": {
+            "name": "Hashrate recovered (%)"
+          },
+          "reboot_attempts": {
+            "name": "Reboot attempts"
+          },
+          "power_cycle_attempts": {
+            "name": "Power cycle attempts"
+          },
+          "power_switch": {
+            "name": "Linked power switch"
+          },
+          "power_on_retries": {
+            "name": "Failed power-on attempts"
+          }
+        }
       },
       "farm_activity": {
-        "name": "Activity"
+        "name": "Activity",
+        "state_attributes": {
+          "event_type": {
+            "name": "Event",
+            "state": {
+              "emergency_power_off": "Farm emergency stop",
+              "emergency_power_off_partial_failure": "Farm partially stopped",
+              "emergency_power_off_failed": "Farm emergency stop failed",
+              "emergency_stop_cleared": "Emergency stop lock cleared",
+              "preset_applied": "Pool preset applied",
+              "preset_partial_failure": "Pool preset partially applied",
+              "preset_failed": "Pool preset failed"
+            }
+          }
+        }
       }
     },
     "switch": {

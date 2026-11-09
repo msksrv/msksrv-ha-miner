@@ -510,10 +510,254 @@
     },
     "event": {
       "activity": {
-        "name": "События"
+        "name": "События",
+        "state_attributes": {
+          "event_type": {
+            "name": "Событие",
+            "state": {
+              "offline": "Потеряна связь с майнером",
+              "online": "Связь с майнером восстановлена",
+              "problem_detected": "Обнаружена проблема",
+              "problem_cleared": "Проблема устранена",
+              "problem_acknowledged": "Проблема отмечена как проверенная",
+              "pool_changed": "Пул изменён",
+              "work_mode_changed": "Режим майнинга изменён",
+              "reboot_command_sent": "Отправлена команда перезагрузки",
+              "recovery_reboot_command_sent": "Отправлена команда перезагрузки для восстановления",
+              "ip_changed": "IP-адрес изменён",
+              "recovery_started": "Начато автовосстановление",
+              "recovery_cancelled": "Автовосстановление отменено",
+              "reboot_recovery_succeeded": "Майнинг восстановился после перезагрузки",
+              "reboot_recovery_failed": "Майнинг не восстановился после перезагрузки",
+              "power_cycle_started": "Начат цикл отключения и возврата питания",
+              "power_off_command_sent": "Отправлена команда отключения питания",
+              "power_on_command_sent": "Отправлена команда включения питания",
+              "power_cycle_succeeded": "Майнинг восстановился после цикла питания",
+              "power_cycle_failed": "Ошибка цикла питания",
+              "recovery_locked": "Автовосстановление заблокировано",
+              "recovery_manually_reset": "Блокировка автовосстановления снята вручную",
+              "problem_detected_hashboard": "Проблема с хеш-платой",
+              "problem_detected_hashrate": "Низкий хешрейт",
+              "problem_detected_temperature": "Перегрев",
+              "problem_detected_fan": "Проблема с вентилятором",
+              "problem_detected_pool": "Проблема с пулом",
+              "problem_detected_reject": "Много отклонённых шар",
+              "problem_detected_power": "Необычная потребляемая мощность",
+              "problem_detected_recovery": "Медленное восстановление после перезагрузки",
+              "problem_detected_recovery_failed": "Автовосстановление не удалось",
+              "problem_detected_power_restore_failed": "Не удалось восстановить питание"
+            }
+          },
+          "problem_type": {
+            "name": "Проблема",
+            "state": {
+              "hashboard": "Хеш-платы",
+              "hashrate": "Низкий хешрейт",
+              "temperature": "Высокая температура",
+              "fan": "Проблема с вентилятором",
+              "pool": "Проблема с пулом",
+              "reject": "Много отклонённых шар",
+              "power": "Необычная потребляемая мощность",
+              "recovery": "Медленное восстановление после перезагрузки",
+              "recovery_failed": "Автовосстановление не удалось",
+              "power_restore_failed": "Не удалось восстановить питание"
+            }
+          },
+          "reason": {
+            "name": "Причина",
+            "state": {
+              "temperature_high": "Температура превысила заданный порог",
+              "power_anomaly": "Мощность отличается от ожидаемой",
+              "hashrate_low": "Хешрейт ниже ожидаемого",
+              "board_problem": "Хеш-плата отсутствует или работает хуже ожидаемого",
+              "fan_problem": "Обороты вентилятора ниже ожидаемых",
+              "pool_problem": "Проблема с подключением к пулу или получением заданий",
+              "reject_rate_high": "Слишком много отклонённых шар",
+              "hashrate_power_mismatch": "Хешрейт низкий для текущей мощности",
+              "hashrate_efficiency_drop": "Эффективность майнинга снизилась",
+              "board_hashrate_outlier": "Хешрейт одной платы отличается от остальных",
+              "board_temp_outlier": "Температура одной платы отличается от остальных",
+              "fan_imbalance": "Обороты вентиляторов отличаются сильнее обычного",
+              "post_reboot_slow_recovery": "Хешрейт медленно восстанавливается после перезагрузки",
+              "share_stale": "Давно не было принятых шар",
+              "max_recovery_attempts": "Попытки автовосстановления исчерпаны",
+              "power_restore_failed": "Привязанный выключатель не восстановил питание"
+            }
+          },
+          "severity": {
+            "name": "Важность",
+            "state": {
+              "info": "Информация",
+              "warning": "Предупреждение",
+              "error": "Ошибка",
+              "critical": "Критическая"
+            }
+          },
+          "max_chip_temperature_c": {
+            "name": "Максимальное показание температуры чипов (°C)"
+          },
+          "chip_temperature_limit_c": {
+            "name": "Порог температуры чипов (°C)"
+          },
+          "max_board_temperature_c": {
+            "name": "Максимальная температура платы (°C)"
+          },
+          "board_temperature_limit_c": {
+            "name": "Порог температуры платы (°C)"
+          },
+          "failed_polls": {
+            "name": "Неудачные опросы подряд"
+          },
+          "board": {
+            "name": "Слот хеш-платы"
+          },
+          "board_missing": {
+            "name": "Хеш-плата отсутствует"
+          },
+          "board_hashrate": {
+            "name": "Хешрейт платы (ТХ/с)"
+          },
+          "median_board_hashrate": {
+            "name": "Медианный хешрейт плат (ТХ/с)"
+          },
+          "board_temperature": {
+            "name": "Показание платы (°C)"
+          },
+          "median_board_temperature": {
+            "name": "Медианное показание плат (°C)"
+          },
+          "temp_delta": {
+            "name": "Разница температур (°C)"
+          },
+          "working_chips": {
+            "name": "Обнаружено чипов"
+          },
+          "expected_chips": {
+            "name": "Ожидается чипов"
+          },
+          "current_hashrate": {
+            "name": "Текущий хешрейт (ТХ/с)"
+          },
+          "expected_hashrate": {
+            "name": "Ожидаемый хешрейт (ТХ/с)"
+          },
+          "baseline_hashrate": {
+            "name": "Хешрейт по эталону (ТХ/с)"
+          },
+          "hashrate_limit": {
+            "name": "Порог низкого хешрейта (ТХ/с)"
+          },
+          "hashrate_drop_pct": {
+            "name": "Падение хешрейта (%)"
+          },
+          "pct_below": {
+            "name": "Ниже медианы (%)"
+          },
+          "fan": {
+            "name": "Индекс вентилятора"
+          },
+          "fan_speed": {
+            "name": "Обороты вентилятора (об/мин)"
+          },
+          "fan_speed_limit_rpm": {
+            "name": "Минимальные обороты (об/мин)"
+          },
+          "median_fan_speed": {
+            "name": "Медианные обороты (об/мин)"
+          },
+          "pool_active": {
+            "name": "Пул активен"
+          },
+          "pool_alive": {
+            "name": "Пул доступен"
+          },
+          "pool_get_failures": {
+            "name": "Ошибки получения заданий от пула"
+          },
+          "pool_stale_percent": {
+            "name": "Устаревшие шары (%)"
+          },
+          "pool_stale_limit_percent": {
+            "name": "Порог устаревших шар (%)"
+          },
+          "seconds_since_share": {
+            "name": "Время с последней принятой шары (с)"
+          },
+          "share_stale_limit_seconds": {
+            "name": "Порог ожидания принятой шары (с)"
+          },
+          "baseline_share_interval": {
+            "name": "Интервал между шарами по эталону (с)"
+          },
+          "current_reject_rate": {
+            "name": "Отклонённые шары (%)"
+          },
+          "baseline_reject_rate": {
+            "name": "Доля отклонённых шар по эталону (%)"
+          },
+          "reject_rate_limit_percent": {
+            "name": "Порог отклонённых шар (%)"
+          },
+          "accepted_shares": {
+            "name": "Количество принятых шар"
+          },
+          "rejected_shares": {
+            "name": "Количество отклонённых шар"
+          },
+          "total_shares": {
+            "name": "Всего шар"
+          },
+          "current_power": {
+            "name": "Текущая мощность (Вт)"
+          },
+          "baseline_power": {
+            "name": "Мощность по эталону (Вт)"
+          },
+          "configured_power_limit_w": {
+            "name": "Лимит мощности майнера (Вт)"
+          },
+          "power_lower_bound_w": {
+            "name": "Нижний порог мощности (Вт)"
+          },
+          "power_upper_bound_w": {
+            "name": "Верхний порог мощности (Вт)"
+          },
+          "power_change_pct": {
+            "name": "Изменение мощности (%)"
+          },
+          "recovery_pct": {
+            "name": "Хешрейт восстановился (%)"
+          },
+          "reboot_attempts": {
+            "name": "Попытки перезагрузки"
+          },
+          "power_cycle_attempts": {
+            "name": "Попытки цикла питания"
+          },
+          "power_switch": {
+            "name": "Привязанный выключатель питания"
+          },
+          "power_on_retries": {
+            "name": "Неудачные попытки включения питания"
+          }
+        }
       },
       "farm_activity": {
-        "name": "События"
+        "name": "События",
+        "state_attributes": {
+          "event_type": {
+            "name": "Событие",
+            "state": {
+              "emergency_power_off": "Аварийная остановка фермы",
+              "emergency_power_off_partial_failure": "Ферма остановлена частично",
+              "emergency_power_off_failed": "Не удалось аварийно остановить ферму",
+              "emergency_stop_cleared": "Блокировка аварийной остановки снята",
+              "preset_applied": "Пресет пулов применён",
+              "preset_partial_failure": "Пресет пулов применён частично",
+              "preset_failed": "Не удалось применить пресет пулов"
+            }
+          }
+        }
       }
     },
     "switch": {
