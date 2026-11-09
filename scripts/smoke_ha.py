@@ -259,6 +259,7 @@ async def main(source):
 
         await check_energy(hass, miner, farm)
         await check_legacy_cost(hass, farm)
+        await check_repair_forms(hass, miner, farm)
         await check_power_recovery(hass, miner, farm, events)
         await check_offline(hass, axe, miner, farm)
         print(f"Completed {manifest['version']}", flush=True)
@@ -373,6 +374,89 @@ async def check_legacy_cost(hass, farm):
         registry.async_get(legacy.entity_id).disabled_by
         == entity_registry.RegistryEntryDisabler.USER,
     )
+
+
+async def check_repair_forms(hass, miner, farm):
+    from homeassistant.components.repairs.websocket_api import RepairsFlowIndexView
+    from homeassistant.helpers.translation import async_get_translations
+
+    from custom_components.miner.health.repairs.definitions import (
+        farm_issue_id,
+        miner_issue_id,
+    )
+
+    manager = hass.data["repairs"]["flow_manager"]
+    for issue_id, key in (
+        (farm_issue_id(farm.entry_id, "offline"), "farm_offline"),
+        (miner_issue_id(miner.entry_id, "temperature"), "miner_temperature"),
+    ):
+        issue_registry.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=True,
+            severity=issue_registry.IssueSeverity.WARNING,
+            translation_key=key,
+            translation_placeholders={
+                "name": "Audit",
+                "offline": "1",
+                "total": "1",
+                "miners": "Bitaxe",
+                "miners_more": "",
+                "chip_temperature": "80",
+                "board_temperature": "65",
+            },
+        )
+        step = await manager.async_init(DOMAIN, data={"issue_id": issue_id})
+        require(f"{key} repair opens", step["type"] is FlowResultType.FORM)
+        serialized = RepairsFlowIndexView(manager)._prepare_result_json(step)
+        require(
+            f"{key} repair serializes its action selector",
+            any(field["name"] == "action" for field in serialized["data_schema"]),
+        )
+        for language in ("en", "ru"):
+            translations = await async_get_translations(
+                hass, language, "issues", [DOMAIN]
+            )
+            prefix = f"component.miner.issues.{key}.fix_flow.step.{step['step_id']}"
+            require(
+                f"{key} repair has {language} action and description",
+                bool(translations.get(prefix + ".data.action"))
+                and bool(translations.get(prefix + ".description")),
+            )
+        if key == "miner_temperature":
+            thresholds = await manager.async_configure(
+                step["flow_id"], {"action": "thresholds"}
+            )
+            require(
+                "temperature repair opens thresholds",
+                thresholds["step_id"] == "open_thresholds",
+            )
+            invalid = await manager.async_configure(
+                step["flow_id"],
+                {
+                    "temp_chip_warn_c": 90,
+                    "temp_chip_high_c": 85,
+                    "temp_board_warn_c": 60,
+                    "temp_board_high_c": 70,
+                },
+            )
+            require(
+                "temperature repair rejects inverted thresholds",
+                invalid.get("errors", {}).get("temp_chip_high_c")
+                == "temp_warn_must_be_below_critical",
+            )
+            manager.async_abort(step["flow_id"])
+            step = await manager.async_init(DOMAIN, data={"issue_id": issue_id})
+        done = await manager.async_configure(step["flow_id"], {"action": "checked"})
+        require(
+            f"{key} repair accepts acknowledgement",
+            done["type"] is FlowResultType.CREATE_ENTRY,
+        )
+        require(
+            f"{key} repair disappears",
+            issue_registry.async_get(hass).async_get_issue(DOMAIN, issue_id) is None,
+        )
 
 
 class AuditPowerSwitch(SwitchEntity):

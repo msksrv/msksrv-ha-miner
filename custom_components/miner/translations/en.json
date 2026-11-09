@@ -834,154 +834,378 @@
   "issues": {
     "miner_hashboard_chips": {
       "title": "{name}: hashboard problem",
-      "description": "Board {board} reports {chips} of {expected_chips} working chips."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Board {board} reports {chips} of {expected_chips} working chips.\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          }
+        },
+        "abort": {
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost."
+        }
+      }
     },
     "miner_hashboard_hashrate": {
       "title": "{name}: board hashrate outlier",
-      "description": "Board {board} hashrate is {board_hashrate} TH/s ({pct_below}% below median {median_board_hashrate} TH/s)."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Board {board} hashrate is {board_hashrate} TH/s ({pct_below}% below median {median_board_hashrate} TH/s).\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          }
+        },
+        "abort": {
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost."
+        }
+      }
     },
     "miner_hashboard_temperature": {
       "title": "{name}: board temperature outlier",
-      "description": "Board {board} is {temp_delta} °C colder than others ({board_temperature} °C vs median {median_board_temperature} °C)."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Board {board} is {temp_delta} °C colder than others ({board_temperature} °C vs median {median_board_temperature} °C).\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          }
+        },
+        "abort": {
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost."
+        }
+      }
     },
     "miner_hashrate": {
       "title": "{name}: hashrate below normal",
-      "description": "Hashrate is {current_hashrate} TH/s (baseline {baseline_hashrate} TH/s) at {power} W."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Hashrate is {current_hashrate} TH/s (baseline {baseline_hashrate} TH/s) at {power} W.\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          },
+          "open_thresholds": {
+            "title": "Adjust thresholds for {name}",
+            "description": "Change the values below and submit. The repair stays open until the condition clears or you confirm you checked the equipment.",
+            "data": {
+              "hashrate_low_ratio": "Minimum hashrate (fraction of reference — Auto: learned baseline, Generic/Custom: ideal)"
+            }
+          }
+        },
+        "abort": {
+          "issue_unsupported": "This repair issue is not recognized by the current integration version.",
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost."
+        }
+      }
     },
     "miner_temperature": {
       "title": "{name}: dangerously high temperature",
-      "description": "Peak chip temperature {chip_temperature} °C, peak board temperature {board_temperature} °C."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Peak chip temperature {chip_temperature} °C, peak board temperature {board_temperature} °C.\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "open_thresholds": {
+            "title": "Adjust thresholds for {name}",
+            "description": "Change the values below and submit. The repair stays open until the condition clears or you confirm you checked the equipment.",
+            "data": {
+              "temp_chip_warn_c": "Chip temperature warning (°C)",
+              "temp_chip_high_c": "Chip temperature high (°C)",
+              "temp_board_warn_c": "Board temperature warning (°C)",
+              "temp_board_high_c": "Board temperature high (°C)"
+            }
+          },
+          "confirm_power": {
+            "title": "Turn off power to {name}?",
+            "description": "The linked power switch will be turned off. Confirm only if you intend to cut power."
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          }
+        },
+        "abort": {
+          "issue_unsupported": "This repair issue is not recognized by the current integration version.",
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "no_power_switch": "Link a power switch entity in integration options to use power control from this repair.",
+          "power_off_failed": "Could not turn off the linked switch. Check the entity and try again.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost."
+        },
+        "error": {
+          "temp_warn_must_be_below_critical": "Warning threshold must be lower than high threshold",
+          "invalid_threshold": "Enter a valid number"
+        }
+      }
     },
     "miner_fan": {
       "title": "{name}: fan problem",
-      "description": "Fan {fan} speed is {fan_speed} RPM — zero RPM or sustained imbalance."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Fan {fan} speed is {fan_speed} RPM — zero RPM or sustained imbalance.\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_power": {
+            "title": "Turn off power to {name}?",
+            "description": "The linked power switch will be turned off. Confirm only if you intend to cut power."
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          }
+        },
+        "abort": {
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "no_power_switch": "Link a power switch entity in integration options to use power control from this repair.",
+          "power_off_failed": "Could not turn off the linked switch. Check the entity and try again.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost."
+        }
+      }
     },
     "miner_offline": {
       "title": "{name}: miner unreachable",
-      "description": "Cannot reach the miner at {ip} for more than 10 minutes."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Cannot reach the miner at {ip} for more than 10 minutes.\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_power_on": {
+            "title": "Turn on power to {name}?",
+            "description": "The linked power switch will be turned on."
+          }
+        },
+        "abort": {
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "no_power_switch": "Link a power switch entity in integration options to use power control from this repair.",
+          "power_on_failed": "Could not turn on the linked switch. Check the entity and try again.",
+          "refresh_failed": "The miner is still unreachable or the poll did not succeed. Try again later."
+        }
+      }
     },
     "miner_pool": {
       "title": "{name}: pool or shares problem",
-      "description": "Pool {pool_host}: no new shares accepted for {seconds_since_share} s (baseline interval {baseline_share_interval} s)."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Pool {pool_host}: no new shares accepted for {seconds_since_share} s (baseline interval {baseline_share_interval} s).\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          },
+          "confirm_restart_backend": {
+            "title": "Restart backend on {name}?",
+            "description": "The miner control service will restart. Mining may pause briefly."
+          }
+        },
+        "abort": {
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "miner_unavailable": "Could not connect to the miner. Reboot was not sent.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost.",
+          "refresh_failed": "The miner is still unreachable or the poll did not succeed. Try again later.",
+          "restart_backend_failed": "The miner rejected the restart command or the connection was lost."
+        }
+      }
     },
     "miner_recovery": {
       "title": "{name}: slow recovery after reboot",
-      "description": "Hashrate {current_hashrate} TH/s ({recovery_pct}% of baseline {baseline_hashrate} TH/s)."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Hashrate {current_hashrate} TH/s ({recovery_pct}% of baseline {baseline_hashrate} TH/s).\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          }
+        }
+      }
     },
     "miner_recovery_failed": {
       "title": "{name}: automatic recovery did not help",
-      "description": "After software reboot and optional power cycle, hashrate is still {current_hashrate} TH/s (expected about {expected_hashrate} TH/s)."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "After software reboot and optional power cycle, hashrate is still {current_hashrate} TH/s (expected about {expected_hashrate} TH/s).\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          },
+          "confirm_power": {
+            "title": "Turn off power to {name}?",
+            "description": "The linked power switch will be turned off. Confirm only if you intend to cut power."
+          },
+          "confirm_power_on": {
+            "title": "Turn on power to {name}?",
+            "description": "The linked power switch will be turned on."
+          }
+        },
+        "abort": {
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "no_power_switch": "Link a power switch entity in integration options to use power control from this repair.",
+          "power_off_failed": "Could not turn off the linked switch. Check the entity and try again.",
+          "power_on_failed": "Could not turn on the linked switch. Check the entity and try again.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost."
+        }
+      }
     },
     "miner_power_restore_failed": {
       "title": "{name}: could not restore power",
-      "description": "Power switch {power_switch} stayed off or could not be turned on after an automatic power cycle."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Power switch {power_switch} stayed off or could not be turned on after an automatic power cycle.\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "confirm_power_on": {
+            "title": "Turn on power to {name}?",
+            "description": "The linked power switch will be turned on."
+          }
+        },
+        "abort": {
+          "no_power_switch": "Link a power switch entity in integration options to use power control from this repair.",
+          "power_on_failed": "Could not turn on the linked switch. Check the entity and try again."
+        }
+      }
     },
     "miner_reject": {
       "title": "{name}: high reject rate",
-      "description": "Reject rate {current_reject_rate}% (baseline {baseline_reject_rate}%)."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Reject rate {current_reject_rate}% (baseline {baseline_reject_rate}%).\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "open_thresholds": {
+            "title": "Adjust thresholds for {name}",
+            "description": "Change the values below and submit. The repair stays open until the condition clears or you confirm you checked the equipment.",
+            "data": {
+              "reject_rate_high_pct": "Maximum reject rate (%)"
+            }
+          }
+        },
+        "abort": {
+          "issue_unsupported": "This repair issue is not recognized by the current integration version.",
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading."
+        }
+      }
     },
     "farm_offline": {
       "title": "{name}: miners offline",
-      "description": "{offline} of {total} miners unreachable: {miners}{miners_more}."
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "{offline} of {total} miners unreachable: {miners}{miners_more}.\n\nChoose an action for this farm.",
+            "data": {
+              "action": "Action"
+            }
+          }
+        },
+        "abort": {
+          "farm_not_loaded": "The farm integration is not available. Try again after Home Assistant finishes reloading.",
+          "refresh_failed": "The miner is still unreachable or the poll did not succeed. Try again later."
+        }
+      }
     },
     "miner_power": {
       "title": "{name}: abnormal power consumption",
-      "description": "Power draw is {current_power} W in mode {power_mode} (learned baseline {baseline_power} W)."
-    }
-  },
-  "repairs": {
-    "fix_flow": {
-      "init": {
-        "title": "Repair {name}",
-        "description": "Choose an action for this miner."
-      },
-      "farm_init": {
-        "title": "Repair {name}",
-        "description": "Choose an action for this farm."
-      },
-      "confirm_reboot": {
-        "title": "Reboot {name}?",
-        "description": "Mining will pause for several minutes while the miner reboots."
-      },
-      "confirm_restart_backend": {
-        "title": "Restart backend on {name}?",
-        "description": "The miner control service will restart. Mining may pause briefly."
-      },
-      "confirm_power": {
-        "title": "Turn off power to {name}?",
-        "description": "The linked power switch will be turned off. Confirm only if you intend to cut power."
-      },
-      "confirm_power_on": {
-        "title": "Turn on power to {name}?",
-        "description": "The linked power switch will be turned on."
-      },
-      "open_thresholds": {
-        "title": "Adjust thresholds for {name}",
-        "description": "Change the values below and submit. The repair stays open until the condition clears or you confirm you checked the equipment.",
-        "data": {
-          "temp_chip_warn_c": "Chip temperature warning (°C)",
-          "temp_chip_high_c": "Chip temperature high (°C)",
-          "temp_board_warn_c": "Board temperature warning (°C)",
-          "temp_board_high_c": "Board temperature high (°C)",
-          "reject_rate_high_pct": "Maximum reject rate (%)",
-          "power_low_ratio": "Low power ratio (vs baseline)",
-          "power_high_ratio": "High power ratio (vs baseline)",
-          "hashrate_low_ratio": "Minimum hashrate (fraction of reference — Auto: learned baseline, Generic/Custom: ideal)"
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Repair {name}",
+            "description": "Power draw is {current_power} W in mode {power_mode} (learned baseline {baseline_power} W).\n\nChoose an action for this miner.",
+            "data": {
+              "action": "Action"
+            }
+          },
+          "check_power": {
+            "title": "Check power to {name}",
+            "description": "Current draw {current_power} W; learned baseline {baseline_power} W. Verify PSU, cables, and breaker, then go back."
+          },
+          "check_profile": {
+            "title": "Power profile on {name}",
+            "description": "Active mode: {power_mode}. Confirm the miner is on the intended power preset, then go back."
+          },
+          "confirm_reboot": {
+            "title": "Reboot {name}?",
+            "description": "Mining will pause for several minutes while the miner reboots."
+          },
+          "open_thresholds": {
+            "title": "Adjust thresholds for {name}",
+            "description": "Change the values below and submit. The repair stays open until the condition clears or you confirm you checked the equipment.",
+            "data": {
+              "power_low_ratio": "Low power ratio (vs baseline)",
+              "power_high_ratio": "High power ratio (vs baseline)"
+            }
+          }
+        },
+        "abort": {
+          "issue_unsupported": "This repair issue is not recognized by the current integration version.",
+          "miner_not_loaded": "The miner integration is not available. Try again after Home Assistant finishes reloading.",
+          "reboot_failed": "The miner rejected the reboot command or the connection was lost."
+        },
+        "error": {
+          "invalid_threshold": "Enter a valid number",
+          "power_low_must_be_below_high": "Low power ratio must be below high power ratio"
         }
-      },
-      "check_power": {
-        "title": "Check power to {name}",
-        "description": "Current draw {current_power} W; learned baseline {baseline_power} W. Verify PSU, cables, and breaker, then go back."
-      },
-      "check_profile": {
-        "title": "Power profile on {name}",
-        "description": "Active mode: {power_mode}. Confirm the miner is on the intended power preset, then go back."
       }
-    },
-    "error": {
-      "temp_warn_must_be_below_critical": "Warning threshold must be lower than high threshold",
-      "invalid_threshold": "Enter a valid number",
-      "power_low_must_be_below_high": "Low power ratio must be below high power ratio"
-    },
-    "miner_not_loaded": {
-      "title": "Miner not loaded",
-      "description": "The miner integration is not available. Try again after Home Assistant finishes reloading."
-    },
-    "miner_unavailable": {
-      "title": "Miner unavailable",
-      "description": "Could not connect to the miner. Reboot was not sent."
-    },
-    "reboot_failed": {
-      "title": "Reboot failed",
-      "description": "The miner rejected the reboot command or the connection was lost."
-    },
-    "no_power_switch": {
-      "title": "No power switch",
-      "description": "Link a power switch entity in integration options to use power control from this repair."
-    },
-    "power_off_failed": {
-      "title": "Power off failed",
-      "description": "Could not turn off the linked switch. Check the entity and try again."
-    },
-    "power_on_failed": {
-      "title": "Power on failed",
-      "description": "Could not turn on the linked switch. Check the entity and try again."
-    },
-    "restart_backend_failed": {
-      "title": "Backend restart failed",
-      "description": "The miner rejected the restart command or the connection was lost."
-    },
-    "refresh_failed": {
-      "title": "Refresh failed",
-      "description": "The miner is still unreachable or the poll did not succeed. Try again later."
-    },
-    "farm_not_loaded": {
-      "title": "Farm not loaded",
-      "description": "The farm integration is not available. Try again after Home Assistant finishes reloading."
-    },
-    "issue_unsupported": {
-      "title": "Unsupported repair",
-      "description": "This repair issue is not recognized by the current integration version."
     }
   }
 }

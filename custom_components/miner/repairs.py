@@ -149,8 +149,7 @@ class MinerRepairFlow(RepairsFlow):
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
     ) -> data_entry_flow.FlowResult:
-        if user_input is not None:
-            action = user_input["action"]
+        if user_input and (action := user_input.get("action")):
             if action == ACTION_CHECKED:
                 return await self._async_dismiss()
             if action == ACTION_REBOOT:
@@ -469,14 +468,13 @@ class FarmRepairFlow(RepairsFlow):
     async def async_step_init(
         self, user_input: dict[str, str] | None = None
     ) -> data_entry_flow.FlowResult:
-        if user_input is not None:
-            action = user_input["action"]
+        if user_input and (action := user_input.get("action")):
             if action == ACTION_CHECKED:
                 return await self._async_dismiss()
             if action == ACTION_RETRY:
                 return await self._async_retry_offline_members()
         return self.async_show_form(
-            step_id="farm_init",
+            step_id="init",
             data_schema=vol.Schema(
                 {
                     vol.Required("action"): selector.SelectSelector(
