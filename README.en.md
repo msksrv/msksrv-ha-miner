@@ -24,14 +24,13 @@ Each miner gets its own device (Antminer, WhatsMiner, Avalon, Innosilicon, Golds
 - [Farm entities](#farm-entities)
 - [Health, recovery, and energy](#health-recovery-and-energy)
 - [Automations](#automations)
-- [Services](#services)
+- [Actions](#actions)
 - [Discovery](#discovery)
 - [Requirements](#requirements)
 - [Security](#security)
 - [Troubleshooting](#troubleshooting)
 - [Reporting bugs](#reporting-bugs)
 - [Limitations](#limitations)
-- [Screenshots](#screenshots)
 - [License](#license)
 
 ---
@@ -45,25 +44,29 @@ Each miner gets its own device (Antminer, WhatsMiner, Avalon, Innosilicon, Golds
 | **Farm** | Totals, emergency stop, bulk pool apply, single- or multi-zone tariff |
 | **Automation** | Services and device actions for reboot, work mode, pools |
 
-Poll interval: **10 seconds**. Unreachable miners show entities as **unavailable** (no fake zero readings).
+The integration polls miners every **10 seconds** and updates farm metrics every **15 seconds**. Live telemetry becomes unavailable when a miner loses connectivity. The farm keeps updating and includes unreachable members in its health assessment.
+
+[Latest stable release](https://github.com/msksrv/msksrv-ha-miner/releases/latest) · [1.7 changelog](CHANGELOG-1.7.md)
 
 ---
 
 ## Installation
 
-### Marketplace and HACS
+### Home Assistant 2026.11 or later
 
-On Home Assistant 2026.11 or later, open **Settings → Marketplace**. On earlier versions, use HACS.
+1. Open **Settings → Marketplace → Add from link**.
+2. Enter `https://github.com/msksrv/msksrv-ha-miner`. Connect GitHub if the Marketplace prompts you.
+3. Open **MSKSRV ASIC Miner** and install the stable version. Restart Home Assistant if prompted.
 
-1. **HACS → Integrations → Custom repositories** (if needed):  
-   `https://github.com/msksrv/msksrv-ha-miner`, category **Integration**.
-2. Install **MSKSRV ASIC Miner** and restart Home Assistant.
+Home Assistant migrates existing HACS repositories and installations when you upgrade. [Marketplace documentation](https://www.home-assistant.io/integrations/marketplace/#custom-repositories)
 
-Or use the HACS button at the top of this README.
+### Home Assistant 2026.3–2026.10 with HACS
 
-### Manual
+In HACS, open **⋮ → Custom repositories**. Add `https://github.com/msksrv/msksrv-ha-miner` with type **Integration**, then download **MSKSRV ASIC Miner** and restart Home Assistant. [HACS documentation](https://www.hacs.xyz/docs/faq/custom_repositories/)
 
-Copy `custom_components/miner` to `config/custom_components/` and restart Home Assistant.
+### Manual installation and updates
+
+Download [miner.zip](https://github.com/msksrv/msksrv-ha-miner/releases/latest/download/miner.zip) from the stable release. Extract its contents into `config/custom_components/miner/` so `manifest.json` sits directly inside `miner`. To update, replace the integration files and keep the existing Home Assistant entries. Restart Home Assistant.
 
 ---
 
@@ -71,7 +74,7 @@ Copy `custom_components/miner` to `config/custom_components/` and restart Home A
 
 Common path: **Settings → Devices & services → Integrations → MSKSRV ASIC Miner**.
 
-Below, **“Integrations”** means that screen; **“Configure”** is the action on the miner or farm **entry row** (not the device page).
+Open **Configure** on the miner or farm entry on the Integrations page to change its options.
 
 ### Add a miner
 
@@ -88,7 +91,11 @@ On a single-miner entry: **Reconfigure** (often under **⋯**) — IP, credentia
 **Configure** on the miner entry:
 
 - **Power switch** — link a `switch` for power on/off buttons.
-- **Stratum pool** — replace primary or append backup (host, port, SSL, worker). Confirmation is required before apply; the miner must be reachable.
+- **Energy source** — automatic selection, physical meter, or estimation from power.
+- **Miner health thresholds** — automatic model profile, generic thresholds, or custom thresholds.
+- **Repair timing** — how long a fault must persist before a Repair opens and how long readings must stay normal before it clears.
+- **Automatic recovery** — reboot for sustained low hashrate, with optional power cycling.
+- **Stratum pool** — replace the primary pool or add a backup. Confirm the change while the miner is reachable.
 
 ---
 
@@ -96,7 +103,7 @@ On a single-miner entry: **Reconfigure** (often under **⋯**) — IP, credentia
 
 A **farm** groups existing miner devices into one virtual device.
 
-1. **Add integration → Farm** → name and miner list.
+1. In the **MSKSRV ASIC Miner** setup flow, choose **Farm**, enter a name, and select miners that report the same algorithm. If a miner's algorithm is unknown, wait for a successful poll.
 2. **Configure** on the farm entry opens a menu:
 
 | Item | Purpose |
@@ -104,7 +111,8 @@ A **farm** groups existing miner devices into one virtual device.
 | **Farm members** | Miner device list |
 | **Room temperature sensors** | `sensor` with `device_class: temperature` |
 | **Pools and workers** | Up to five stratum presets |
-| **Electricity tariff** | Single-rate or two-/three-zone TOU |
+| **Electricity tariff** | A single rate or two or three time-of-use periods with separate rates |
+| **Farm energy meter** | A shared physical meter and the legacy cost sensor option |
 | **Mass actions** | Apply a preset to all members (with confirmation) |
 
 Configure a **power switch** on each member (**Configure** on that miner’s entry) for emergency stop to work.
@@ -125,11 +133,13 @@ Preset pool passwords are not shown again in forms; an empty password field keep
 
 | Platform | Purpose |
 |----------|---------|
-| **sensor** | Hashrate, temperature, pool, power, diagnostics (IP, MAC, firmware…) |
+| **sensor** | Miner telemetry, health and anomaly scores, energy, efficiency, and data quality |
+| **binary_sensor** | Problems with hashrate, temperature, hashboards, fans, pools, and power |
+| **event** | Miner activity, including connectivity changes, pool changes, and recovery actions |
 | **switch** | Pause / resume mining (when supported) |
 | **number** | Power limit (autotuning) |
 | **select** | Power mode; pool priority (≥ 2 pools) |
-| **button** | Reboot; **power on and off** via linked `switch` |
+| **button** | Reboot, linked power switch control, learned baseline controls, and recovery lock reset |
 
 ---
 
@@ -143,26 +153,47 @@ Preset pool passwords are not shown again in forms; an empty password field keep
 | **sensor** | Algorithms | Summary from online members; empty if none report an algorithm |
 | **sensor** | Effective chips, % | Across online members |
 | **sensor** | Room temperature | Linked ambient sensors |
+| **sensor** | Farm health and efficiency | Overall score, unreachable or affected members, expected and lost hashrate, and average efficiency |
+| **sensor** | Farm energy | Lifetime, today, this month, and previous month |
+| **event** | Farm activity | Pool preset and emergency stop results |
 | **sensor** | Electricity cost | When a tariff is configured (day, current and previous month, lifetime, and hourly cost at current draw) |
 | **select** | Pool preset | Slot used by apply buttons |
 | **button** | Apply primary pool | Preset → primary stratum on all members |
 | **button** | Append backup pool | Preset → backup slot |
 | **button** | Emergency stop | Locks automatic recovery and turns off linked switches |
+| **button** | Clear emergency stop | Confirm by pressing twice within 30 seconds |
 
 ---
 
 ## Health, recovery, and energy
 
-- **Health.** Miners and farms report health scores and diagnostics. Miner options include threshold profiles and timing for Home Assistant Repairs.
-- **Automatic recovery.** Off by default. It can reboot a miner after sustained low hashrate. Power cycling requires a linked HA switch and separate opt-in. The farm emergency stop lock survives reloads. Press the clear button twice within 30 seconds to unlock recovery. Clearing the lock does not energize the switch.
-- **Energy.** Miner options support a physical meter or integration from power readings. A farm can sum its members or use a shared meter. In the Energy Dashboard, choose the cumulative kWh sensor for the farm or individual miners. Counting both inflates the reported total.
-- **Upgrading.** Electricity cost sensors use the energy accounting totals. The update disables old cost sensors by default. Farm energy options can re-enable them for existing automations.
+### Health and Repairs
+
+Miner health uses available readings for hashrate, temperatures, fans, hashboards, pools, and reported errors. The integration learns a baseline for the current work mode as readings accumulate. Farm health accounts for unreachable members.
+
+For a persistent issue, open **Settings → System → Repairs**. Actions depend on the issue. For example, a high-temperature Repair can open the threshold form, and a farm connectivity Repair can retry polling. Configure miner-specific delays in the miner options.
+
+### Automatic recovery and emergency stop
+
+Automatic recovery is off by default. It responds to sustained low hashrate by trying a miner reboot first. Power cycling requires a linked Home Assistant switch and separate opt-in.
+
+Farm emergency stop locks automatic recovery for members and turns off linked switches. The lock survives reloads. Press the clear button twice within 30 seconds to remove the lock. Clearing the lock does not turn power on.
+
+### Energy sources and the Energy Dashboard
+
+In **Auto** mode, the integration prefers a physical energy meter, then power from the linked switch's device, then miner-reported power. You can also explicitly select a meter or power sensor. A physical meter uses the `energy` device class and Wh, kWh, or MWh. A power sensor uses the `power` device class and W, kW, or MW.
+
+A farm can sum its members or use a shared meter under **Farm energy meter**. Add a cumulative kWh sensor to **Individual devices** in the Energy Dashboard. If you display the farm and its miners together, set the farm as the upstream device for its miners in the dashboard to avoid double counting. [Home Assistant energy documentation](https://www.home-assistant.io/docs/energy/individual-devices/)
+
+### Electricity cost sensors when upgrading to 1.7
+
+Costs are calculated from recorded energy and the farm tariff. The upgrade disables existing legacy cost sensors by default. If your automations or dashboards use them, switch to the new entities or enable legacy sensors under **Farm energy meter**. Entities you disabled manually stay disabled.
 
 ---
 
 ## Automations
 
-Use `device_id` from **Developer tools → Devices**.
+To find a `device_id`, open **Developer tools → Actions**, select `miner.reboot` and the miner, then switch to YAML mode. For `miner.set_farm_pool`, select the farm device.
 
 ### Reboot a miner
 
@@ -189,7 +220,7 @@ data:
 
 ### Farm-wide pool
 
-Worker string may use `{ip}` or `{ip_last}`.
+In a worker name, `{ip}` expands to the miner IP and `{ip_last}` to the final IPv4 octet.
 
 ```yaml
 action: miner.set_farm_pool
@@ -197,39 +228,61 @@ data:
   device_id:
     - FARM_DEVICE_ID
   mode: manual
-  host: stratum.pool.com
+  host: pool.example.com
   port: 443
   use_ssl: true
   username: user.{ip_last}
 ```
 
+### Notify when a miner goes offline
+
+The integration publishes miner and farm activity to the Home Assistant event bus as `miner_event`. The `type` field identifies the event, and `scope` is `miner` or `farm`. This example triggers after three consecutive failed miner polls.
+
+```yaml
+alias: Miner offline
+triggers:
+  - trigger: event
+    event_type: miner_event
+    event_data:
+      scope: miner
+      type: offline
+      device_id: YOUR_DEVICE_ID
+actions:
+  - action: persistent_notification.create
+    data:
+      title: Miner offline
+      message: Check the miner's power and network connection.
+```
+
 ---
 
-## Services
+<a id="services"></a>
 
-| Service | Description |
+## Actions
+
+| Action | Description |
 |---------|-------------|
 | **`miner.reboot`** | Reboot |
 | **`miner.restart_backend`** | Restart mining process |
 | **`miner.set_work_mode`** | `low` / `normal` / `high` |
-| **`miner.set_pool`** | Change primary or append backup pool |
-| **`miner.set_farm_pool`** | Same for all farm members |
+| **`miner.set_pool`** | `existing` promotes a pool by zero-based index, `manual` replaces the primary pool, and `append` adds a backup |
+| **`miner.set_farm_pool`** | `manual` or `append` for farm members. Provide a host and port |
 
 **`miner.set_farm_pool`**: blocked when algorithms differ. On partial failure (offline miner, firmware reject), some members may already have the new pool — see [Farm](#farm).
 
-`set_pool` / `set_farm_pool` are services only, not device actions.
+Call `miner.set_pool` or `miner.set_farm_pool` for pool changes. The device action picker offers reboot, mining process restart, and work mode.
 
 ---
 
 ## Discovery
 
-DHCP matches **lowercase hostnames** (`whatsminer*`, `antminer*`…) and known **MAC OUIs** (Bitmain `E0A509`, WhatsMiner `C41025` / `C80831`). The integration probes the API up to **3 times** (6 s timeout). Already configured miners are skipped by IP, MAC, and `unique_id`.
+DHCP matches **lowercase hostnames** (`whatsminer*`, `antminer*`…) and known **MAC OUIs** (Bitmain `E0A509`, WhatsMiner `C41025` / `C80831`). For DHCP discovery, the integration makes up to three API probes with a six-second timeout per attempt. Manual scanning accepts IPv4 subnets of up to 1,024 addresses. The integration skips already configured devices.
 
 ---
 
 ## Requirements
 
-- **Home Assistant** ≥ **2026.3.0** (see `hacs.json`).
+- **Home Assistant** 2026.3.0 or later. Integration release 1.7.0 was tested on Core 2026.3.0 and 2026.11.0 with a Bitaxe emulator.
 - **pyasic** `0.78.x` — installed by Home Assistant (`manifest.json`: `pyasic>=0.78.9,<0.79`).
 
 If logs show **`Requirements for miner not found`**: verify Home Assistant can reach **PyPI** and that your Python version is supported. If the error persists, open an [issue](https://github.com/msksrv/msksrv-ha-miner/issues) with the full install log.
@@ -251,7 +304,7 @@ If logs show **`Requirements for miner not found`**: verify Home Assistant can r
 | Miner unavailable | Ping, passwords, firewall, web UI from HA host |
 | No farm cost sensors | Tariff under **Configure**; for zones — currency and positive prices in every zone |
 | Bulk pool apply fails | Log lines `Farm stratum:` — offline, mixed algorithms, bad preset |
-| DHCP never triggers | Hostname patterns in `manifest.json` are **lowercase** |
+| DHCP never triggers | Check discovered integrations. If the miner is missing, scan its IPv4 subnet or enter the IP manually |
 | pyasic install error | Network, proxy, Python; see [Requirements](#requirements) |
 
 ---
@@ -261,11 +314,10 @@ If logs show **`Requirements for miner not found`**: verify Home Assistant can r
 [GitHub Issues](https://github.com/msksrv/msksrv-ha-miner/issues) — include:
 
 1. Home Assistant version  
-2. Integration version (integration **⋮ → System → Information**, or release tag)  
+2. Integration version from Marketplace, HACS, or `custom_components/miner/manifest.json`
 3. Miner model and firmware  
 4. pyasic version (from setup log)  
-5. Integration **diagnostics** (no secrets)  
-6. Relevant log excerpt (no passwords or pool credentials unless necessary)
+5. Steps to reproduce and a relevant log excerpt. Remove passwords and pool credentials from the log.
 
 ---
 
@@ -276,12 +328,6 @@ If logs show **`Requirements for miner not found`**: verify Home Assistant can r
 - Power off/on drives a linked HA `switch` only, not miner-side shutdown APIs.
 
 Supported hardware: [pyasic docs](https://pyasic.readthedocs.io/en/latest/miners/supported_types/).
-
----
-
-## Screenshots
-
-UI screenshots (setup forms, farm menu, device card) live in [`docs/images/`](docs/images/) when published, or in [release assets](https://github.com/msksrv/msksrv-ha-miner/releases).
 
 ---
 
